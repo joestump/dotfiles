@@ -25,6 +25,17 @@ elif [ "$OS" = "Linux" ] && command -v apt-get >/dev/null 2>&1; then
   echo "Linux detected -> using apt (Homebrew is NOT installed on Linux)."
   sudo apt-get update -y
   sudo apt-get install -y zsh git curl ca-certificates gnupg
+
+  # ---- Node 22 (qmd needs >= 22; Ubuntu ships an older nodejs) ----
+  # Runs here in the BEFORE phase so Node is present before run_onchange_install-qmd
+  # (which deliberately won't install Node itself). NodeSource handles the apt repo,
+  # version pinning, and the distro-nodejs -> NodeSource transition.
+  node_major="$(node -v 2>/dev/null | sed 's/^v//; s/\..*//')"
+  if [ -z "$node_major" ] || [ "$node_major" -lt 22 ]; then
+    echo "Installing Node 22 (NodeSource); have: $(node -v 2>/dev/null || echo none)"
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+  fi
 fi
 
 # ---- ~/.ssh dir (the Vault Agent renders SSH keys into it) ----
