@@ -22,7 +22,9 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/j
 ```
 
 Installs Homebrew + tools + Oh My Zsh, clones themes/plugins, and applies
-everything. See [docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md).
+everything. To bootstrap a **remote** box (ie01/ie02) from your laptop in one
+step: `chezmoi ssh <host> https://gitea.stump.rocks/joestump/dotfiles.git`.
+See [docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md).
 
 ## Separation of concerns
 

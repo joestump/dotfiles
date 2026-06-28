@@ -21,6 +21,32 @@ That command:
 You'll be prompted once for Gitea credentials (HTTPS). On macOS they're cached in
 the login keychain thereafter.
 
+## From your laptop: `chezmoi ssh` (for ie01 / ie02)
+
+`chezmoi ssh` (chezmoi ≥ 2.70) does the one-liner *for you over SSH*: it connects
+to the host, installs chezmoi there, runs `chezmoi init --apply <repo>`, and drops
+you into a shell on the box.
+
+```sh
+chezmoi ssh <host> https://gitea.stump.rocks/joestump/dotfiles.git
+```
+
+- **`<host>` must be SSH-reachable from your laptop** — the bare name `ie01` does
+  not resolve here; use its real address: a Tailscale name, an FQDN
+  (`ie01.stump.rocks`), or a `Host ie01` alias in `~/.ssh/config`.
+- It runs the full bootstrap on the remote interactively, so the Ubuntu apt steps
+  can prompt for `sudo`. Add `-p apt` if chezmoi can't auto-detect the package
+  manager when installing itself.
+- `-s=false` skips dropping into a shell afterward; `-- --one-shot <repo>` applies
+  then removes chezmoi (ephemeral boxes — **not** what you want for ie01/ie02).
+
+Equivalent to SSHing in yourself and running the one-liner — just fewer steps.
+
+> **After it finishes**, secrets aren't loaded yet (that needs your identity):
+> on the box, `vault login -method=oidc` (over SSH → use the tunnel; see
+> [secrets.md](secrets.md#remote-machines--ssh)) then `vault-agent start`. That's
+> when `~/.ssh/id_rsa` and the env secrets render on that machine.
+
 ## What the bootstrap does
 
 `run_once_before_10-install-prereqs.sh` (before any file is written; idempotent):
