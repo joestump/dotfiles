@@ -1,0 +1,31 @@
+{
+  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. Secret env values (gitea/github/karakeep tokens) are injected at apply time from OpenBao by the merge scripts; outline is added per-app (http for Code, mcp-remote bridge for Desktop). Edit here, then chezmoi apply.",
+  "chrome-devtools": {
+    "command": "npx",
+    "args": ["chrome-devtools-mcp@latest"],
+    "env": {}
+  },
+  "gitea": {
+    "command": "go",
+    "args": ["run", "gitea.com/gitea/gitea-mcp@latest", "-t", "stdio"],
+    "env": { "GITEA_HOST": "https://gitea.stump.rocks" }
+  },
+  "github": {
+    "command": "docker",
+    "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"],
+    "env": {}
+  },
+  "karakeep": {
+    "command": "npx",
+    "args": ["@karakeep/mcp"],
+    "env": { "KARAKEEP_API_ADDR": "https://karakeep.stump.rocks" }
+  },
+  "signal": {
+    "command": "/opt/homebrew/bin/uv",
+    "args": ["run", "--directory", "/Users/joestump/src/signal-mcp", "server", "--user-id", "+12062257886", "--transport", "stdio"],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "XDG_DATA_HOME": "/Users/joestump/.local/share/claude-desktop"
+    }
+  }
+}

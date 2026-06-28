@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Merge the shared MCP server set into Claude Code (~/.claude.json).
+# Reruns when the base defs or lib change:
+# base hash: {{ include "dot_config/dotfiles/mcp-servers.json" | sha256sum }}
+# lib  hash: {{ include "dot_config/dotfiles/mcp-merge-lib.sh" | sha256sum }}
+set -euo pipefail
+
+. "$HOME/.config/dotfiles/mcp-merge-lib.sh"
+CJ="$HOME/.claude.json"
+[ -f "$CJ" ] || { echo "no ~/.claude.json; skipping"; exit 0; }
+echo "==> Claude Code mcpServers merge"
+
+GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.gitea.env.GITEA_ACCESS_TOKEN // ""'        "$CJ")")"
+GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // ""' "$CJ")")"
+KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$CJ")")"
+
+desired="$(mcp_base | jq --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" '
+    .gitea.env.GITEA_ACCESS_TOKEN              = $gt
+  | .github.env.GITHUB_PERSONAL_ACCESS_TOKEN   = $gh
+  | .karakeep.env.KARAKEEP_API_KEY             = $kk
+  | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
+  | .outline = {type:"http", url:"https://outline.stump.rocks/mcp"}
+')"
+
+mcp_merge "$CJ" "$desired"
