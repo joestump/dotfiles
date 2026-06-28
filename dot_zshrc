@@ -15,7 +15,7 @@ export ZSH="$HOME/.oh-my-zsh"
 #   quantum-zsh/quantum
 #   comfyline_prompt/comfyline      (needs a Powerline/Nerd font)
 #   robbyrussell                    (OMZ built-in fallback)
-ZSH_THEME="powerlevel10k/powerlevel10k"
+ZSH_THEME="spaceship-prompt/spaceship"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -83,6 +83,7 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # here — it is hooked via ~/.oh-my-zsh/custom/direnv.zsh instead.
 plugins=(
   git
+  git-auto-fetch
   gh
   aws
   terraform
@@ -98,6 +99,7 @@ plugins=(
   virtualenv
   npm
   colored-man-pages
+  colorize
   dirhistory
   extract
   jsontools
