@@ -10,14 +10,15 @@ SPACESHIP_PROMPT_ADD_NEWLINE=false
 # Two-line prompt: all the info on line 1, the prompt character alone on line 2.
 SPACESHIP_PROMPT_SEPARATE_LINE=true
 
-# Prompt character: a random zap/sparkle Nerd Font glyph (re-rolled each shell),
+# Prompt character: a random glyph from $PROMPT_GLYPHS (defined in ~/.zshrc),
 # pink, with a trailing space so it isn't jammed against the command you type.
 () {
-  local glyphs=(
-    $''   # zap (bolt)
-    $''   # sparkle (star)
-    $''   # sparkle (star, outline)
-  )
+  local glyphs
+  if (( ${#PROMPT_GLYPHS} )); then
+    glyphs=( "${PROMPT_GLYPHS[@]}" )
+  else
+    glyphs=( $'' $'' $'' )   # fallback: zap, star, heart
+  fi
   SPACESHIP_CHAR_SYMBOL="${glyphs[$((RANDOM % ${#glyphs} + 1))]} "
 }
 SPACESHIP_CHAR_COLOR_SUCCESS=213   # pink (256-color); red still shows on error

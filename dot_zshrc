@@ -17,6 +17,22 @@ export ZSH="$HOME/.oh-my-zsh"
 #   robbyrussell                    (OMZ built-in fallback)
 ZSH_THEME="spaceship-prompt/spaceship"
 
+# Prompt-character glyphs: ~/.oh-my-zsh/custom/spaceship.zsh picks one at random
+# each time a shell starts. Add/remove glyphs here (needs a Nerd Font). Must be
+# set before `source $ZSH/oh-my-zsh.sh` below.
+PROMPT_GLYPHS=(
+  $''   # zap
+  $''   # star
+  $''   # star (outline)
+  $''   # heart
+  $''   # paw
+  $''   # magic wand
+  $''   # rocket
+  $''   # coffee
+  $''   # smiley
+  $''   # moon
+)
+
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
 # a theme from this variable instead of looking in $ZSH/themes/
