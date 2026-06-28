@@ -15,3 +15,4 @@ test/
 !.oh-my-zsh/custom/
 # OMZ ships this example; leave it to OMZ, don't manage it.
 .oh-my-zsh/custom/example.zsh
+website/

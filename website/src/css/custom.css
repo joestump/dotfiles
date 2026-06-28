@@ -1,0 +1,136 @@
+/* ============================================================================
+   StumpCloud Dotfiles — cyberpunk terminal theme
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap');
+
+:root {
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff2e97;
+  --neon-green: #39ff14;
+  --neon-amber: #ffb000;
+  --bg-void: #070a0f;
+  --bg-panel: #0c1018;
+  --bg-elev: #11161f;
+  --grid: rgba(0, 240, 255, 0.05);
+
+  --ifm-color-primary: #00f0ff;
+  --ifm-color-primary-dark: #00d8e6;
+  --ifm-color-primary-darker: #00cbd8;
+  --ifm-color-primary-darkest: #00a6b0;
+  --ifm-color-primary-light: #33f3ff;
+  --ifm-color-primary-lighter: #4df4ff;
+  --ifm-color-primary-lightest: #80f7ff;
+
+  --ifm-background-color: var(--bg-void);
+  --ifm-background-surface-color: var(--bg-panel);
+  --ifm-font-family-base: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ifm-font-family-monospace: 'JetBrains Mono', ui-monospace, monospace;
+  --ifm-heading-font-family: 'Orbitron', 'JetBrains Mono', monospace;
+  --ifm-navbar-background-color: rgba(7, 10, 15, 0.85);
+  --ifm-footer-background-color: #05070b;
+  --ifm-code-background: #0a0f17;
+  --ifm-code-font-size: 0.9em;
+  --ifm-link-color: var(--neon-cyan);
+  --ifm-link-hover-color: var(--neon-magenta);
+  --ifm-heading-color: #e9fbff;
+  --ifm-font-color-base: #c5d6e0;
+  --ifm-toc-link-color: #7f93a3;
+  --ifm-blockquote-color: #9fb3c0;
+  --ifm-table-stripe-background: rgba(0, 240, 255, 0.03);
+  --docusaurus-highlighted-code-line-bg: rgba(255, 46, 151, 0.12);
+}
+
+/* Subtle moving grid + scanlines over the whole page */
+html, body {
+  background-color: var(--bg-void);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0) 4px);
+  mix-blend-mode: overlay;
+  opacity: 0.4;
+}
+
+/* Headings — neon glow */
+h1, h2, h3 { letter-spacing: 0.04em; text-transform: uppercase; }
+.markdown h1, .hero__title {
+  color: #eafdff;
+  text-shadow: 0 0 8px rgba(0,240,255,0.55), 0 0 22px rgba(0,240,255,0.25);
+}
+.markdown h2 {
+  color: var(--neon-cyan);
+  border-bottom: 1px solid rgba(0,240,255,0.25);
+  padding-bottom: 0.3em;
+}
+.markdown h2::before { content: '> '; color: var(--neon-magenta); }
+.markdown h3 { color: var(--neon-magenta); }
+
+a { text-decoration: none; }
+a:hover { text-shadow: 0 0 8px rgba(255,46,151,0.6); }
+
+/* Navbar */
+.navbar {
+  border-bottom: 1px solid rgba(0,240,255,0.25);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 24px rgba(0,240,255,0.08);
+}
+.navbar__title { font-family: var(--ifm-heading-font-family); letter-spacing: 0.18em; color: var(--neon-cyan); }
+.navbar__item, .navbar__link { font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.navbar__link:hover { color: var(--neon-magenta); }
+
+/* Code blocks — terminal panels */
+.theme-code-block, pre[class*='language-'] {
+  border: 1px solid rgba(0,240,255,0.22);
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 8px 30px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,240,255,0.03);
+}
+div[class^='codeBlockTitle'] {
+  background: #060a10 !important;
+  color: var(--neon-green) !important;
+  border-bottom: 1px solid rgba(0,240,255,0.2);
+}
+code {
+  border: 1px solid rgba(0,240,255,0.18);
+  border-radius: 4px;
+  color: var(--neon-green);
+  padding: 0.1em 0.4em;
+}
+
+/* Inline "kbd"-ish, blockquotes as alerts */
+blockquote {
+  border-left: 3px solid var(--neon-magenta);
+  background: linear-gradient(90deg, rgba(255,46,151,0.07), transparent);
+}
+
+/* Sidebar */
+.menu { font-size: 0.85rem; }
+.menu__link { border-radius: 6px; }
+.menu__link--active { color: var(--neon-cyan); background: rgba(0,240,255,0.08); box-shadow: inset 2px 0 0 var(--neon-cyan); }
+.menu__link:hover { color: var(--neon-magenta); background: rgba(255,46,151,0.06); }
+.table-of-contents__link--active { color: var(--neon-cyan); }
+
+/* Tables */
+.markdown table { border: 1px solid rgba(0,240,255,0.18); }
+.markdown th { background: #0a0f17; color: var(--neon-cyan); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Cards / admonitions */
+.theme-admonition { border-radius: 8px; border-width: 1px; }
+
+/* Pagination buttons */
+.pagination-nav__link { border-color: rgba(0,240,255,0.2); }
+.pagination-nav__link:hover { border-color: var(--neon-magenta); box-shadow: 0 0 18px rgba(255,46,151,0.18); }
+
+/* Footer */
+.footer { border-top: 1px solid rgba(0,240,255,0.2); }
+.footer__title { color: var(--neon-cyan); text-transform: uppercase; letter-spacing: 0.1em; }
+
+::selection { background: var(--neon-magenta); color: #05070b; }
