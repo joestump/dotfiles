@@ -1,0 +1,6 @@
+# Go: put `go install` output ($GOPATH/bin) and your personal ~/bin on PATH.
+# The `go` binary itself already comes from macOS path_helper (/etc/paths.d/go);
+# this only adds the user bin dirs that path_helper does not.
+export GOPATH="${GOPATH:-$HOME/go}"
+typeset -U path            # keep PATH entries unique (no duplicates on re-source)
+path=("$HOME/bin" "$GOPATH/bin" $path)
