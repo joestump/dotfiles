@@ -10,6 +10,7 @@ self-updates the rest of its tree and is never touched by chezmoi.
 ## Docs
 
 - **[docs/usage.md](docs/usage.md)** — day-to-day: add helpers, swap themes, plugins, direnv.
+- **[docs/packages.md](docs/packages.md)** — declarative tooling (Brewfile, Go tools) on macOS + Ubuntu.
 - **[docs/secrets.md](docs/secrets.md)** — OpenBao + Vault Agent: how secrets reach your shell.
 - **[docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md)** — one-command setup on any machine.
 - **[Architecture.md](Architecture.md)** — design rationale and decisions.
@@ -38,13 +39,16 @@ blocks accidental secret commits.
 
 ```
 dot_zshrc                          → ~/.zshrc  (theme + plugins; seeded from OMZ)
-dot_oh-my-zsh/custom/*.zsh         → ~/.oh-my-zsh/custom/  (helpers: vault-login, direnv)
+dot_oh-my-zsh/custom/*.zsh         → ~/.oh-my-zsh/custom/  (helpers + secrets loader)
+dot_Brewfile                       → ~/.Brewfile  (declarative tooling; brew bundle)
+dot_config/dotfiles/go-tools.txt   → Go tools to `go install`
+dot_config/vault/                  → Vault Agent config + Consul-Templates
 .chezmoiexternal.toml              → clones themes + external plugins on apply
-run_once_before_*.sh               → bootstrap a new machine (brew, OMZ, tools)
-run_once_after_*.sh                → wire the gitleaks git hook
-.chezmoiignore                     → keep chezmoi to .zshrc + custom/ only
+run_once_before_*.sh               → bootstrap: Homebrew + Oh My Zsh (+ apt prereqs on Linux)
+run_once_after_*.sh                → brew bundle + Go tools + vault; wire the gitleaks hook
+.chezmoiignore                     → keep chezmoi to .zshrc + custom/ (+ a few managed files)
 .githooks/  .gitleaks.toml         → secret-leak prevention
-examples/  docs/                   → repo-only (not applied to $HOME)
+examples/  docs/  scripts/  test/  → repo-only (not applied to $HOME)
 ```
 
 ### Themes (swap via `ZSH_THEME` in `~/.zshrc`)

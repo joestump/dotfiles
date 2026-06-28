@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# chezmoi run_once_ script: runs AFTER chezmoi writes files, so ~/.Brewfile and
+# ~/.config/dotfiles/go-tools.txt exist. Installs all tooling declaratively.
+# Idempotent: brew bundle / go install skip what's already present.
+set -euo pipefail
+
+# Put brew on PATH (Apple Silicon / Intel / Linux).
+for p in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+  [ -x "$p" ] && eval "$("$p" shellenv)" && break
+done
+
+# ---- Homebrew bundle (the tool list) ----
+if command -v brew >/dev/null 2>&1 && [ -f "$HOME/.Brewfile" ]; then
+  echo "==> brew bundle (~/.Brewfile)"
+  brew bundle --global || echo "WARN: brew bundle had failures (re-run: brew bundle --global)"
+fi
+
+# ---- vault (OpenBao-compatible client), OS-aware. Kept out of the Brewfile to
+#      avoid hashicorp/tap trust friction. Idempotent: skips if already present. ----
+ensure_vault() {
+  command -v vault >/dev/null 2>&1 && return 0
+  case "$(uname -s)" in
+    Darwin)
+      brew tap hashicorp/tap >/dev/null 2>&1 || true
+      brew trust hashicorp/tap >/dev/null 2>&1 || true
+      brew trust --formula hashicorp/tap/vault >/dev/null 2>&1 || true
+      brew install hashicorp/tap/vault || echo "WARN: brew install hashicorp/tap/vault failed"
+      ;;
+    Linux)
+      echo "==> installing vault via HashiCorp apt repo"
+      sudo apt-get install -y gnupg curl >/dev/null 2>&1 || true
+      curl -fsSL https://apt.releases.hashicorp.com/gpg \
+        | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+        | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
+      sudo apt-get update -y && sudo apt-get install -y vault || echo "WARN: apt install vault failed"
+      ;;
+  esac
+}
+ensure_vault
+
+# ---- Go tools ----
+GO_TOOLS="$HOME/.config/dotfiles/go-tools.txt"
+if command -v go >/dev/null 2>&1 && [ -f "$GO_TOOLS" ]; then
+  echo "==> go install (from go-tools.txt)"
+  while IFS= read -r mod; do
+    case "$mod" in ''|\#*) continue ;; esac          # skip blanks + comments
+    echo "   go install $mod"
+    go install "$mod" || echo "   WARN: go install $mod failed"
+  done < "$GO_TOOLS"
+fi
+
+echo "==> packages installed"

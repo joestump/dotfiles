@@ -23,19 +23,20 @@ the login keychain thereafter.
 
 ## What the bootstrap does
 
-`run_once_before_10-install-prereqs.sh` (runs once per machine, before any file
-is written — every step is idempotent):
+`run_once_before_10-install-prereqs.sh` (before any file is written; idempotent):
 
-- installs **Homebrew** if missing,
-- `brew install chezmoi direnv gitleaks fzf zoxide` (+ the `vault` CLI from
-  `hashicorp/tap` — the OpenBao-compatible client),
+- on **Ubuntu**, `apt-get install` Homebrew's prerequisites (build-essential, etc.),
+- installs **Homebrew** if missing (macOS + Linux),
 - installs **Oh My Zsh** if `~/.oh-my-zsh` is absent, using
-  `RUNZSH=no KEEP_ZSHRC=yes` so it **never** overwrites the chezmoi-managed
-  `~/.zshrc`.
+  `RUNZSH=no KEEP_ZSHRC=yes` so it **never** overwrites the chezmoi-managed `~/.zshrc`.
 
-`run_once_after_20-configure-git-hooks.sh` sets `core.hooksPath=.githooks` in the
-freshly-cloned source repo (git clone doesn't carry that local config), wiring the
-gitleaks pre-commit hook.
+Then chezmoi writes the files (including `~/.Brewfile`), and the **after** scripts run:
+
+- `run_once_after_10-install-packages.sh` → `brew bundle --global` (the tool list),
+  Go tools from `go-tools.txt`, and an OS-aware `vault` install. See
+  [docs/packages.md](packages.md).
+- `run_once_after_20-configure-git-hooks.sh` → sets `core.hooksPath=.githooks`
+  (git clone doesn't carry it), wiring the gitleaks pre-commit hook.
 
 ## After first apply
 

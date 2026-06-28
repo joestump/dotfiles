@@ -1,0 +1,35 @@
+# ~/.Brewfile — the single source of truth for CLI tooling.
+# Installed with `brew bundle --global` (run automatically by the chezmoi
+# bootstrap, and any time: `brew bundle --global`).
+#
+# Cross-platform: works on macOS and on Ubuntu/Linux via Homebrew. `cask` lines
+# are macOS-only and guarded with `if OS.mac?`.
+#
+# ADD NEW TOOLING HERE — drop a `brew "name"` line, run `chezmoi apply` (or
+# `brew bundle --global`), and never remember the install command again.
+
+# NOTE: `vault` (the OpenBao-compatible client) is intentionally NOT here. It
+# lives in hashicorp/tap (macOS) or HashiCorp's apt repo (Ubuntu) and is
+# installed by an OS-aware step in run_once_after_10-install-packages.sh. Keeping
+# it out of the Brewfile avoids tap-trust friction so `brew bundle check` is clean.
+
+# ---- Required: tooling this dotfiles setup depends on ----
+brew "chezmoi"
+brew "direnv"
+brew "gitleaks"
+brew "fzf"
+brew "zoxide"
+brew "bats-core"               # test runner for this repo
+
+# ---- Optional: uncomment what you want; this is your "don't think about it"
+#      list. Nothing below installs until you uncomment it. ----
+# brew "go"                    # also enables the Go tools manifest (go-tools.txt)
+# brew "jq"
+# brew "ripgrep"
+# brew "eza"
+# brew "bat"
+# brew "kubernetes-cli"
+# brew "awscli"
+
+# ---- macOS-only ----
+# cask "font-meslo-lg-nerd-font" if OS.mac?   # Nerd Font for spaceship / powerlevel10k
