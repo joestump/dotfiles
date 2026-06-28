@@ -14,8 +14,10 @@ ensure_cargo() {
   case "$(uname -s)" in
     Darwin)
       command -v brew >/dev/null 2>&1 || { echo "ERROR: Homebrew required to install Rust on macOS"; exit 1; }
-      brew list rustup >/dev/null 2>&1 || brew list rustup-init >/dev/null 2>&1 || brew install rustup-init
-      rustup-init -y --no-modify-path        # we manage PATH via custom/cargo.zsh
+      # Homebrew's `rustup` formula replaced `rustup-init`; it is keg-only.
+      brew list rustup >/dev/null 2>&1 || brew install rustup
+      export PATH="$(brew --prefix rustup)/bin:$PATH"
+      rustup default stable                  # install + set the default toolchain (creates cargo)
       ;;
     Linux)
       command -v apt-get >/dev/null 2>&1 || { echo "ERROR: no apt-get; install Rust manually, then re-apply"; exit 1; }
