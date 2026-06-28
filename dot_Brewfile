@@ -42,4 +42,4 @@ brew "chroma"                  # syntax highlighter — backend for the colorize
 # brew "awscli"
 
 # ---- macOS-only ----
-# cask "font-meslo-lg-nerd-font" if OS.mac?   # Nerd Font for spaceship / powerlevel10k
+cask "font-meslo-lg-nerd-font" if OS.mac?     # Nerd Font for spaceship / powerlevel10k glyphs
