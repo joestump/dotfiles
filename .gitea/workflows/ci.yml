@@ -54,7 +54,8 @@ jobs:
           done
 
       - name: yamllint — workflows
-        run: yamllint -d "{extends: relaxed, rules: {truthy: disable, line-length: disable, document-start: disable}}" .gitea/workflows
+        run: |
+          yamllint -d "{extends: relaxed, rules: {truthy: disable, line-length: disable, document-start: disable}}" .gitea/workflows
 
       - name: gitleaks — secret scan
         run: |
