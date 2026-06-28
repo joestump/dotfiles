@@ -22,7 +22,8 @@ ensure_cargo() {
       command -v brew >/dev/null 2>&1 || skip "Homebrew required to install Rust on macOS"
       # Homebrew's `rustup` formula replaced `rustup-init`; it is keg-only.
       brew list rustup >/dev/null 2>&1 || brew install rustup || skip "brew install rustup failed"
-      export PATH="$(brew --prefix rustup)/bin:$PATH"
+      local rustup_prefix; rustup_prefix="$(brew --prefix rustup)/bin"
+      export PATH="$rustup_prefix:$PATH"
       rustup default stable || skip "rustup default stable failed"   # install + set default toolchain
       ;;
     Linux)
