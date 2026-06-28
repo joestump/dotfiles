@@ -88,8 +88,50 @@ commit, push.
 **Apply elsewhere:** `chezmoi init --apply https://gitea.stump.rocks/joestump/dotfiles.git`,
 then `chezmoi update` to pull + apply.
 
+## Portability & "my own Oh My Zsh ecosystem"
+
+Three chezmoi features make this fully portable to any machine with Gitea access:
+
+1. **`chezmoi init --apply <repo>`** — one command clones + applies everything.
+2. **`run_once_` scripts** — `run_once_before_10-install-prereqs.sh` installs
+   Homebrew, the CLI tools, and Oh My Zsh (with `KEEP_ZSHRC=yes` so it never
+   clobbers the managed `.zshrc`); `run_once_after_20-configure-git-hooks.sh`
+   wires `core.hooksPath` (not carried by `git clone`).
+3. **`.chezmoiexternal.toml`** — declares external git repos (themes + external
+   plugins) that chezmoi clones into `~/.oh-my-zsh/custom/` on apply and keeps
+   refreshed. This is the "own ecosystem" layer: curated upstreams, not vendored.
+
+## Themes & plugins
+
+- Themes (externals, swap via `ZSH_THEME`): `spaceship-prompt/spaceship`
+  (default — Joe's favorite), `powerlevel10k/powerlevel10k`, `quantum-zsh/quantum`.
+  Installing many and switching by one line is supported.
+- External plugins (externals): `zsh-autosuggestions`, `zsh-syntax-highlighting`
+  (kept last in `plugins=()`).
+- Bundled plugins enabled: git, gh, aws, terraform, kubectl, kubectx, helm,
+  docker, docker-compose, brew, macos, python, pip, virtualenv, npm,
+  colored-man-pages, dirhistory, extract, jsontools, fzf, zoxide.
+- `direnv` is hooked via `custom/direnv.zsh`, NOT the OMZ direnv plugin (avoids a
+  double hook; keeps the hook explicit and guarded).
+
+## Secrets — OpenBao (status: PENDING decision)
+
+`~/.zprofile` currently holds plaintext secrets (AWS, OpenAI, LiteLLM, Gemini,
+Pocket ID, Gitea token, Garage S3). These are **not** committed and `.zprofile`
+is not chezmoi-managed. The target design:
+
+- Store secrets in OpenBao (`https://vault.stump.rocks`).
+- Manage a `private_dot_zprofile.tmpl` that references **bao paths only** (no
+  secret values), rendered at `chezmoi apply` time via chezmoi's vault template
+  function (`[vault] command = "bao"` in the chezmoi config), writing
+  `~/.zprofile` at mode 0600 — never committed.
+- Rotate the currently-exposed credentials.
+
+Open until Joe chooses how to load values into OpenBao.
+
 ## Open / future ideas
 
+- Migrate `.zprofile` secrets to OpenBao templating (see above).
 - Add more helpers as needed (aws profile switchers, k8s context helpers).
-- Consider a `run_once_` chezmoi script to `brew install` prereqs on new machines.
-- Optional: machine-specific config via chezmoi templates if a second host appears.
+- Optional: machine-specific config via chezmoi templates if hosts diverge.
+- Nerd Font cask in bootstrap if a non-interactive font install is acceptable.

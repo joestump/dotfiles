@@ -1,0 +1,34 @@
+# chezmoi externals — THIS is what makes "my own Oh My Zsh ecosystem" portable.
+# On `chezmoi apply`, chezmoi clones these git repos into the target paths and
+# keeps them refreshed (refreshPeriod). They are NOT vendored into this repo, so
+# the dotfiles repo stays small and the upstreams stay updatable.
+#
+# Update them on demand with:  chezmoi apply --refresh-externals
+# (or they auto-refresh after the refreshPeriod elapses).
+
+# ---------- External Oh My Zsh plugins (not bundled with OMZ) ----------
+[".oh-my-zsh/custom/plugins/zsh-autosuggestions"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-autosuggestions.git"
+    refreshPeriod = "168h"
+
+[".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+    refreshPeriod = "168h"
+
+# ---------- Themes (install many, swap via ZSH_THEME in ~/.zshrc) ----------
+[".oh-my-zsh/custom/themes/spaceship-prompt"]
+    type = "git-repo"
+    url = "https://github.com/spaceship-prompt/spaceship-prompt.git"
+    refreshPeriod = "168h"
+
+[".oh-my-zsh/custom/themes/powerlevel10k"]
+    type = "git-repo"
+    url = "https://github.com/romkatv/powerlevel10k.git"
+    refreshPeriod = "168h"
+
+[".oh-my-zsh/custom/themes/quantum-zsh"]
+    type = "git-repo"
+    url = "https://github.com/calebephrem/quantum-zsh.git"
+    refreshPeriod = "168h"

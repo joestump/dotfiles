@@ -1,58 +1,61 @@
 # dotfiles
 
-Personal dotfiles, managed with [chezmoi](https://www.chezmoi.io/) and backed by
-self-hosted Gitea at <https://gitea.stump.rocks/joestump/dotfiles> (private).
+Personal dotfiles, managed with [chezmoi](https://www.chezmoi.io/), backed by
+self-hosted Gitea at <https://gitea.stump.rocks/joestump/dotfiles> (private), and
+layered on an existing [Oh My Zsh](https://ohmyz.sh/) install.
 
-Integrated with an existing [Oh My Zsh](https://ohmyz.sh/) install. chezmoi
-manages **only** `~/.zshrc` and the contents of `~/.oh-my-zsh/custom/`. OMZ
+chezmoi manages **only** `~/.zshrc` and `~/.oh-my-zsh/custom/`. Oh My Zsh
 self-updates the rest of its tree and is never touched by chezmoi.
+
+## Docs
+
+- **[docs/usage.md](docs/usage.md)** — day-to-day: add helpers, swap themes, plugins, direnv, secrets.
+- **[docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md)** — one-command setup on any machine.
+- **[Architecture.md](Architecture.md)** — design rationale and decisions.
+
+## Set up on a new machine (one command)
+
+```sh
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+```
+
+Installs Homebrew + tools + Oh My Zsh, clones themes/plugins, and applies
+everything. See [docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md).
 
 ## Separation of concerns
 
 | Kind | Where it lives | Example |
 | --- | --- | --- |
-| Shell helper functions | one `*.zsh` file per helper in `~/.oh-my-zsh/custom/` (OMZ auto-sources these) | `custom/vault-login.zsh` |
-| Non-secret config | direnv `.envrc` files in each project (hostnames, ports, AWS profiles, regions) | [`examples/envrc.example`](examples/envrc.example) |
-| Secrets | **never** in env files or this repo — fetched at runtime from OpenBao (<https://vault.stump.rocks>) via `bao kv get` | inside `vault-login`, commented in the `.envrc` example |
+| Shell helper functions | one `*.zsh` per helper in `~/.oh-my-zsh/custom/` (OMZ auto-sources) | `dot_oh-my-zsh/custom/vault-login.zsh` |
+| Non-secret config | direnv `.envrc` per project | [`examples/envrc.example`](examples/envrc.example) |
+| Secrets | **never** in env files or this repo — fetched at runtime from OpenBao (<https://vault.stump.rocks>) via `bao kv get` | inside `vault-login` |
 
-No dotenvx. No committed `.env`. No second secrets path. A `gitleaks`
-pre-commit hook blocks accidental secret commits.
+No dotenvx. No `python-dotenv`. No committed `.env`. A `gitleaks` pre-commit hook
+blocks accidental secret commits.
 
-## Add a helper (the convention)
+## What's in here
 
-1. Drop a `*.zsh` file in `~/.oh-my-zsh/custom/` — OMZ auto-loads it on next shell.
-   ```sh
-   $EDITOR ~/.oh-my-zsh/custom/my-helper.zsh
-   ```
-2. Bring it under chezmoi management, then commit and push:
-   ```sh
-   chezmoi add ~/.oh-my-zsh/custom/my-helper.zsh
-   chezmoi cd
-   git add -A && git commit -m "Add my-helper" && git push
-   exit
-   ```
+```
+dot_zshrc                          → ~/.zshrc  (theme + plugins; seeded from OMZ)
+dot_oh-my-zsh/custom/*.zsh         → ~/.oh-my-zsh/custom/  (helpers: vault-login, direnv)
+.chezmoiexternal.toml              → clones themes + external plugins on apply
+run_once_before_*.sh               → bootstrap a new machine (brew, OMZ, tools)
+run_once_after_*.sh                → wire the gitleaks git hook
+.chezmoiignore                     → keep chezmoi to .zshrc + custom/ only
+.githooks/  .gitleaks.toml         → secret-leak prevention
+examples/  docs/                   → repo-only (not applied to $HOME)
+```
 
-## Apply on another machine
+### Themes (swap via `ZSH_THEME` in `~/.zshrc`)
+
+`spaceship-prompt/spaceship` (default) · `powerlevel10k/powerlevel10k` ·
+`quantum-zsh/quantum`. Installed as externals — see
+[docs/usage.md](docs/usage.md#swap-the-prompt-theme).
+
+## Add a helper (quick reference)
 
 ```sh
-# Prereqs: brew install chezmoi direnv gitleaks ; Oh My Zsh already installed.
-chezmoi init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+$EDITOR ~/.oh-my-zsh/custom/my-helper.zsh
+chezmoi add ~/.oh-my-zsh/custom/my-helper.zsh
+chezmoi cd && git add -A && git commit -m "Add my-helper" && git push && exit
 ```
-
-Thereafter, pull and apply updates with:
-
-```sh
-chezmoi update     # git pull + chezmoi apply
-```
-
-## What chezmoi manages here
-
-```
-~/.zshrc                          (seeded verbatim from the OMZ-generated file)
-~/.oh-my-zsh/custom/vault-login.zsh
-~/.oh-my-zsh/custom/direnv.zsh     (eval "$(direnv hook zsh)")
-```
-
-`.chezmoiignore` guarantees nothing else under `~/.oh-my-zsh/` is managed.
-
-See [Architecture.md](Architecture.md) for the full design rationale.

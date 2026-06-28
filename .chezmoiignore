@@ -1,6 +1,7 @@
 # Repo-only files: present in the source repo, never applied to $HOME.
 README.md
 Architecture.md
+docs/
 examples/
 
 # Oh My Zsh self-manages its own tree and self-updates it. chezmoi must manage
