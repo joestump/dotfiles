@@ -2,12 +2,31 @@
 # (oh-my-zsh.sh: custom at ~line 209, theme at ~214), so these take effect.
 
 # Always show the hostname so I can tell which machine I'm on (laptop, ie01, …).
-# Spaceship otherwise only shows it over SSH.
 SPACESHIP_HOST_SHOW=always
 
-# Drop the blank line Spaceship inserts above each prompt.
+# No blank line above the prompt.
 SPACESHIP_PROMPT_ADD_NEWLINE=false
 
-# Keep the prompt character (➜) on the SAME line as the info, not its own line.
-# (Set back to true if you want the two-line prompt with full-width input.)
-SPACESHIP_PROMPT_SEPARATE_LINE=false
+# Two-line prompt: all the info on line 1, the prompt character alone on line 2.
+SPACESHIP_PROMPT_SEPARATE_LINE=true
+
+# Prompt character: a RANDOM cute Nerd Font glyph, re-rolled every shell start.
+# (Anonymous function so `glyphs` stays local; SPACESHIP_CHAR_SYMBOL is global.)
+() {
+  local glyphs=(
+    $''  # paw
+    $''  # heart
+    $''  # star
+    $''  # rocket
+    $''  # coffee
+    $''  # smiley
+    $''  # leaf
+    $''  # music note
+    $''  # gift
+    $''  # magic wand
+    $''  # spark
+    $''  # moon
+  )
+  SPACESHIP_CHAR_SYMBOL="${glyphs[$((RANDOM % ${#glyphs} + 1))]} "
+}
+SPACESHIP_CHAR_COLOR_SUCCESS=magenta   # cuter than the default green
