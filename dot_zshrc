@@ -23,14 +23,10 @@ ZSH_THEME="spaceship-prompt/spaceship"
 PROMPT_GLYPHS=(
   $''   # zap
   $''   # star
-  $''   # star (outline)
   $''   # heart
   $''   # paw
-  $''   # magic wand
   $''   # rocket
   $''   # coffee
-  $''   # smiley
-  $''   # moon
 )
 
 # Set list of themes to pick from when loading at random
