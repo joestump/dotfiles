@@ -117,9 +117,17 @@ plugins=(
   jsontools
   fzf
   zoxide
+  zsh-ai
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
+
+# zsh-ai (matheusml/zsh-ai): type `# describe what you want` + Enter to turn it
+# into a shell command. API keys come from the environment — OPENAI_API_KEY,
+# GEMINI_API_KEY, etc. are exported by the Vault Agent. Switch backends with
+# ZSH_AI_PROVIDER (openai | anthropic | gemini | ollama). Set before oh-my-zsh loads.
+export ZSH_AI_PROVIDER="openai"
+export ZSH_AI_PROMPT_EXTEND="Prefer rg over grep, fd over find, eza over ls, and bat over cat."
 
 source $ZSH/oh-my-zsh.sh
 

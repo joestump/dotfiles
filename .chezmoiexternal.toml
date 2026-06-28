@@ -17,6 +17,11 @@
     url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
     refreshPeriod = "168h"
 
+[".oh-my-zsh/custom/plugins/zsh-ai"]
+    type = "git-repo"
+    url = "https://github.com/matheusml/zsh-ai.git"
+    refreshPeriod = "168h"
+
 # ---------- Themes (install many, swap via ZSH_THEME in ~/.zshrc) ----------
 [".oh-my-zsh/custom/themes/spaceship-prompt"]
     type = "git-repo"
