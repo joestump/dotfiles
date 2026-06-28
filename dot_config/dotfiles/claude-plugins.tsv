@@ -1,0 +1,11 @@
+# Claude Code plugins to ensure installed. One per line:
+#   <marketplace-add source>  <plugin>@<marketplace-name>
+# Whitespace-separated; # comments allowed. The marketplace source may be a
+# GitHub owner/repo, a full git URL (e.g. Gitea), or a local path.
+# Add a line + `chezmoi apply` to install it everywhere. Sync with `claude plugin update`.
+# GitHub marketplaces add directly by owner/repo. The private Gitea one is a
+# LOCAL PATH (chezmoi external clones it to ~/.config/claude-marketplaces/).
+tobi/qmd                                       qmd@qmd
+joestump/claude-plugin-sdd                     sdd@claude-plugin-sdd
+joestump/claude-skills                         claude-skills@joestump
+~/.config/claude-marketplaces/claude-personal  personal@claude-personal

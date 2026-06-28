@@ -37,3 +37,12 @@
     type = "git-repo"
     url = "https://gitlab.com/imnotpua/comfyline_prompt.git"
     refreshPeriod = "168h"
+
+# ---------- Private Claude skills marketplace (Gitea) ----------
+# Cloned locally because `claude plugin marketplace add` can't HTTP-fetch a
+# private Gitea repo (404). chezmoi keeps it synced (refreshPeriod); the plugin
+# install script adds it as a local-path marketplace.
+[".config/claude-marketplaces/claude-personal"]
+    type = "git-repo"
+    url = "https://gitea.stump.rocks/joestump/claude-personal.git"
+    refreshPeriod = "168h"
