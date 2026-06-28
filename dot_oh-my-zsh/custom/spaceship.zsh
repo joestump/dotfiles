@@ -7,3 +7,7 @@ SPACESHIP_HOST_SHOW=always
 
 # Drop the blank line Spaceship inserts above each prompt.
 SPACESHIP_PROMPT_ADD_NEWLINE=false
+
+# Keep the prompt character (➜) on the SAME line as the info, not its own line.
+# (Set back to true if you want the two-line prompt with full-width input.)
+SPACESHIP_PROMPT_SEPARATE_LINE=false
