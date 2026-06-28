@@ -1,0 +1,14 @@
+# Repo-only files: present in the source repo, never applied to $HOME.
+README.md
+Architecture.md
+examples/
+
+# Oh My Zsh self-manages its own tree and self-updates it. chezmoi must manage
+# ONLY ~/.oh-my-zsh/custom/. Use non-recursive '*' here: gitignore semantics
+# forbid re-including children of a fully-excluded directory, so excluding
+# '.oh-my-zsh/**' would also swallow custom/. Excluding only the direct children
+# lets us re-include the custom/ dir below.
+.oh-my-zsh/*
+!.oh-my-zsh/custom/
+# OMZ ships this example; leave it to OMZ, don't manage it.
+.oh-my-zsh/custom/example.zsh

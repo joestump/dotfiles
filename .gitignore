@@ -1,0 +1,12 @@
+# NEVER commit secrets or real local env files. Secrets come from OpenBao at
+# runtime (see examples/envrc.example), not from files in this repo.
+.env
+.env.*
+*.local
+.envrc
+!examples/*.example
+.direnv/
+
+# chezmoi local state / OS cruft
+.DS_Store
+chezmoistate.boltdb

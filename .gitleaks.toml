@@ -1,0 +1,10 @@
+# gitleaks config — extends the built-in ruleset.
+# https://github.com/gitleaks/gitleaks
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example/config files contain no real secrets — they reference bao kv get at runtime."
+paths = [
+  '''examples/envrc\.example''',
+]

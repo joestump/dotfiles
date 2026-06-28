@@ -1,0 +1,27 @@
+# Example .envrc — NON-SECRET project configuration only.
+#
+# Usage: copy this into a project directory as `.envrc`, edit, then:
+#     direnv allow
+#
+# RULES (enforced by this repo's separation of concerns):
+#   • Non-secret config (hostnames, ports, AWS profiles, regions) goes HERE.
+#   • Secrets are NEVER written to this file or committed anywhere. Fetch them
+#     at runtime from OpenBao (https://vault.stump.rocks) with `bao kv get`.
+
+# ----------------------------------------------------------------------------
+# Non-secret config (safe to commit alongside a project)
+# ----------------------------------------------------------------------------
+export AWS_PROFILE="stumpcloud-dev"
+export AWS_REGION="us-west-2"
+export SERVICE_HOST="api.internal.stump.rocks"
+export SERVICE_PORT="8443"
+
+# ----------------------------------------------------------------------------
+# Secrets — fetched at runtime, NEVER stored in this file
+# ----------------------------------------------------------------------------
+# Requires `bao` authenticated against OpenBao. The values below are pulled
+# into the environment on `direnv allow`; nothing secret is persisted to disk.
+#
+# export VAULT_ADDR="https://vault.stump.rocks"
+# export DATABASE_URL="$(bao kv get -field=url   secret/myproject/db)"
+# export API_TOKEN="$(bao kv get -field=token secret/myproject/api)"
