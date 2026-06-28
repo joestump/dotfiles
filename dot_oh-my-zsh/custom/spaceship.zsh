@@ -10,23 +10,14 @@ SPACESHIP_PROMPT_ADD_NEWLINE=false
 # Two-line prompt: all the info on line 1, the prompt character alone on line 2.
 SPACESHIP_PROMPT_SEPARATE_LINE=true
 
-# Prompt character: a RANDOM cute Nerd Font glyph, re-rolled every shell start.
-# (Anonymous function so `glyphs` stays local; SPACESHIP_CHAR_SYMBOL is global.)
+# Prompt character: a random zap/sparkle Nerd Font glyph (re-rolled each shell),
+# pink, with a trailing space so it isn't jammed against the command you type.
 () {
   local glyphs=(
-    $''  # paw
-    $''  # heart
-    $''  # star
-    $''  # rocket
-    $''  # coffee
-    $''  # smiley
-    $''  # leaf
-    $''  # music note
-    $''  # gift
-    $''  # magic wand
-    $''  # spark
-    $''  # moon
+    $''   # zap (bolt)
+    $''   # sparkle (star)
+    $''   # sparkle (star, outline)
   )
   SPACESHIP_CHAR_SYMBOL="${glyphs[$((RANDOM % ${#glyphs} + 1))]} "
 }
-SPACESHIP_CHAR_COLOR_SUCCESS=magenta   # cuter than the default green
+SPACESHIP_CHAR_COLOR_SUCCESS=213   # pink (256-color); red still shows on error
