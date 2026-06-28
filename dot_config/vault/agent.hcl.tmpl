@@ -49,3 +49,16 @@ template {
   destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.env"
   perms       = "0600"
 }
+
+# SSH keys rendered as FILES (not env). Source of truth = OpenBao
+# secret/personal/ssh. The agent keeps ~/.ssh/id_rsa{,.pub} in sync on a schedule.
+template {
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-id_rsa.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.ssh/id_rsa"
+  perms       = "0600"
+}
+template {
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-id_rsa-pub.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.ssh/id_rsa.pub"
+  perms       = "0644"
+}

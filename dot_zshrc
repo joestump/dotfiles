@@ -15,7 +15,7 @@ export ZSH="$HOME/.oh-my-zsh"
 #   quantum-zsh/quantum
 #   comfyline_prompt/comfyline      (needs a Powerline/Nerd font)
 #   robbyrussell                    (OMZ built-in fallback)
-ZSH_THEME="spaceship-prompt/spaceship"
+ZSH_THEME="comfyline_prompt/comfyline"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load

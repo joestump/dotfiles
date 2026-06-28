@@ -27,6 +27,9 @@ elif [ "$OS" = "Linux" ] && command -v apt-get >/dev/null 2>&1; then
   sudo apt-get install -y zsh git curl ca-certificates gnupg
 fi
 
+# ---- ~/.ssh dir (the Vault Agent renders SSH keys into it) ----
+mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+
 # ---- Oh My Zsh (both OSes; never overwrite the chezmoi-managed ~/.zshrc) ----
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
   echo "Installing Oh My Zsh (keeping chezmoi-managed .zshrc)..."
