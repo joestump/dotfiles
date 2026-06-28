@@ -21,10 +21,19 @@ brew "fzf"
 brew "zoxide"
 brew "bats-core"               # test runner for this repo
 
+# ---- Everyday CLIs (the usual suspects) ----
+brew "jq"                      # JSON processor
+brew "yq"                      # YAML/JSON/XML processor
+brew "curl"
+brew "vim"
+brew "wget"
+brew "gh"                      # GitHub CLI
+brew "tea"                     # Gitea CLI (gitea.com/gitea/tea)
+# (vault — the OpenBao client — is installed OS-aware; see the note above.)
+
 # ---- Optional: uncomment what you want; this is your "don't think about it"
 #      list. Nothing below installs until you uncomment it. ----
 # brew "go"                    # also enables the Go tools manifest (go-tools.txt)
-# brew "jq"
 # brew "ripgrep"
 # brew "eza"
 # brew "bat"

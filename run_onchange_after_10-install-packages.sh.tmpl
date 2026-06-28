@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# chezmoi run_once_ script: runs AFTER chezmoi writes files, so ~/.Brewfile and
-# ~/.config/dotfiles/go-tools.txt exist. Installs all tooling declaratively.
-# Idempotent: brew bundle / go install skip what's already present.
+# chezmoi run_onchange_ script: reruns whenever the manifests below change (their
+# hashes are embedded, so editing ~/.Brewfile or go-tools.txt re-triggers it on
+# the next `chezmoi apply`). Installs all tooling declaratively + idempotently.
+#
+# Brewfile hash:   {{ include "dot_Brewfile" | sha256sum }}
+# go-tools hash:   {{ include "dot_config/dotfiles/go-tools.txt" | sha256sum }}
 set -euo pipefail
 
 # Put brew on PATH (Apple Silicon / Intel / Linux).

@@ -63,6 +63,7 @@ Three themes are installed (cloned via chezmoi externals). Switch by editing the
 | `spaceship-prompt/spaceship` | Spaceship (default) |
 | `powerlevel10k/powerlevel10k` | Powerlevel10k — run `p10k configure` once after switching |
 | `quantum-zsh/quantum` | Quantum |
+| `comfyline_prompt/comfyline` | ComfyLine (needs a Powerline/Nerd font) |
 | `robbyrussell` | OMZ built-in fallback |
 
 ```sh
@@ -83,6 +84,13 @@ Edit the `plugins=(...)` array in `~/.zshrc`. Bundled plugins live in
 > `zsh-syntax-highlighting` must stay **last** in the array.
 > `direnv` is deliberately **not** a plugin here — it's hooked via
 > `~/.oh-my-zsh/custom/direnv.zsh` so the hook is explicit and guarded.
+
+### History autosuggestions + Tab
+
+`zsh-autosuggestions` shows the grayed-out completion from your history. Accept it
+with **→ / End** (built-in) or **Tab** (added by `custom/autosuggest-tab.zsh`).
+When no suggestion is showing, Tab does normal completion (fzf-aware). To accept
+with a different key instead, edit that file's `bindkey` line.
 
 ## Add an external plugin or theme (the "ecosystem")
 

@@ -32,7 +32,7 @@ the login keychain thereafter.
 
 Then chezmoi writes the files (including `~/.Brewfile`), and the **after** scripts run:
 
-- `run_once_after_10-install-packages.sh` → `brew bundle --global` (the tool list),
+- `run_onchange_after_10-install-packages.sh` → `brew bundle --global` (the tool list),
   Go tools from `go-tools.txt`, and an OS-aware `vault` install. See
   [docs/packages.md](packages.md).
 - `run_once_after_20-configure-git-hooks.sh` → sets `core.hooksPath=.githooks`

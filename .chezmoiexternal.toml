@@ -32,3 +32,8 @@
     type = "git-repo"
     url = "https://github.com/calebephrem/quantum-zsh.git"
     refreshPeriod = "168h"
+
+[".oh-my-zsh/custom/themes/comfyline_prompt"]
+    type = "git-repo"
+    url = "https://gitlab.com/imnotpua/comfyline_prompt.git"
+    refreshPeriod = "168h"
