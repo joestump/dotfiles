@@ -1,0 +1,16 @@
+# Ubuntu/Debian packages (apt) — the Linux counterpart to ~/.Brewfile.
+# One package per line; # comments allowed. Edit + `chezmoi apply` to install.
+#
+# vault and gh are installed from their official apt repos by the package script,
+# so they don't need to be listed here.
+zsh
+git
+curl
+wget
+vim
+jq
+fzf
+zoxide
+direnv
+bats
+# golang-go      # uncomment for the Go toolchain (enables go-tools.txt)

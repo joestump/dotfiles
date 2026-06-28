@@ -17,10 +17,25 @@ brew bundle --global
 brew bundle check --global        # are all deps installed?
 ```
 
-- Cross-platform via **Homebrew on Linux** — the same Brewfile works on Ubuntu.
+- **macOS only.** Homebrew is **not** installed on Linux — Ubuntu uses apt (below).
 - `cask` lines are macOS-only, guarded with `if OS.mac?`.
 - Optional tools are listed commented-out; uncomment to enable. Nothing installs
   until you uncomment it.
+
+## Ubuntu / apt — the Linux list
+
+On Linux the package script uses **apt only** (no Homebrew). The list lives in
+`~/.config/dotfiles/apt-packages.txt` (managed; source `dot_config/dotfiles/apt-packages.txt`),
+one package per line — the apt counterpart to the Brewfile.
+
+```sh
+chezmoi edit ~/.config/dotfiles/apt-packages.txt   # add: ripgrep
+chezmoi apply                                      # sudo apt-get install …
+```
+
+`vault` and `gh` are installed from their official **apt repos** by the package
+script (not listed in the manifest). Tools without a clean apt package (e.g. `yq`,
+`tea`, `gitleaks`) can be added as binary installs in the script's Linux branch.
 
 ## Go tools
 
@@ -47,9 +62,9 @@ canonical install is HashiCorp's apt repo. So a dedicated idempotent step in
 
 | Phase | Script | Does |
 | --- | --- | --- |
-| before | `run_once_before_10-install-prereqs.sh` | apt prereqs (Linux) → install Homebrew → install Oh My Zsh |
-| *(files)* | chezmoi apply | writes `~/.Brewfile`, `~/.config/dotfiles/go-tools.txt`, etc. |
-| after | `run_onchange_after_10-install-packages.sh` | `brew bundle --global` → Go tools → ensure `vault` |
+| before | `run_once_before_10-install-prereqs.sh` | **macOS:** install Homebrew · **Linux:** apt essentials (zsh/git/curl…) — no Homebrew · then Oh My Zsh |
+| *(files)* | chezmoi apply | writes `~/.Brewfile`, `apt-packages.txt`, `go-tools.txt`, etc. |
+| after | `run_onchange_after_10-install-packages.sh` | **macOS:** `brew bundle` · **Linux:** `apt-get install` (+ gh/vault apt repos) · then Go tools |
 | after | `run_once_after_20-configure-git-hooks.sh` | wire the gitleaks hook |
 
 ## Adding another ecosystem (npm, pipx, cargo…)
