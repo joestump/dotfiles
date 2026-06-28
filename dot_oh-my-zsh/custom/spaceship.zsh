@@ -22,3 +22,8 @@ SPACESHIP_PROMPT_SEPARATE_LINE=true
   SPACESHIP_CHAR_SYMBOL="${glyphs[$((RANDOM % ${#glyphs} + 1))]} "
 }
 SPACESHIP_CHAR_COLOR_SUCCESS=213   # pink (256-color); red still shows on error
+
+# The docker_compose section prints a cryptic per-container status letter
+# (docker-compose ps → "MM" = two running containers), not a version. Noise —
+# the docker section already shows the engine version. Turn it off.
+SPACESHIP_DOCKER_COMPOSE_SHOW=false
