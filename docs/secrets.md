@@ -84,11 +84,54 @@ Until step 4 succeeds, `custom/secrets.zsh` is a silent no-op and your existing
   picks up the new `~/.vault-token`.
 - **See what's happening:** `vault-agent log` (tails `~/.config/vault/agent.log`).
 
-## New machine
+## New machine — what chezmoi does vs. what you do
 
-`vault login -method=oidc` first (seeds the token), then the normal
-`chezmoi init --apply ...` places the agent + loaders; `vault-agent start`.
-Static KV + the AWS engine already exist server-side, so no re-setup needed.
+`chezmoi init --apply https://gitea.stump.rocks/joestump/dotfiles.git` **configures
+everything client-side automatically**: installs the `vault` CLI + tools + Oh My
+Zsh, writes the agent config (`~/.config/vault/agent.hcl` + the `*.ctmpl`), installs
+the launchd job, and drops `custom/secrets.zsh` / `custom/vault-agent.zsh`.
+
+Two things are **not** baked into the image (they can't be — they're identity /
+already-global):
+
+1. **`vault login -method=oidc`** — interactive, mints your `~/.vault-token`.
+2. **`vault-agent start`** — loads the launchd job (needs the token first).
+
+The KV data and the AWS secrets engine are **server-side and already set up once
+globally** — a new machine never re-runs `load-static-secrets.sh` or
+`openbao-aws-setup.sh`. So a new laptop is just:
+
+```sh
+chezmoi init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+vault login -method=oidc
+vault-agent start
+exec zsh
+```
+
+## Remote machines & SSH
+
+The agent itself talks to `https://vault.stump.rocks` directly, so on a remote
+host it works as long as the host can reach that URL — no tunnel needed for normal
+operation. The **only** step that needs a tunnel is the interactive **OIDC login**,
+because its `localhost:8250` callback has to reach your laptop's browser.
+
+The tooling detects this for you. If you run `load-static-secrets.sh`,
+`openbao-aws-setup.sh`, or `vault-oidc-login` while SSH'd into a box without a
+valid token, it prints the exact tunnel commands. Two ways to log in remotely:
+
+```sh
+# A) From your LAPTOP — one step (tunnels in AND logs in on the remote):
+vault-login <remote-host>
+
+# B) From the REMOTE — it tells you to open, on your laptop:
+ssh -L 8250:localhost:8250 <user>@<remote-host>
+#    then back on the remote:
+vault-oidc-login        # or: vault login -method=oidc
+```
+
+If the remote can't even reach `vault.stump.rocks`, also forward it:
+`ssh -L 8200:vault.stump.rocks:443 <user>@<remote>` and
+`export VAULT_ADDR=https://localhost:8200`.
 
 ## Why not fetch per-shell?
 

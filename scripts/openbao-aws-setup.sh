@@ -22,8 +22,8 @@
 #     with a PLACEHOLDER policy you MUST tailor.
 set -euo pipefail
 
-: "${VAULT_ADDR:?export VAULT_ADDR=https://vault.stump.rocks first}"
-vault token lookup >/dev/null 2>&1 || { echo "Run: vault login -method=oidc (as admin)"; exit 1; }
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+ensure_vault_auth   # SSH-aware: prints tunnel guidance if you're remote + unauthed
 : "${AWS_VAULT_ROOT_ACCESS_KEY:?set AWS_VAULT_ROOT_ACCESS_KEY (the IAM key OpenBao uses)}"
 : "${AWS_VAULT_ROOT_SECRET_KEY:?set AWS_VAULT_ROOT_SECRET_KEY}"
 REGION="${AWS_REGION:-us-west-2}"

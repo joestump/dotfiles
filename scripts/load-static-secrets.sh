@@ -12,9 +12,8 @@
 #     ~/.local/share/chezmoi/scripts/load-static-secrets.sh
 set -euo pipefail
 
-: "${VAULT_ADDR:?export VAULT_ADDR=https://vault.stump.rocks first}"
-command -v vault >/dev/null || { echo "vault CLI not found"; exit 1; }
-vault token lookup >/dev/null 2>&1 || { echo "Not authenticated. Run: vault login -method=oidc"; exit 1; }
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+ensure_vault_auth   # SSH-aware: prints tunnel guidance if you're remote + unauthed
 
 req() {
   local missing=0
