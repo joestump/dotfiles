@@ -3,6 +3,7 @@ README.md
 Architecture.md
 docs/
 examples/
+scripts/
 
 # Oh My Zsh self-manages its own tree and self-updates it. chezmoi must manage
 # ONLY ~/.oh-my-zsh/custom/. Use non-recursive '*' here: gitignore semantics

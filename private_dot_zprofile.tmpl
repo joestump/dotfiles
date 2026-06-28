@@ -1,0 +1,31 @@
+# ~/.zprofile — managed by chezmoi (source: private_dot_zprofile.tmpl), mode 0600.
+#
+# Secrets are pulled from OpenBao at `chezmoi apply` time via chezmoi's vault
+# template function ([vault] command = "bao", i.e. `bao kv get -format=json`).
+# NO secret VALUES live in this template or the repo — only OpenBao paths.
+# To change a secret: update it in OpenBao, then re-run `chezmoi apply`.
+# Prereq before apply: `bao login` (and VAULT_ADDR exported). See
+# docs/secrets-migration.md.
+
+# ---------------- Non-secret environment ----------------
+export VAULT_ADDR=https://vault.stump.rocks
+export GITEA_URL=https://gitea.stump.rocks
+export NODE_EXTRA_CA_CERTS="$HOME/src/citadel/.citadel/tls/server.crt"
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+# ---------------- Secrets from OpenBao (KV v2 @ mount `secret/`) ----------------
+{{- $aws := (vault "secret/personal/aws").data.data }}
+export AWS_ACCESS_KEY_ID={{ $aws.AWS_ACCESS_KEY_ID | quote }}
+export AWS_SECRET_ACCESS_KEY={{ $aws.AWS_SECRET_ACCESS_KEY | quote }}
+
+{{- $llm := (vault "secret/personal/llm").data.data }}
+export OPENAI_API_KEY={{ $llm.OPENAI_API_KEY | quote }}
+export LITELLM_API_KEY={{ $llm.LITELLM_API_KEY | quote }}
+export GEMINI_API_KEY={{ $llm.GEMINI_API_KEY | quote }}
+
+export GITEA_TOKEN={{ (vault "secret/personal/gitea").data.data.GITEA_TOKEN | quote }}
+export POCKETID_API_KEY={{ (vault "secret/personal/pocketid").data.data.POCKETID_API_KEY | quote }}
+
+{{- $garage := (vault "secret/personal/garage").data.data }}
+export GARAGE_ACCESS_KEY={{ $garage.GARAGE_ACCESS_KEY | quote }}
+export GARAGE_SECRET_KEY={{ $garage.GARAGE_SECRET_KEY | quote }}

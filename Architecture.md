@@ -114,20 +114,22 @@ Three chezmoi features make this fully portable to any machine with Gitea access
 - `direnv` is hooked via `custom/direnv.zsh`, NOT the OMZ direnv plugin (avoids a
   double hook; keeps the hook explicit and guarded).
 
-## Secrets — OpenBao (status: PENDING decision)
+## Secrets — OpenBao (status: WIRED; pending one-time bao load)
 
-`~/.zprofile` currently holds plaintext secrets (AWS, OpenAI, LiteLLM, Gemini,
-Pocket ID, Gitea token, Garage S3). These are **not** committed and `.zprofile`
-is not chezmoi-managed. The target design:
+`~/.zprofile` previously held plaintext secrets (AWS, OpenAI, LiteLLM, Gemini,
+Pocket ID, Gitea token, Garage S3). Never committed. Now wired for OpenBao:
 
-- Store secrets in OpenBao (`https://vault.stump.rocks`).
-- Manage a `private_dot_zprofile.tmpl` that references **bao paths only** (no
-  secret values), rendered at `chezmoi apply` time via chezmoi's vault template
-  function (`[vault] command = "bao"` in the chezmoi config), writing
-  `~/.zprofile` at mode 0600 — never committed.
-- Rotate the currently-exposed credentials.
+- `.chezmoi.toml.tmpl` sets `[vault] command = "bao"`; chezmoi's `vault` function
+  runs `bao kv get -format=json <path>` (verified: KV v2, value at `.data.data`).
+- `private_dot_zprofile.tmpl` references **OpenBao paths only** (`secret/personal/*`),
+  rendered at `chezmoi apply` into `~/.zprofile` at mode 0600. No secret values in
+  the repo. Template render validated against a mock bao.
+- `scripts/migrate-zprofile-to-bao.sh` (no values, just var names + paths) loads
+  the current env secrets into OpenBao. Runbook: `docs/secrets-migration.md`.
 
-Open until Joe chooses how to load values into OpenBao.
+Remaining (Joe-owned, per decision): run `bao login` → migration script →
+`chezmoi apply`; then rotate the previously-exposed credentials and re-load.
+Until secrets exist in OpenBao, `chezmoi apply` will fail on `~/.zprofile`.
 
 ## Open / future ideas
 
