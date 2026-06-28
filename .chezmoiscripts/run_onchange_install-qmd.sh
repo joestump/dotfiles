@@ -17,5 +17,7 @@ case "$(uname -s)" in
   Linux)  command -v apt-get >/dev/null 2>&1 && { sudo apt-get install -y sqlite3 libsqlite3-dev || true; } ;;
 esac
 
-npm install -g @tobilu/qmd
+# macOS (Homebrew) has a user-writable global prefix; Linux (NodeSource) puts the
+# global prefix under /usr/lib and needs root — fall back to sudo there.
+npm install -g @tobilu/qmd || sudo npm install -g @tobilu/qmd
 echo "qmd installed. NOTE: ~2GB GGUF models download to ~/.cache/qmd/ on first use (not pre-warmed here)."
