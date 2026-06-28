@@ -60,3 +60,13 @@ $EDITOR ~/.oh-my-zsh/custom/my-helper.zsh
 chezmoi add ~/.oh-my-zsh/custom/my-helper.zsh
 chezmoi cd && git add -A && git commit -m "Add my-helper" && git push && exit
 ```
+
+## Tests
+
+BATS tests cover the shell logic (SSH-aware vault auth, the OMZ helper dispatch,
+secret loading). They run in Gitea Actions on every push (`.gitea/workflows/test.yml`).
+
+```sh
+brew install bats-core
+bats test/
+```
