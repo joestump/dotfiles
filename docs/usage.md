@@ -116,17 +116,22 @@ $EDITOR .envrc
 direnv allow
 ```
 
-## Secrets — OpenBao, never files
+## Secrets — OpenBao + Vault Agent
 
-Secrets are **never** committed and never written to `.envrc`/`.zprofile` by hand.
-They live in OpenBao (<https://vault.stump.rocks>) and are fetched at runtime:
+Secrets are **never** committed or written to `.envrc`/`.zprofile` by hand. They
+live in OpenBao (<https://vault.stump.rocks>); a **Vault Agent** renders them to
+`~/.config/vault/secrets-*.env` on a schedule and `~/.oh-my-zsh/custom/secrets.zsh`
+sources them — including short-lived dynamic AWS credentials. Use the **`vault`**
+CLI (the Homebrew `bao` is the unrelated BLAKE3 tool).
 
 ```sh
-export DATABASE_URL="$(bao kv get -field=url secret/myproject/db)"
+vault-agent status        # is the agent running?
+vault-agent env           # what it has rendered
+vault kv put secret/personal/llm OPENAI_API_KEY=sk-new...   # rotate a secret
 ```
 
-`bao` must be authenticated first (e.g. via the `vault-login` helper). The
-gitleaks pre-commit hook blocks any accidental secret commit to this repo.
+Full design + one-time bring-up: **[docs/secrets.md](secrets.md)**. The gitleaks
+pre-commit hook blocks any accidental secret commit to this repo.
 
 ## Command cheat sheet
 

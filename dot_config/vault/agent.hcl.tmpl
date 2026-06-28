@@ -1,0 +1,51 @@
+# Vault Agent config — managed by chezmoi (source: dot_config/vault/agent.hcl.tmpl).
+# Runs continuously under launchd: auto-auths with a token you seed via OIDC,
+# renews it, and re-renders the secrets files on a schedule / on secret change.
+#
+# The brace expressions below are resolved by chezmoi at `chezmoi apply` (they
+# fill in your home dir). The Consul-Template logic lives in the *.ctmpl files.
+
+pid_file = "{{ .chezmoi.homeDir }}/.config/vault/agent.pid"
+
+vault {
+  address = "https://vault.stump.rocks"
+}
+
+auto_auth {
+  # token_file: you run `vault login -method=oidc` once; the agent reads that
+  # token from ~/.vault-token, uses it, and keeps it renewed. Re-run the login
+  # only when the token hits its max TTL.
+  method "token_file" {
+    config = {
+      token_file_path = "{{ .chezmoi.homeDir }}/.vault-token"
+    }
+  }
+
+  sink "file" {
+    config = {
+      path = "{{ .chezmoi.homeDir }}/.config/vault/agent-token"
+      mode = 0600
+    }
+  }
+}
+
+# Keep running and retrying even if a template can't render yet (e.g. the AWS
+# secrets engine isn't configured during initial bring-up).
+template_config {
+  exit_on_retry_failure = false
+  static_secret_render_interval = "5m"
+}
+
+# Static KV secrets (LLM keys, Gitea, Pocket ID, Garage).
+template {
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.env.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.env"
+  perms       = "0600"
+}
+
+# Dynamic, short-lived AWS credentials (auto-rotated on lease expiry).
+template {
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.env.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.env"
+  perms       = "0600"
+}

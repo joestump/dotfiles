@@ -27,7 +27,8 @@ the login keychain thereafter.
 is written — every step is idempotent):
 
 - installs **Homebrew** if missing,
-- `brew install chezmoi direnv gitleaks fzf zoxide` (+ `openbao` for `bao`),
+- `brew install chezmoi direnv gitleaks fzf zoxide` (+ the `vault` CLI from
+  `hashicorp/tap` — the OpenBao-compatible client),
 - installs **Oh My Zsh** if `~/.oh-my-zsh` is absent, using
   `RUNZSH=no KEEP_ZSHRC=yes` so it **never** overwrites the chezmoi-managed
   `~/.zshrc`.
@@ -43,10 +44,14 @@ gitleaks pre-commit hook.
    brew install --cask font-meslo-lg-nerd-font
    ```
    then select it in your terminal profile.
-2. **Authenticate OpenBao** so secret-fetching helpers work:
+2. **Authenticate OpenBao and start the Vault Agent** so secrets render:
    ```sh
-   bao login -method=oidc        # or: vault-login <host>
+   export VAULT_ADDR=https://vault.stump.rocks
+   vault login -method=oidc      # seeds ~/.vault-token (the agent reads + renews it)
+   vault-agent start             # launchd job renders ~/.config/vault/secrets-*.env
    ```
+   (Static KV + the AWS engine already exist server-side — no re-setup.) See
+   [docs/secrets.md](secrets.md).
 3. Open a new shell (`exec zsh`).
 
 ## Updating an existing machine
@@ -64,4 +69,4 @@ chezmoi apply --refresh-externals    # also re-pull theme/plugin upstreams
 | Install tools + OMZ on a bare machine | `run_once_before_` script |
 | "My own OMZ ecosystem" (themes, external plugins) | `.chezmoiexternal.toml` git-repo externals |
 | Reproducible repo-local git hooks | `run_once_after_` + `core.hooksPath` |
-| Secrets that travel without being committed | OpenBao fetched at runtime (see [usage.md](usage.md)) |
+| Secrets that travel without being committed | OpenBao + Vault Agent (see [secrets.md](secrets.md)) |

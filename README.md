@@ -9,7 +9,8 @@ self-updates the rest of its tree and is never touched by chezmoi.
 
 ## Docs
 
-- **[docs/usage.md](docs/usage.md)** — day-to-day: add helpers, swap themes, plugins, direnv, secrets.
+- **[docs/usage.md](docs/usage.md)** — day-to-day: add helpers, swap themes, plugins, direnv.
+- **[docs/secrets.md](docs/secrets.md)** — OpenBao + Vault Agent: how secrets reach your shell.
 - **[docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md)** — one-command setup on any machine.
 - **[Architecture.md](Architecture.md)** — design rationale and decisions.
 
@@ -28,7 +29,7 @@ everything. See [docs/bootstrap-new-machine.md](docs/bootstrap-new-machine.md).
 | --- | --- | --- |
 | Shell helper functions | one `*.zsh` per helper in `~/.oh-my-zsh/custom/` (OMZ auto-sources) | `dot_oh-my-zsh/custom/vault-login.zsh` |
 | Non-secret config | direnv `.envrc` per project | [`examples/envrc.example`](examples/envrc.example) |
-| Secrets | **never** in env files or this repo — fetched at runtime from OpenBao (<https://vault.stump.rocks>) via `bao kv get` | inside `vault-login` |
+| Secrets | **never** in files or this repo — held in OpenBao (<https://vault.stump.rocks>); a Vault Agent renders them on a schedule and OMZ sources the result | [docs/secrets.md](docs/secrets.md) |
 
 No dotenvx. No `python-dotenv`. No committed `.env`. A `gitleaks` pre-commit hook
 blocks accidental secret commits.

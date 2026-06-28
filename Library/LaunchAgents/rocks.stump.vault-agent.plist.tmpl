@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>rocks.stump.vault-agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ lookPath "vault" }}</string>
+        <string>agent</string>
+        <string>-config={{ .chezmoi.homeDir }}/.config/vault/agent.hcl</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>VAULT_ADDR</key>
+        <string>https://vault.stump.rocks</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.config/vault/agent.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.config/vault/agent.log</string>
+</dict>
+</plist>

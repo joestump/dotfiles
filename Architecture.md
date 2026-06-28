@@ -19,7 +19,7 @@ non-secret config, and secrets.
 | Backing remote | Gitea | `https://gitea.stump.rocks/joestump/dotfiles` (private), HTTPS + osxkeychain token |
 | Shell framework | Oh My Zsh | pre-installed at `~/.oh-my-zsh`; **never** re-installed or overwritten |
 | Per-project config | direnv | `.envrc` files; non-secret only |
-| Secrets | OpenBao (`bao`) | `https://vault.stump.rocks`; fetched at runtime, never stored |
+| Secrets | OpenBao via `vault` CLI + Vault Agent | `https://vault.stump.rocks`; rendered to env files on a schedule, never committed |
 | Secret-leak guard | gitleaks | pre-commit hook via `core.hooksPath` |
 
 ## What chezmoi manages — and what it must not
@@ -50,9 +50,9 @@ automatically.)
    manual source-loop in `.zshrc` is needed.
 2. **Non-secret config** — direnv `.envrc` (hostnames, ports, AWS profiles,
    regions). See `examples/envrc.example`.
-3. **Secrets** — never in env files or the repo. Secret-bearing helpers fetch at
-   runtime via `bao kv get` against OpenBao. No dotenvx, no committed `.env`, no
-   second secrets path.
+3. **Secrets** — never in env files or the repo. A Vault Agent renders them from
+   OpenBao to local env files (sourced by `custom/secrets.zsh`). No dotenvx, no
+   committed `.env`, no second secrets path. See the Secrets section below.
 
 ## OMZ integration rules
 
@@ -114,26 +114,40 @@ Three chezmoi features make this fully portable to any machine with Gitea access
 - `direnv` is hooked via `custom/direnv.zsh`, NOT the OMZ direnv plugin (avoids a
   double hook; keeps the hook explicit and guarded).
 
-## Secrets — OpenBao (status: WIRED; pending one-time bao load)
+## Secrets — OpenBao + Vault Agent
 
-`~/.zprofile` previously held plaintext secrets (AWS, OpenAI, LiteLLM, Gemini,
-Pocket ID, Gitea token, Garage S3). Never committed. Now wired for OpenBao:
+CLIENT: use the HashiCorp **`vault`** CLI (API-compatible with the OpenBao 2.5.0
+server). The Homebrew `bao` is the unrelated BLAKE3 hashing tool — NOT OpenBao;
+an earlier draft wrongly wired `[vault] command = "bao"` and was removed.
 
-- `.chezmoi.toml.tmpl` sets `[vault] command = "bao"`; chezmoi's `vault` function
-  runs `bao kv get -format=json <path>` (verified: KV v2, value at `.data.data`).
-- `private_dot_zprofile.tmpl` references **OpenBao paths only** (`secret/personal/*`),
-  rendered at `chezmoi apply` into `~/.zprofile` at mode 0600. No secret values in
-  the repo. Template render validated against a mock bao.
-- `scripts/migrate-zprofile-to-bao.sh` (no values, just var names + paths) loads
-  the current env secrets into OpenBao. Runbook: `docs/secrets-migration.md`.
+Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
 
-Remaining (Joe-owned, per decision): run `bao login` → migration script →
-`chezmoi apply`; then rotate the previously-exposed credentials and re-load.
-Until secrets exist in OpenBao, `chezmoi apply` will fail on `~/.zprofile`.
+- **Vault Agent** under launchd (`rocks.stump.vault-agent`) auto-auths via
+  `token_file` (`~/.vault-token`, seeded by an interactive `vault login -method=oidc`),
+  renews the token, and renders env files on a schedule. Validated: config parses
+  and the agent authenticates against the live server.
+- **Templates** (Consul-Template `*.ctmpl`, kept separate from chezmoi templating):
+  `secrets-static.env` ← KV `secret/personal/*`; `secrets-aws.env` ← dynamic
+  `aws/creds/personal-cli`. `exit_on_retry_failure=false` so a not-yet-configured
+  engine doesn't crash the agent.
+- **OMZ loader** `custom/secrets.zsh` sources `~/.config/vault/secrets-*.env`
+  (guarded). `custom/vault-agent.zsh` provides `vault-agent {start|stop|status|log|env}`.
+- Repo holds config + templates + the loader (paths only); rendered `*.env` files
+  (0600) are never committed.
+
+Static secrets stay in KV (`secret/personal/{llm,gitea,pocketid,garage}`); **AWS
+moves to dynamic, short-lived credentials** (auto-rotated by the agent), retiring
+the static AWS keys entirely.
+
+Remaining (Joe-owned): `vault login` → `scripts/load-static-secrets.sh` →
+`scripts/openbao-aws-setup.sh` (server-side, admin + AWS root cred) →
+`vault-agent start` → verify → strip secret lines from `~/.zprofile` → rotate the
+previously-exposed credentials. Runbook: `docs/secrets.md`.
 
 ## Open / future ideas
 
-- Migrate `.zprofile` secrets to OpenBao templating (see above).
+- Complete the secrets bring-up (load KV, set up dynamic AWS, start agent, strip
+  `~/.zprofile`); see the Secrets section.
 - Add more helpers as needed (aws profile switchers, k8s context helpers).
 - Optional: machine-specific config via chezmoi templates if hosts diverge.
 - Nerd Font cask in bootstrap if a non-interactive font install is acceptable.

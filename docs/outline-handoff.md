@@ -25,7 +25,7 @@ and backed by self-hosted Gitea at
 | --- | --- | --- |
 | Shell helper functions | one `*.zsh` file per helper in `~/.oh-my-zsh/custom/` (OMZ auto-sources) | — |
 | Non-secret config | direnv `.envrc` per project (hosts, ports, AWS profiles, regions) | — |
-| Secrets | OpenBao (`https://vault.stump.rocks`), fetched at runtime via `bao kv get` | never in a file, `.env`, or the repo |
+| Secrets | OpenBao (`https://vault.stump.rocks`); a Vault Agent renders them on a schedule, OMZ sources them (use the `vault` CLI, not `bao`) | never in a file, `.env`, or the repo |
 
 No dotenvx, no `python-dotenv`, no committed `.env`. A gitleaks pre-commit hook
 blocks accidental secret commits.
@@ -105,15 +105,21 @@ cp ~/.local/share/chezmoi/examples/envrc.example .envrc   # NON-SECRET only
 $EDITOR .envrc && direnv allow
 ```
 
-## Secrets — OpenBao
+## Secrets — OpenBao + Vault Agent
 
-Secrets are fetched at runtime; nothing secret is stored in files or the repo:
+Nothing secret is stored in files or the repo. Secrets live in OpenBao; a **Vault
+Agent** (launchd) renders them to `~/.config/vault/secrets-*.env` on a schedule —
+including short-lived **dynamic AWS** credentials — and `~/.oh-my-zsh/custom/secrets.zsh`
+sources them. Use the **`vault`** CLI (the Homebrew `bao` is an unrelated hashing
+tool).
 
 ```sh
-export DATABASE_URL="$(bao kv get -field=url secret/myproject/db)"
+vault-agent status        # agent running?
+vault kv put secret/personal/llm OPENAI_API_KEY=sk-new...   # rotate; agent re-renders
 ```
 
-Authenticate first with `bao login -method=oidc` (or the `vault-login` helper).
+Authenticate with `vault login -method=oidc` (seeds the token the agent renews).
+Full detail lives in the repo at `docs/secrets.md`.
 
 ## Set up a brand-new machine (one command)
 
@@ -123,7 +129,8 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/j
 
 This installs Homebrew + tools + Oh My Zsh (without clobbering `.zshrc`), clones
 the themes/plugins, applies all dotfiles, and wires the git hook — via chezmoi
-`run_once_` bootstrap scripts. Afterward: set a Nerd Font and run `bao login`.
+`run_once_` bootstrap scripts. Afterward: set a Nerd Font, `vault login -method=oidc`,
+and `vault-agent start`.
 
 ## Command cheat sheet
 

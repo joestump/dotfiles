@@ -23,8 +23,15 @@ done
 echo "Installing CLI tools via Homebrew..."
 brew install chezmoi direnv gitleaks fzf zoxide
 
-# ---- OpenBao (secrets) ----
-command -v bao >/dev/null 2>&1 || brew install openbao || true
+# ---- vault (HashiCorp CLI; API-compatible client for the OpenBao server) ----
+# It lives in the hashicorp/tap, which Homebrew won't auto-load as "untrusted".
+# We do NOT install the openbao/`bao` client — `bao` collides with the unrelated
+# BLAKE3 `bao` hashing tool. Guarded + non-fatal so bootstrap never aborts here.
+if ! command -v vault >/dev/null 2>&1; then
+  brew tap hashicorp/tap 2>/dev/null || true
+  brew install hashicorp/tap/vault \
+    || echo "WARN: install vault manually: brew tap hashicorp/tap && brew install hashicorp/tap/vault"
+fi
 
 # ---- Oh My Zsh (must NOT overwrite ~/.zshrc — chezmoi owns it) ----
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
