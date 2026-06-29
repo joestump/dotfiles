@@ -128,6 +128,12 @@ plugins=(
 # ZSH_AI_PROVIDER (openai | anthropic | gemini | ollama). Set before oh-my-zsh loads.
 export ZSH_AI_PROVIDER="openai"
 export ZSH_AI_PROMPT_EXTEND="Prefer rg over grep, fd over find, eza over ls, and bat over cat."
+# Point zsh-ai at the LiteLLM gateway. These STATIC values are set here (before OMZ
+# loads the plugin) so the plugin sees a non-default endpoint and doesn't warn about
+# an unset OpenAI key at startup. The actual key — OPENAI_API_KEY / ZSH_AI_OPENAI_API_KEY
+# = $LITELLM_API_KEY — is set in custom/env.zsh, which loads after secrets render.
+export ZSH_AI_OPENAI_URL="https://litellm.stump.rocks/v1/chat/completions"
+export ZSH_AI_OPENAI_MODEL="gpt-oss:120b"
 
 source $ZSH/oh-my-zsh.sh
 

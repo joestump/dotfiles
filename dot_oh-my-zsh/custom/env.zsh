@@ -15,8 +15,6 @@ export VAULT_ADDR="https://vault.stump.rocks"
 export OPENAI_BASE_URL="https://litellm.stump.rocks/v1"
 export OPENAI_API_KEY="$LITELLM_API_KEY"
 
-# zsh-ai's OpenAI provider → same gateway. URL is derived from OPENAI_BASE_URL
-# (which already includes the scheme + /v1), so no double "https://".
-export ZSH_AI_OPENAI_URL="${OPENAI_BASE_URL}/chat/completions"
+# zsh-ai's API key → same LiteLLM gateway. Its STATIC url + model live in ~/.zshrc
+# (set before OMZ loads the plugin, so it doesn't warn about an unset key at startup).
 export ZSH_AI_OPENAI_API_KEY="$LITELLM_API_KEY"
-export ZSH_AI_OPENAI_MODEL="gpt-oss:120b"
