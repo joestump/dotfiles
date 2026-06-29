@@ -57,4 +57,7 @@
 [".config/claude-marketplaces/claude-personal"]
     type = "git-repo"
     url = "https://gitea.stump.rocks/joestump/claude-personal.git"
-    refreshPeriod = "168h"
+    # 24h so newly-pushed skills propagate within a day; the plugin install
+    # script reinstalls when this clone's HEAD moves. For an immediate pull:
+    # `chezmoi apply --refresh-externals`.
+    refreshPeriod = "24h"
