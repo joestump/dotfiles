@@ -14,7 +14,7 @@ const sidebars = {
       type: 'category',
       label: 'Systems',
       collapsed: false,
-      items: ['secrets', 'packages', 'claude', 'terminal'],
+      items: ['secrets', 'packages', 'claude', 'signal', 'terminal'],
     },
     'maintenance',
     'architecture',

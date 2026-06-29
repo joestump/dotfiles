@@ -33,7 +33,18 @@ chezmoi apply
 ## Add a Claude MCP server or plugin
 
 Edit `~/.config/dotfiles/mcp-servers.json` (+ its OpenBao secret) or
-`claude-plugins.tsv`, then `chezmoi apply`.
+`claude-plugins.tsv`, then `chezmoi apply`. Full reference: [Claude (MCP +
+Plugins)](claude).
+
+## Link Signal on a new node
+
+`chezmoi apply` installs everything, but the device link is interactive:
+
+```bash
+signal-link        # scan the QR from Signal → Linked Devices
+```
+
+Details (daemon control, troubleshooting): [Signal](signal).
 
 ## Add a prompt glyph
 
@@ -43,11 +54,15 @@ Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
 ## Update everything
 
 ```bash
-chezmoi update                         # git pull + apply
-chezmoi apply --refresh-externals      # also re-pull themes/plugins/marketplaces
+chezmoi update                         # git pull + apply (re-runs changed run_onchange_ scripts)
+chezmoi apply --refresh-externals      # also re-pull themes/plugins/marketplaces + signal-mcp
 brew bundle --global                   # macOS tools
-claude plugin update                   # Claude plugins
 ```
+
+Claude **plugins** update themselves — the `run_after_` script reinstalls the
+local-path marketplace and updates remotes on every apply. There's no bulk
+`claude plugin update`; to force one by hand it's `claude plugin update
+<plugin>@<marketplace>` (e.g. `qmd@qmd`). See [Claude](claude#plugins).
 
 ## CI
 
