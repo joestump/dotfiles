@@ -13,13 +13,19 @@ echo "==> Claude Desktop mcpServers merge"
 GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.gitea.env.GITEA_ACCESS_TOKEN // ""'        "$DC")")"
 GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // ""' "$DC")")"
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$DC")")"
+# Desktop is GUI-launched (no shell env to inherit), so outline's Bearer token is
+# baked here at apply time — read straight from the Vault-Agent-rendered secrets
+# (path-agnostic). Never written to the chezmoi repo.
+OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${OUTLINE_API_TOKEN:-}" )"
 
-# Claude Desktop entries carry NO "type" field; outline uses the npx mcp-remote stdio bridge.
-desired="$(mcp_base | jq --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" '
+# Claude Desktop entries carry NO "type" field; outline uses the npx mcp-remote stdio
+# bridge with a STATIC Bearer header (no OAuth, no refresh tokens to expire).
+desired="$(mcp_base | jq --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" '
     .gitea.env.GITEA_ACCESS_TOKEN              = $gt
   | .github.env.GITHUB_PERSONAL_ACCESS_TOKEN   = $gh
   | .karakeep.env.KARAKEEP_API_KEY             = $kk
-  | .outline = {command:"npx", args:["-y","mcp-remote","https://outline.stump.rocks/mcp"]}
+  | .outline = {command:"npx", args:["-y","mcp-remote","https://outline.stump.rocks/mcp",
+                                      "--header", ("Authorization:Bearer " + $ot)]}
 ')"
 
 mcp_merge "$DC" "$desired"

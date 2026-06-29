@@ -21,7 +21,11 @@ desired="$(mcp_base | jq --arg gh "$GH" --arg kk "$KK" '
     .github.env.GITHUB_PERSONAL_ACCESS_TOKEN   = $gh
   | .karakeep.env.KARAKEEP_API_KEY             = $kk
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
-  | .outline = {type:"http", url:"https://outline.stump.rocks/mcp"}
+  # outline: native http + a static Bearer token (no OAuth/refresh tokens). The
+  # token is inherited from the shell ($OUTLINE_API_TOKEN) and expanded by Claude
+  # Code, so nothing is baked here.
+  | .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
+                headers:{"Authorization":"Bearer ${OUTLINE_API_TOKEN}"}}
 ')"
 
 mcp_merge "$CJ" "$desired"
