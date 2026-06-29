@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Install Ghostty's terminfo (xterm-ghostty) into ~/.terminfo — NO sudo — so every
+# shell, SSH session, tmux, and cron job on this machine recognizes
+# TERM=xterm-ghostty, independent of Ghostty's client-side ssh-terminfo feature.
+# Re-runs whenever the description below changes.
+#
+# terminfo hash: {{ include "dot_config/dotfiles/xterm-ghostty.terminfo" | sha256sum }}
+set -euo pipefail
+
+command -v tic >/dev/null 2>&1 || { echo "no tic (ncurses); skipping ghostty terminfo"; exit 0; }
+src="$HOME/.config/dotfiles/xterm-ghostty.terminfo"
+[ -r "$src" ] || { echo "ghostty terminfo source missing; skipping"; exit 0; }
+
+# tic -x compiles into ~/.terminfo (user dir). It exits non-zero on benign
+# warnings, so judge success by whether the entry is then resolvable.
+tic -x "$src" 2>/dev/null || true
+if infocmp xterm-ghostty >/dev/null 2>&1; then
+  echo "xterm-ghostty terminfo installed (~/.terminfo)"
+else
+  echo "WARN: xterm-ghostty terminfo did not install (non-fatal)"
+fi
