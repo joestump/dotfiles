@@ -9,9 +9,18 @@
 set -euo pipefail
 
 # signal-cli must be installed AND linked for the daemon to run. If the binary is
-# missing (fresh node, not yet linked), skip cleanly — nothing to supervise.
+# missing (fresh node), skip cleanly — nothing to supervise.
 if ! command -v signal-cli >/dev/null 2>&1; then
-  echo "signal-cli not installed yet; skipping signal-daemon (link it, then re-run 'chezmoi apply')"
+  echo "signal-cli not installed yet; skipping signal-daemon (install + 'signal-link', then re-run 'chezmoi apply')"
+  exit 0
+fi
+
+# Installed but not linked? Don't start the daemon (KeepAlive/Restart would just
+# crash-loop on "no account"). Detect via accounts.json — a file check, so we
+# never spin signal-cli and risk deadlocking against an already-running daemon.
+accounts="$HOME/.local/share/signal-cli/data/accounts.json"
+if [ ! -f "$accounts" ] || ! grep -q '"number"' "$accounts" 2>/dev/null; then
+  echo "signal-cli installed but no account linked here — run 'signal-link', then 'signal-daemon start'."
   exit 0
 fi
 

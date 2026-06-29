@@ -1,5 +1,5 @@
 # Ubuntu/Debian packages (apt) — the Linux counterpart to ~/.Brewfile.
-# One package per line; # comments allowed. Edit + `chezmoi apply` to install.
+# One package per line; # comments allowed (inline or full-line). Edit + `chezmoi apply` to install.
 #
 # vault and gh are installed from their official apt repos by the package script,
 # so they don't need to be listed here.
@@ -14,5 +14,6 @@ zoxide
 direnv
 bats
 figlet             # ASCII wordmark for the StumpCloud MOTD
+qrencode           # terminal QR for `signal-link` (link a new Signal device)
 python3-pygments   # provides `pygmentize` — backend for the colorize plugin
 # golang-go      # uncomment for the Go toolchain (enables go-tools.txt)

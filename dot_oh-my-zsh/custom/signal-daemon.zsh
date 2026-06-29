@@ -32,3 +32,36 @@ signal-daemon() {
     esac
   fi
 }
+
+# signal-link — link THIS machine as a Signal device, interactively. Run once per
+# new node: it renders the device-link QR right in your terminal; scan it from
+# your phone (Signal → Settings → Linked Devices → Link New Device). signal-cli
+# blocks until you scan, then we start the daemon. signal-cli must already be
+# installed (brew/apt); your Mac is already linked, so this is for new nodes.
+#   usage: signal-link [device-name]   (default: signal-cli@<hostname>)
+signal-link() {
+  emulate -L zsh
+  local name="${1:-signal-cli@${HOST%%.*}}"
+  if ! command -v signal-cli >/dev/null 2>&1; then
+    print -u2 "signal-link: signal-cli is not installed on this host — install it first."
+    return 1
+  fi
+  if ! command -v qrencode >/dev/null 2>&1; then
+    print -u2 "signal-link: need qrencode to draw the QR — brew install qrencode / sudo apt install -y qrencode"
+    return 1
+  fi
+  print -- "Linking this device as: ${name}"
+  print -- "On your phone: Signal → Settings → Linked Devices → + → scan the QR below."
+  print -- ""
+  # `signal-cli link` prints the tsdevice:/sgnl:// URI to stdout, then BLOCKS until
+  # the phone approves the link. Render that one line as a QR; pass the rest through.
+  signal-cli link -n "$name" | while IFS= read -r line; do
+    case "$line" in
+      sgnl://*|tsdevice:*) qrencode -t ANSIUTF8 -- "$line" ;;
+      *) print -- "$line" ;;
+    esac
+  done
+  print -- ""
+  print -- "Linked ✓  Starting the daemon…"
+  signal-daemon start
+}

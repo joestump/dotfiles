@@ -56,7 +56,12 @@ install_linux() {
   local list="$HOME/.config/dotfiles/apt-packages.txt"
   local pkgs=()
   if [ -f "$list" ]; then
-    while IFS= read -r p; do case "$p" in ''|\#*) ;; *) pkgs+=("$p") ;; esac; done < "$list"
+    while IFS= read -r p; do
+      p="${p%%#*}"                          # strip inline/trailing comments
+      p="${p#"${p%%[![:space:]]*}"}"        # ltrim
+      p="${p%"${p##*[![:space:]]}"}"        # rtrim
+      [ -n "$p" ] && pkgs+=("$p")           # skip blank/comment-only lines
+    done < "$list"
   fi
   echo "==> apt-get install: ${pkgs[*]:-(none)}"
   sudo apt-get update -y
