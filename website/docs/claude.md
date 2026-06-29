@@ -45,7 +45,7 @@ daemon** on `tcp 127.0.0.1:7583`, supervised per-OS:
 - **Linux** — systemd `--user` unit `signal-daemon`; `chezmoi apply` provisions the
   JRE (apt), `uv` (astral installer), `signal-cli` (pinned release tarball →
   `~/.local/bin`), and clones the MCP repo to `~/src/signal-mcp` (a Linux-only
-  external, pinned to the daemon-rewrite branch).
+  external tracking the default branch).
 
 **One-time per node:** signal-cli must be *linked* as a device — interactive, so
 chezmoi can't do it. After `chezmoi apply`, run:

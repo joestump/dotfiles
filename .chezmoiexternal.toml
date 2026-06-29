@@ -67,14 +67,12 @@
 # The Signal MCP (a JSON-RPC client for the signal-cli daemon) is launched with
 # `uv run --directory ~/src/signal-mcp`. On macOS this is Joe's own dev checkout,
 # so chezmoi must NOT manage it there — clone it only on Linux utility nodes.
-# Pinned to feat/parse-reactions: the branch carrying the daemon-rewrite the Mac
-# runs. When that's reconciled into main, switch this to the default branch.
+# Tracks the default branch (main), which carries the reconciled daemon-rewrite +
+# reactions + trusted-recipients allowlist. ff-only pull keeps the clone clean.
 ["src/signal-mcp"]
     type = "git-repo"
     url = "https://github.com/joestump/signal-mcp.git"
     refreshPeriod = "168h"
-["src/signal-mcp".clone]
-    args = ["--branch", "feat/parse-reactions", "--single-branch"]
 ["src/signal-mcp".pull]
     args = ["--ff-only"]
 {{ end -}}
