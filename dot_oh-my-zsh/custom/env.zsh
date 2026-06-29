@@ -18,3 +18,8 @@ export OPENAI_API_KEY="$LITELLM_API_KEY"
 # zsh-ai's API key → same LiteLLM gateway. Its STATIC url + model live in ~/.zshrc
 # (set before OMZ loads the plugin, so it doesn't warn about an unset key at startup).
 export ZSH_AI_OPENAI_API_KEY="$LITELLM_API_KEY"
+
+# gitea-mcp reads GITEA_ACCESS_TOKEN; alias it from the rendered $GITEA_TOKEN. The
+# Gitea MCP server, launched by Claude Code from this shell, inherits it — so no
+# token is baked into ~/.claude.json and none is committed.
+export GITEA_ACCESS_TOKEN="$GITEA_TOKEN"

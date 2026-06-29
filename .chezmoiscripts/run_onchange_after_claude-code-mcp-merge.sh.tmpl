@@ -10,19 +10,16 @@ CJ="$HOME/.claude.json"
 [ -f "$CJ" ] || { echo "no ~/.claude.json; skipping"; exit 0; }
 echo "==> Claude Code mcpServers merge"
 
-# github + karakeep tokens are still baked at apply time (from OpenBao). gitea is
-# different: it launches via a wrapper that resolves the token at RUNTIME, so no
-# gitea token is ever written to ~/.claude.json (fixes empty-token-on-apply when
-# Vault isn't authed during apply, and survives token rotation).
+# github + karakeep tokens are baked here at apply time (from OpenBao). gitea needs
+# NO token in the config: gitea-mcp inherits GITEA_ACCESS_TOKEN from the shell that
+# Claude Code is launched from (exported in ~/.oh-my-zsh/custom/env.zsh). So nothing
+# gitea-related is ever written to ~/.claude.json beyond GITEA_HOST.
 GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // ""' "$CJ")")"
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$CJ")")"
 
 desired="$(mcp_base | jq --arg gh "$GH" --arg kk "$KK" '
     .github.env.GITHUB_PERSONAL_ACCESS_TOKEN   = $gh
   | .karakeep.env.KARAKEEP_API_KEY             = $kk
-  | .gitea = { command: "{{ .chezmoi.homeDir }}/.local/bin/gitea-mcp-launch",
-               args: ([.gitea.command] + .gitea.args),
-               env: { GITEA_HOST: .gitea.env.GITEA_HOST } }
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
   | .outline = {type:"http", url:"https://outline.stump.rocks/mcp"}
 ')"
