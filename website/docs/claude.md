@@ -19,7 +19,13 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
   drop.
 - Per-app shape: Code uses `type` + the native `http` outline; Desktop omits `type`
   and uses the `mcp-remote` stdio bridge.
-- Tokens (gitea/github/karakeep) come from **OpenBao** at apply time — never committed.
+- Secrets come from **OpenBao** at apply time — never committed. The merge reads each
+  with `vault kv get secret/personal/<svc>` and writes it into that server's `env`
+  block (e.g. `.karakeep.env.KARAKEEP_API_KEY`) — that env map is the process
+  environment Claude hands the spawned server. Two exceptions: **gitea** inherits
+  `GITEA_ACCESS_TOKEN` from the login shell (no token in the config at all), and
+  **outline** bakes a static `Bearer` header (Claude can't expand `${VAR}` in http
+  headers). See `mcp_secret` / `mcp_merge` in `mcp-merge-lib.sh`.
 
 Servers: `chrome-devtools`, `gitea`, `github`, `karakeep`, `outline`, `signal`.
 
@@ -30,8 +36,8 @@ chezmoi apply
 
 ## Plugins
 
-`~/.config/dotfiles/claude-plugins.tsv` lists every plugin; one `run_onchange_`
-script ensures each is installed:
+`~/.config/dotfiles/claude-plugins.tsv` lists every plugin; a `run_after_` script
+(runs on every apply) ensures each is installed **and current**:
 
 ```
 tobi/qmd                                       qmd@qmd
@@ -42,6 +48,16 @@ joestump/claude-skills                         claude-skills@joestump
 
 GitHub marketplaces add by `owner/repo`. The **private Gitea** one
 (`claude-personal`) can't be HTTP-fetched, so a chezmoi **external** clones it
-locally and it's added as a **local-path** marketplace (which also keeps it synced).
+locally (refreshed every **24h**) and it's added as a **local-path** marketplace.
 
-Keep plugins current with `claude plugin update`.
+**Propagation:** local-path marketplaces (`claude-personal`) **auto-reinstall**
+when the clone's git HEAD moves — so newly-pushed skills appear without bumping
+the plugin `version` (which `claude plugin update` otherwise requires, and which
+is easy to forget). The last-installed HEAD is tracked per plugin in
+`~/.config/dotfiles/.claude-plugin-state/`. For an immediate pull + propagate:
+
+```bash
+chezmoi apply --refresh-externals
+```
+
+Remote (GitHub) marketplaces are install-once; update them with `claude plugin update`.
