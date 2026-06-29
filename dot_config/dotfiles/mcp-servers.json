@@ -16,8 +16,8 @@
     "env": {}
   },
   "karakeep": {
-    "command": "npx",
-    "args": ["-y", "@karakeep/mcp"],
+    "command": "docker",
+    "args": ["run", "-i", "--rm", "--platform", "linux/amd64", "-e", "KARAKEEP_API_ADDR", "-e", "KARAKEEP_API_KEY", "gitea.stump.rocks/joestump/karakeep-mcp:latest"],
     "env": { "KARAKEEP_API_ADDR": "https://karakeep.stump.rocks" }
   },
   "signal": {
