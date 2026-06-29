@@ -60,7 +60,13 @@ install_linux() {
   fi
   echo "==> apt-get install: ${pkgs[*]:-(none)}"
   sudo apt-get update -y
-  if [ "${#pkgs[@]}" -gt 0 ]; then sudo apt-get install -y "${pkgs[@]}" || echo "WARN: some apt packages failed"; fi
+  if [ "${#pkgs[@]}" -gt 0 ]; then
+    # A transient apt/network blip during bootstrap must not silently leave packages
+    # missing — run_onchange won't retry on a stable hash. Retry once after a refresh.
+    sudo apt-get install -y "${pkgs[@]}" \
+      || { echo "apt install failed — refreshing indexes and retrying…"; sudo apt-get update -y; sudo apt-get install -y "${pkgs[@]}"; } \
+      || echo "WARN: some apt packages still failed — install by hand, or re-run 'chezmoi apply --force'."
+  fi
   ensure_gh_linux
   ensure_vault_linux
 }
