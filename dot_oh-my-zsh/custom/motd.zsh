@@ -36,8 +36,7 @@ motd() {
   fi
 
   # --- dynamic facts ---
-  local host kern os up load disk now
-  host="$(hostname -s 2>/dev/null || hostname)"
+  local kern os up load disk now
   kern="$(uname -r)"
   now="$(date '+%a %d %b · %H:%M')"
   if [[ "$OSTYPE" == darwin* ]]; then
@@ -53,12 +52,12 @@ motd() {
 
   local fmt="  ${c}%-7s${r} %s"
   print -r -- ""
-  print -r -- "  ${p}${q}${r}  ${g}${USER}${d}@${r}${b}${p}${host}${r}    ${d}${now}${r}"
   printf "$fmt\n" "os"     "$os"
   printf "$fmt\n" "kernel" "$kern"
   printf "$fmt\n" "uptime" "${up:-?}"
   printf "$fmt\n" "load"   "${load:-?}"
   printf "$fmt\n" "disk"   "${disk:-?}"
+  printf "$fmt\n" "time"   "$now"
   print -r -- ""
 }
 
