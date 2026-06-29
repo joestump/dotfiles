@@ -22,25 +22,32 @@ KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.kar
 # never lands in the chezmoi repo.
 OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${OUTLINE_API_TOKEN:-}" )"
 
-desired="$(mcp_base | jq --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" '
+# signal is OS-specific: the uv binary path and env PATH differ macOS vs Linux; the
+# repo dir is ~/src/signal-mcp on both (Joe's dev checkout on the Mac, a chezmoi
+# external clone on Linux). Resolve those here. The daemon it talks to (tcp
+# 127.0.0.1:7583) is supervised by launchd (macOS) / systemd --user (Linux).
+{{- if eq .chezmoi.os "darwin" }}
+SIG_UV="/opt/homebrew/bin/uv"
+SIG_PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+{{- else }}
+SIG_UV="{{ .chezmoi.homeDir }}/.local/bin/uv"
+SIG_PATH="{{ .chezmoi.homeDir }}/.local/bin:/usr/bin:/bin:/usr/local/bin"
+{{- end }}
+SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
+
+desired="$(mcp_base | jq \
+  --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" \
+  --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
     .github.env.GITHUB_PERSONAL_ACCESS_TOKEN   = $gh
   | .karakeep.env.KARAKEEP_API_KEY             = $kk
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
   # outline: native http + a STATIC Bearer token (no OAuth/refresh tokens), baked.
   | .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
                 headers:{"Authorization": ("Bearer " + $ot)}}
-{{- if ne .chezmoi.os "darwin" }}
-  | del(.signal)   # signal-cli daemon (+ uv/signal-cli) is macOS-only
-{{- end }}
+  # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
+  | .signal = {type:"stdio", command:$uv,
+               args:["run","--directory",$sigdir,"server","--user-id","+12062257886","--transport","stdio"],
+               env:{PATH:$sigpath}}
 ')"
 
 mcp_merge "$CJ" "$desired"
-{{- if ne .chezmoi.os "darwin" }}
-
-# signal is macOS-only (signal-cli daemon + uv). mcp_merge preserves existing
-# servers, so explicitly drop any stale signal entry on Linux. Idempotent.
-if jq -e '.mcpServers.signal' "$CJ" >/dev/null 2>&1; then
-  t="$(mktemp)" && jq 'del(.mcpServers.signal)' "$CJ" > "$t" && chmod 600 "$t" && mv "$t" "$CJ" \
-    && echo "  $CJ: dropped macOS-only signal server"
-fi
-{{- end }}

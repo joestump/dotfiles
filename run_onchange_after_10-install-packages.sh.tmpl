@@ -8,6 +8,10 @@
 set -euo pipefail
 OS="$(uname -s)"
 
+# Pinned signal-cli version for Linux (macOS gets it from Homebrew). Bump this and
+# `chezmoi apply` re-runs this script (run_onchange keys on its rendered content).
+SIGNAL_CLI_VER="0.14.5"
+
 # ---------------------------------------------------------------- macOS -------
 ensure_vault_macos() {
   command -v vault >/dev/null 2>&1 && return 0
@@ -51,6 +55,42 @@ ensure_vault_linux() {
   sudo apt-get update -y && sudo apt-get install -y vault || echo "WARN: vault install failed"
 }
 
+# uv — Python runner that launches the Signal MCP (`uv run --directory ~/src/signal-mcp`).
+# Astral's installer drops it in ~/.local/bin; NO_MODIFY_PATH so it never edits the
+# chezmoi-managed shell rc (PATH already includes ~/.local/bin via env.zsh/.profile).
+ensure_uv_linux() {
+  command -v uv >/dev/null 2>&1 && return 0
+  [ -x "$HOME/.local/bin/uv" ] && return 0
+  echo "==> installing uv (astral installer → ~/.local/bin)"
+  curl -LsSf https://astral.sh/uv/install.sh | env INSTALLER_NO_MODIFY_PATH=1 sh \
+    || echo "WARN: uv install failed"
+}
+
+# signal-cli — the JVM Signal client the daemon (systemd --user signal-daemon) runs.
+# Not in apt; install the generic release tarball (needs the JRE from apt-packages)
+# under ~/.local/opt and symlink ~/.local/bin/signal-cli. Arch-independent, so it
+# works on future arm64 nodes too. Idempotent: skips when already at SIGNAL_CLI_VER.
+ensure_signal_cli_linux() {
+  local ver="$SIGNAL_CLI_VER"
+  local dest="$HOME/.local/opt/signal-cli-$ver" link="$HOME/.local/bin/signal-cli"
+  if [ -x "$dest/bin/signal-cli" ] && [ "$(readlink "$link" 2>/dev/null)" = "$dest/bin/signal-cli" ]; then
+    return 0
+  fi
+  echo "==> installing signal-cli $ver (GitHub release tarball → ~/.local/opt)"
+  local url="https://github.com/AsamK/signal-cli/releases/download/v${ver}/signal-cli-${ver}.tar.gz"
+  local tmp; tmp="$(mktemp -d)"
+  if curl -fsSL "$url" -o "$tmp/signal-cli.tar.gz"; then
+    mkdir -p "$HOME/.local/opt" "$HOME/.local/bin"
+    rm -rf "$dest"
+    tar -xzf "$tmp/signal-cli.tar.gz" -C "$HOME/.local/opt"   # → signal-cli-<ver>/
+    ln -sfn "$dest/bin/signal-cli" "$link"
+    echo "   signal-cli $ver → $link (run 'signal-link' once to link this device)"
+  else
+    echo "WARN: could not download signal-cli $ver from $url"
+  fi
+  rm -rf "$tmp"
+}
+
 install_linux() {
   command -v apt-get >/dev/null 2>&1 || { echo "no apt-get; skipping Linux packages"; return 0; }
   local list="$HOME/.config/dotfiles/apt-packages.txt"
@@ -74,6 +114,8 @@ install_linux() {
   fi
   ensure_gh_linux
   ensure_vault_linux
+  ensure_uv_linux
+  ensure_signal_cli_linux
 }
 
 case "$OS" in

@@ -15,5 +15,6 @@ direnv
 bats
 figlet             # ASCII wordmark for the StumpCloud MOTD
 qrencode           # terminal QR for `signal-link` (link a new Signal device)
+openjdk-21-jre-headless  # JRE for signal-cli (the Signal MCP daemon backend)
 python3-pygments   # provides `pygmentize` — backend for the colorize plugin
 # golang-go      # uncomment for the Go toolchain (enables go-tools.txt)

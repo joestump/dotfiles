@@ -2,7 +2,9 @@
 #   <marketplace-add source>  <plugin>@<marketplace-name>
 # Whitespace-separated; # comments allowed. The marketplace source may be a
 # GitHub owner/repo, a full git URL (e.g. Gitea), or a local path.
-# Add a line + `chezmoi apply` to install it everywhere. Sync with `claude plugin update`.
+# Add a line + `chezmoi apply` to install it everywhere (the run_after script keeps
+# them current). To update one by hand: `claude plugin update <plugin>@<marketplace>`
+# (e.g. `claude plugin update qmd@qmd`) — there is no bulk "update all" form.
 # GitHub marketplaces add directly by owner/repo. The private Gitea one is a
 # LOCAL PATH (chezmoi external clones it to ~/.config/claude-marketplaces/).
 tobi/qmd                                       qmd@qmd

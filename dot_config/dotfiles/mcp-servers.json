@@ -1,5 +1,5 @@
 {
-  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. Secret env values (gitea/github/karakeep tokens) are injected at apply time from OpenBao by the merge scripts; outline is added per-app (http for Code, mcp-remote bridge for Desktop). signal is a thin JSON-RPC client for the signal-cli daemon (LaunchAgent rocks.stump.signal-daemon, tcp 127.0.0.1:7583) — the daemon owns the account/data dir, so no signal-cli/XDG_DATA_HOME is needed here. Edit here, then chezmoi apply.",
+  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. Secret env values (gitea/github/karakeep tokens) are injected at apply time from OpenBao by the merge scripts; outline is added per-app (http for Code, mcp-remote bridge for Desktop). signal is OS-specific (uv path + repo dir differ macOS vs Linux), so it is NOT listed here — the merge scripts inject the .signal entry from chezmoi template values. It's a thin JSON-RPC client for the signal-cli daemon (tcp 127.0.0.1:7583; LaunchAgent rocks.stump.signal-daemon on macOS, systemd --user signal-daemon on Linux). Edit here, then chezmoi apply.",
   "chrome-devtools": {
     "command": "npx",
     "args": ["-y", "chrome-devtools-mcp@latest"],
@@ -19,12 +19,5 @@
     "command": "docker",
     "args": ["run", "-i", "--rm", "--platform", "linux/amd64", "-e", "KARAKEEP_API_ADDR", "-e", "KARAKEEP_API_KEY", "gitea.stump.rocks/joestump/karakeep-mcp:latest"],
     "env": { "KARAKEEP_API_ADDR": "https://karakeep.stump.rocks" }
-  },
-  "signal": {
-    "command": "/opt/homebrew/bin/uv",
-    "args": ["run", "--directory", "/Users/joestump/src/signal-mcp", "server", "--user-id", "+12062257886", "--transport", "stdio"],
-    "env": {
-      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-    }
   }
 }

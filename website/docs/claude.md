@@ -34,6 +34,30 @@ Servers: `chrome-devtools`, `gitea`, `github`, `karakeep`, `outline`, `signal`.
 chezmoi apply
 ```
 
+### Signal (cross-platform, daemon-backed)
+
+`signal` is the one server that isn't a plain entry in `mcp-servers.json` — its `uv`
+path and env `PATH` differ by OS, so the merge scripts **inject** `.signal` from
+chezmoi template values. It's a thin JSON-RPC client to a long-running **signal-cli
+daemon** on `tcp 127.0.0.1:7583`, supervised per-OS:
+
+- **macOS** — LaunchAgent `rocks.stump.signal-daemon`; `signal-cli` + `uv` via Homebrew.
+- **Linux** — systemd `--user` unit `signal-daemon`; `chezmoi apply` provisions the
+  JRE (apt), `uv` (astral installer), `signal-cli` (pinned release tarball →
+  `~/.local/bin`), and clones the MCP repo to `~/src/signal-mcp` (a Linux-only
+  external, pinned to the daemon-rewrite branch).
+
+**One-time per node:** signal-cli must be *linked* as a device — interactive, so
+chezmoi can't do it. After `chezmoi apply`, run:
+
+```bash
+signal-link            # renders the device-link QR; scan from Signal → Linked Devices
+```
+
+That links the device and starts the daemon; the MCP connects on next Claude launch.
+On a Linux node you don't log into often, keep the daemon alive across logout with
+`sudo loginctl enable-linger $USER` (one-time, the only sudo step).
+
 ## Plugins
 
 `~/.config/dotfiles/claude-plugins.tsv` lists every plugin; a `run_after_` script
@@ -60,4 +84,14 @@ is easy to forget). The last-installed HEAD is tracked per plugin in
 chezmoi apply --refresh-externals
 ```
 
-Remote (GitHub) marketplaces are install-once; update them with `claude plugin update`.
+Remote (GitHub) marketplaces are install-once. There is **no bulk update** — `claude
+plugin update` requires a plugin argument in `<plugin>@<marketplace>` form, e.g.:
+
+```bash
+claude plugin update qmd@qmd
+claude plugin update sdd@claude-plugin-sdd
+claude plugin update claude-skills@joestump
+```
+
+In practice you rarely run these by hand: the `run_after_` script already updates
+remote plugins and reinstalls the local-path one on every `chezmoi apply`.
