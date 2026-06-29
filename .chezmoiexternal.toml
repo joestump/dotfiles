@@ -22,6 +22,13 @@
     url = "https://github.com/matheusml/zsh-ai.git"
     refreshPeriod = "168h"
 
+# shlink — my Shlink (URL shortener) CLI plugin; public Gitea repo, key supplied
+# per-machine via $SHLINK_API_KEY (OpenBao). Anyone can reuse it with their own key.
+[".oh-my-zsh/custom/plugins/shlink"]
+    type = "git-repo"
+    url = "https://gitea.stump.rocks/joestump/shlink-zsh.git"
+    refreshPeriod = "168h"
+
 # ---------- Themes (install many, swap via ZSH_THEME in ~/.zshrc) ----------
 [".oh-my-zsh/custom/themes/spaceship-prompt"]
     type = "git-repo"

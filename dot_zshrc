@@ -117,6 +117,7 @@ plugins=(
   jsontools
   fzf
   zoxide
+  shlink
   zsh-ai
   zsh-autosuggestions
   zsh-syntax-highlighting
