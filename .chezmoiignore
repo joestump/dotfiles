@@ -16,3 +16,13 @@ test/
 # OMZ ships this example; leave it to OMZ, don't manage it.
 .oh-my-zsh/custom/example.zsh
 website/
+dist/
+
+# OS-specific Vault Agent supervisor: launchd LaunchAgent on macOS, systemd
+# --user service on Linux. Ignore the one that doesn't apply to this machine.
+{{ if ne .chezmoi.os "darwin" -}}
+Library/
+{{ end -}}
+{{ if ne .chezmoi.os "linux" -}}
+.config/systemd/
+{{ end -}}

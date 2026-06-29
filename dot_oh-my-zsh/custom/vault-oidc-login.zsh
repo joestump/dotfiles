@@ -18,5 +18,10 @@ vault-oidc-login() {
     print -u2 "leave it open, then continue here.\n"
     print -n "Press Enter once the tunnel is up (Ctrl-C to abort)... "; read -r
   fi
-  vault login -method=oidc
+  if vault login -method=oidc; then
+    # All-in-one: kick the agent so secrets populate immediately (and it re-reads
+    # the fresh token). restart if it's already up, else start it.
+    print -u2 "✅ logged in — (re)starting the Vault Agent to render secrets…"
+    vault-agent restart 2>/dev/null || vault-agent start
+  fi
 }

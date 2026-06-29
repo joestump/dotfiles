@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Enable the Vault Agent as a systemd USER service on Linux — NO sudo.
+# macOS uses the launchd LaunchAgent instead (handled by the plist + RunAtLoad).
+# Re-runs when the unit file changes (hash embedded below).
+#
+# unit hash: {{ include "dot_config/systemd/user/vault-agent.service.tmpl" | sha256sum }}
+set -euo pipefail
+
+[ "$(uname -s)" = "Linux" ] || exit 0
+command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping vault-agent service"; exit 0; }
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# Needs a per-user systemd instance (present in any login session). Soft-fail if
+# not — the agent can still be started in-session later with `vault-agent start`.
+if ! systemctl --user daemon-reload 2>/dev/null; then
+  echo "WARN: no user systemd bus right now — after 'vault login', run: vault-agent start"
+  exit 0
+fi
+
+if systemctl --user enable --now vault-agent 2>/dev/null; then
+  echo "vault-agent (systemd --user) enabled + started"
+else
+  echo "WARN: couldn't enable vault-agent yet; run 'vault-agent start' after 'vault login'."
+fi

@@ -1,0 +1,22 @@
+# Vault Agent as a systemd USER service (no sudo) — managed by chezmoi.
+# The Linux counterpart to the macOS launchd LaunchAgent. Runs as you, reads the
+# token from `vault login`, and renders ~/.config/vault/secrets-*.env.
+#
+#   enable:  systemctl --user enable --now vault-agent   (or: vault-agent start)
+#   logs:    journalctl --user -u vault-agent -f         (or: vault-agent log)
+#
+# A user service runs while you have a session. To keep it running when you are
+# NOT logged in (optional, needs sudo ONCE):  sudo loginctl enable-linger {{ .chezmoi.username }}
+[Unit]
+Description=Vault Agent (renders OpenBao secrets)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=VAULT_ADDR=https://vault.stump.rocks
+ExecStart={{ lookPath "vault" | default "/usr/bin/vault" }} agent -config=%h/.config/vault/agent.hcl
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
