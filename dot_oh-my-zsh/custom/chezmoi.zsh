@@ -12,13 +12,12 @@ czu() {
   [[ -o interactive ]] && exec zsh
 }
 
-# czinit <host> — bootstrap the dotfiles on a fresh node over SSH, in one step.
-# The private dotfiles repo can't clone on a bare node (no creds yet), so this:
-#   1. seeds the node's git credential store with your Gitea token (piped over
-#      stdin — never in argv), so the clone authenticates;
-#   2. installs chezmoi from get.chezmoi.io and runs `chezmoi init --apply`.
-# After it finishes, run `vault-oidc-login` ON the node once to render secrets
-# (then the Vault-Agent-backed credential helper takes over and `czu` is hands-off).
+# czinit <host> — bootstrap a fresh node end-to-end over SSH, in one command:
+#   1. seed the node's git credential store with your Gitea token (piped over
+#      stdin — never in argv), so the private dotfiles repo can clone;
+#   2. install chezmoi from get.chezmoi.io and run `chezmoi init --apply`;
+#   3. log in to OpenBao via OIDC (vault-login: tunnel + login + agent kick) so
+#      secrets render. You just click Authorize in the browser when it opens.
 #   e.g.  czinit joestump@ie02.stump.rocks
 czinit() {
   emulate -L zsh
@@ -38,7 +37,19 @@ czinit() {
     || { print -u2 "czinit: could not seed credentials on ${host}"; return 1 }
 
   print -u2 "→ installing chezmoi + applying dotfiles on ${host} (sudo may prompt) …"
-  ssh -t "$host" "sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- init --apply '${repo}'"
+  ssh -t "$host" "sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- init --apply '${repo}'" \
+    || { print -u2 "czinit: bootstrap failed on ${host}"; return 1; }
 
-  print -u2 "\n✓ ${host} bootstrapped. Final step — ON ${host}, run: vault-oidc-login"
+  # Log in to OpenBao right here. OIDC needs one browser click to authorize, but
+  # vault-login handles the rest: opens the localhost:8250 tunnel, runs the login
+  # on the node, and kicks the Vault Agent so secrets render.
+  if (( $+functions[vault-login] )); then
+    print -u2 "→ authenticating to OpenBao (OIDC) — click Authorize in the browser tab when it opens …"
+    vault-login "$host" \
+      || print -u2 "czinit: OIDC step skipped/failed — run 'vault-login ${host}' later to render secrets."
+  else
+    print -u2 "→ final step — run: vault-login ${host}"
+  fi
+
+  print -u2 "\n✓ ${host} bootstrapped — dotfiles applied and (once authorized) secrets rendered."
 }
