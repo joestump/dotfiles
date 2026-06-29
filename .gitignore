@@ -10,3 +10,6 @@
 # chezmoi local state / OS cruft
 .DS_Store
 chezmoistate.boltdb
+
+# Docusaurus build output (the pages workflow builds this; never commit it)
+/dist/
