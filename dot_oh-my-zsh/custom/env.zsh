@@ -5,6 +5,13 @@
 # (from secret/personal/llm). The secret VALUES never live in this file or the
 # repo; only $VAR references do.
 
+# Put user-local bins on PATH. Tools like the Claude Code CLI, uv/pipx, and the
+# `signal-link` helper install to ~/.local/bin — and zsh (unlike Ubuntu's bash
+# ~/.profile) doesn't add it on its own, so `claude` & friends would be "not
+# found". `typeset -U` keeps PATH de-duplicated, so this is safe to re-source.
+typeset -U path PATH
+path=( "$HOME/.local/bin" "$HOME/bin" $path )
+
 # OpenBao endpoint — set unconditionally so it's available even on a fresh node,
 # before any secrets exist (you need it to `vault login` the very first time).
 export VAULT_ADDR="https://vault.stump.rocks"
