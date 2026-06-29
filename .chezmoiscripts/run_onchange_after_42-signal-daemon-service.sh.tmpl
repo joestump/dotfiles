@@ -18,7 +18,7 @@ fi
 # Installed but not linked? Don't start the daemon (KeepAlive/Restart would just
 # crash-loop on "no account"). Detect via accounts.json — a file check, so we
 # never spin signal-cli and risk deadlocking against an already-running daemon.
-accounts="$HOME/.local/share/signal-cli/data/accounts.json"
+accounts="${XDG_DATA_HOME:-$HOME/.local/share}/signal-cli/data/accounts.json"
 if [ ! -f "$accounts" ] || ! grep -q '"number"' "$accounts" 2>/dev/null; then
   echo "signal-cli installed but no account linked here — run 'signal-link', then 'signal-daemon start'."
   exit 0

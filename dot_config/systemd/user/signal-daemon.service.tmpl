@@ -18,7 +18,9 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart={{ lookPath "signal-cli" | default "/usr/local/bin/signal-cli" }} -d %h/.local/share/signal-cli -a +12062257886 daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
+# No -d: signal-cli uses its default data dir ($XDG_DATA_HOME/signal-cli, i.e.
+# ~/.local/share/signal-cli) — the same place `signal-cli link` writes.
+ExecStart={{ lookPath "signal-cli" | default "/usr/local/bin/signal-cli" }} -a +12062257886 daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
 Restart=on-failure
 RestartSec=5
 

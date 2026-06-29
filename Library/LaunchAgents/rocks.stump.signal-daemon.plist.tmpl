@@ -6,9 +6,9 @@
     <string>rocks.stump.signal-daemon</string>
     <key>ProgramArguments</key>
     <array>
+        <!-- No -d: signal-cli uses its default data dir ($XDG_DATA_HOME/signal-cli,
+             i.e. ~/.local/share/signal-cli) — the same place `signal-cli link` writes. -->
         <string>{{ lookPath "signal-cli" }}</string>
-        <string>-d</string>
-        <string>{{ .chezmoi.homeDir }}/.local/share/signal-cli</string>
         <string>-a</string>
         <string>+12062257886</string>
         <string>daemon</string>
