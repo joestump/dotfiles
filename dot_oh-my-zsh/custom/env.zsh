@@ -7,3 +7,12 @@
 #
 # Secrets never go here — those come from OpenBao via the Vault Agent (secrets.zsh).
 export VAULT_ADDR="https://vault.stump.rocks"
+
+# LiteLLM Configurations for AI tooling
+export OPENAI_API_KEY="$LITELLM_API_KEY"
+export OPENAI_BASE_URL="https://litellm.stump.rocks"
+
+# Wire up the AI completion in ZSH to LiteLLM
+export ZSH_AI_OPENAI_URL="https://${OPENAI_BASE_URL}/v1/chat/completions"
+export ZSH_AI_OPENAI_API_KEY="$LITELLM_API_KEY"
+export ZSH_AI_OPENAI_MODEL="gpt-oss:120b"
