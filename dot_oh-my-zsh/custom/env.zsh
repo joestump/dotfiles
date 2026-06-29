@@ -1,18 +1,22 @@
-# Static, non-secret profile/environment variables.
+# Environment variables — static, plus a few derived from secrets.
 #
-# This is the home for vars like VAULT_ADDR that must be set in EVERY interactive
-# shell — including on a fresh node before any secrets exist (you need VAULT_ADDR
-# to run `vault login` the very first time). It loads early: alphabetically before
-# secrets.zsh and the vault-*.zsh helpers, so they can rely on it.
-#
-# Secrets never go here — those come from OpenBao via the Vault Agent (secrets.zsh).
+# Loads AFTER 00-secrets.zsh (the secrets loader sorts first), so vars here may
+# reference secrets the Vault Agent rendered from OpenBao — e.g. $LITELLM_API_KEY
+# (from secret/personal/llm). The secret VALUES never live in this file or the
+# repo; only $VAR references do.
+
+# OpenBao endpoint — set unconditionally so it's available even on a fresh node,
+# before any secrets exist (you need it to `vault login` the very first time).
 export VAULT_ADDR="https://vault.stump.rocks"
 
-# LiteLLM Configurations for AI tooling
+# Route ALL OpenAI-compatible tooling through the self-hosted LiteLLM gateway.
+# (On a fresh node before `vault login`, $LITELLM_API_KEY is empty and these are
+# inert until secrets render — exactly what we want.)
+export OPENAI_BASE_URL="https://litellm.stump.rocks/v1"
 export OPENAI_API_KEY="$LITELLM_API_KEY"
-export OPENAI_BASE_URL="https://litellm.stump.rocks"
 
-# Wire up the AI completion in ZSH to LiteLLM
-export ZSH_AI_OPENAI_URL="https://${OPENAI_BASE_URL}/v1/chat/completions"
+# zsh-ai's OpenAI provider → same gateway. URL is derived from OPENAI_BASE_URL
+# (which already includes the scheme + /v1), so no double "https://".
+export ZSH_AI_OPENAI_URL="${OPENAI_BASE_URL}/chat/completions"
 export ZSH_AI_OPENAI_API_KEY="$LITELLM_API_KEY"
 export ZSH_AI_OPENAI_MODEL="gpt-oss:120b"

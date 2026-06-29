@@ -15,13 +15,13 @@ a schedule; an Oh My Zsh file sources those files into your shell.
 OpenBao server  ──►  Vault Agent (launchd: rocks.stump.vault-agent)  ──►  ~/.config/vault/secrets-*.env (0600)
   KV: secret/personal/*        token_file auto-auth (~/.vault-token)         │
   AWS: aws/creds/personal-cli  renders + renews on a schedule               ▼
-                                                          ~/.oh-my-zsh/custom/secrets.zsh  (source)
+                                                          ~/.oh-my-zsh/custom/00-secrets.zsh  (source)
 ```
 
 - **`~/.config/vault/agent.hcl`** — agent config (from `dot_config/vault/agent.hcl.tmpl`).
 - **`secrets-static.env.ctmpl`** → `secrets-static.env` — static KV secrets.
 - **`secrets-aws.env.ctmpl`** → `secrets-aws.env` — dynamic, short-lived AWS creds.
-- **`custom/secrets.zsh`** — sources every `~/.config/vault/secrets-*.env` (guarded).
+- **`custom/00-secrets.zsh`** — sources every `~/.config/vault/secrets-*.env` (guarded).
 - **`custom/vault-agent.zsh`** — `vault-agent {start|stop|restart|status|log|env}`.
 
 ### KV layout (KV v2 @ mount `secret/`)
@@ -87,7 +87,7 @@ env | grep -E 'OPENAI_API_KEY|AWS_ACCESS_KEY_ID' >/dev/null && echo "loaded ✅"
 #    step 2 (and step 3 for AWS) so OpenBao holds the new values.
 ```
 
-Until step 4 succeeds, `custom/secrets.zsh` is a silent no-op and your existing
+Until step 4 succeeds, `custom/00-secrets.zsh` is a silent no-op and your existing
 `~/.zprofile` keeps working — nothing breaks during bring-up.
 
 ## Day-to-day
@@ -104,7 +104,7 @@ Until step 4 succeeds, `custom/secrets.zsh` is a silent no-op and your existing
 `chezmoi init --apply https://gitea.stump.rocks/joestump/dotfiles.git` **configures
 everything client-side automatically**: installs the `vault` CLI + tools + Oh My
 Zsh, writes the agent config (`~/.config/vault/agent.hcl` + the `*.ctmpl`), installs
-the launchd job, and drops `custom/secrets.zsh` / `custom/vault-agent.zsh`.
+the launchd job, and drops `custom/00-secrets.zsh` / `custom/vault-agent.zsh`.
 
 Two things are **not** baked into the image (they can't be — they're identity /
 already-global):

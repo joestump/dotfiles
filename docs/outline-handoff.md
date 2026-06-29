@@ -109,7 +109,7 @@ $EDITOR .envrc && direnv allow
 
 Nothing secret is stored in files or the repo. Secrets live in OpenBao; a **Vault
 Agent** (launchd) renders them to `~/.config/vault/secrets-*.env` on a schedule —
-including short-lived **dynamic AWS** credentials — and `~/.oh-my-zsh/custom/secrets.zsh`
+including short-lived **dynamic AWS** credentials — and `~/.oh-my-zsh/custom/00-secrets.zsh`
 sources them. Use the **`vault`** CLI (the Homebrew `bao` is an unrelated hashing
 tool).
 

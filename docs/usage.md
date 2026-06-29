@@ -128,7 +128,7 @@ direnv allow
 
 Secrets are **never** committed or written to `.envrc`/`.zprofile` by hand. They
 live in OpenBao (<https://vault.stump.rocks>); a **Vault Agent** renders them to
-`~/.config/vault/secrets-*.env` on a schedule and `~/.oh-my-zsh/custom/secrets.zsh`
+`~/.config/vault/secrets-*.env` on a schedule and `~/.oh-my-zsh/custom/00-secrets.zsh`
 sources them — including short-lived dynamic AWS credentials. Use the **`vault`**
 CLI (the Homebrew `bao` is the unrelated BLAKE3 tool).
 

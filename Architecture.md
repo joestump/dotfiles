@@ -51,7 +51,7 @@ automatically.)
 2. **Non-secret config** — direnv `.envrc` (hostnames, ports, AWS profiles,
    regions). See `examples/envrc.example`.
 3. **Secrets** — never in env files or the repo. A Vault Agent renders them from
-   OpenBao to local env files (sourced by `custom/secrets.zsh`). No dotenvx, no
+   OpenBao to local env files (sourced by `custom/00-secrets.zsh`). No dotenvx, no
    committed `.env`, no second secrets path. See the Secrets section below.
 
 ## OMZ integration rules
@@ -130,7 +130,7 @@ Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
   `secrets-static.env` ← KV `secret/personal/*`; `secrets-aws.env` ← dynamic
   `aws/creds/personal-cli`. `exit_on_retry_failure=false` so a not-yet-configured
   engine doesn't crash the agent.
-- **OMZ loader** `custom/secrets.zsh` sources `~/.config/vault/secrets-*.env`
+- **OMZ loader** `custom/00-secrets.zsh` sources `~/.config/vault/secrets-*.env`
   (guarded). `custom/vault-agent.zsh` provides `vault-agent {start|stop|status|log|env}`.
 - Repo holds config + templates + the loader (paths only); rendered `*.env` files
   (0600) are never committed.

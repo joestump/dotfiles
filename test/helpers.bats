@@ -38,18 +38,18 @@ setup() { setup_stub_path; }
   [[ "$output" == *"VAULT login -method=oidc"* ]]
 }
 
-@test "secrets.zsh: sources rendered secrets-*.env files" {
+@test "00-secrets.zsh: sources rendered secrets-*.env files" {
   local fakehome="$BATS_TEST_TMPDIR/home"
   mkdir -p "$fakehome/.config/vault"
   echo 'export TEST_SECRET=hello' > "$fakehome/.config/vault/secrets-test.env"
-  run zsh -c 'export HOME="'"$fakehome"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/secrets.zsh"; echo "val=$TEST_SECRET"'
+  run zsh -c 'export HOME="'"$fakehome"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/00-secrets.zsh"; echo "val=$TEST_SECRET"'
   [[ "$output" == *"val=hello"* ]]
 }
 
-@test "secrets.zsh: no-op (no error) when nothing is rendered yet" {
+@test "00-secrets.zsh: no-op (no error) when nothing is rendered yet" {
   local fakehome="$BATS_TEST_TMPDIR/home"
   mkdir -p "$fakehome/.config/vault"
-  run zsh -c 'export HOME="'"$fakehome"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/secrets.zsh"; echo done'
+  run zsh -c 'export HOME="'"$fakehome"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/00-secrets.zsh"; echo done'
   [ "$status" -eq 0 ]
   [[ "$output" == *done* ]]
 }

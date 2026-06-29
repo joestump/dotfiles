@@ -21,7 +21,7 @@ OpenBao  ──►  Vault Agent (launchd: rocks.stump.vault-agent)  ──►  f
                                           ~/.config/vault/secrets-*.env  (0600)
                                           ~/.ssh/id_rsa{,.pub}
                                                    │  source
-                                          ~/.oh-my-zsh/custom/secrets.zsh
+                                          ~/.oh-my-zsh/custom/00-secrets.zsh
 ```
 
 - **Env secrets** — the static template **dynamically** exports *every* field of
