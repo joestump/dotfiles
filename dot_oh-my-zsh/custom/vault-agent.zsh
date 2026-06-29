@@ -28,3 +28,22 @@ vault-agent() {
     esac
   fi
 }
+
+# vsr — vault secrets refresh: re-render OpenBao secrets NOW (skip the ~5-min
+# interval) and reload the shell once they're written. `vault-agent restart`
+# returns before the render finishes, so we wait for the rendered file to change
+# first — otherwise you'd reload onto the PREVIOUS values. Full update = `czu`.
+vsr() {
+  emulate -L zsh
+  zmodload -F zsh/stat b:zstat 2>/dev/null
+  local f="$HOME/.config/vault/secrets-static.env"
+  local before now i
+  before=$(zstat +mtime "$f" 2>/dev/null)
+  vault-agent restart || return
+  for i in {1..16}; do                       # wait up to ~8s for a fresh render
+    now=$(zstat +mtime "$f" 2>/dev/null)
+    (( ${now:-0} > ${before:-0} )) && break
+    sleep 0.5
+  done
+  [[ -o interactive ]] && exec zsh
+}
