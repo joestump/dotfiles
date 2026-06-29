@@ -13,5 +13,6 @@ fzf
 zoxide
 direnv
 bats
+figlet             # ASCII wordmark for the StumpCloud MOTD
 python3-pygments   # provides `pygmentize` — backend for the colorize plugin
 # golang-go      # uncomment for the Go toolchain (enables go-tools.txt)

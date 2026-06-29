@@ -24,6 +24,7 @@ brew "bats-core"               # test runner for this repo
 # ---- Everyday CLIs (the usual suspects) ----
 brew "jq"                      # JSON processor
 brew "yq"                      # YAML/JSON/XML processor
+brew "figlet"                  # ASCII wordmark for the StumpCloud MOTD
 brew "curl"
 brew "vim"
 brew "wget"
