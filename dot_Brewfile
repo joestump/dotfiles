@@ -31,6 +31,7 @@ brew "wget"
 brew "gh"                      # GitHub CLI
 brew "tea"                     # Gitea CLI (gitea.com/gitea/tea)
 brew "chroma"                  # syntax highlighter — backend for the colorize plugin (conflict-free)
+brew "signal-cli"              # Signal client; runs as a daemon (rocks.stump.signal-daemon) backing the Signal MCP
 # (vault — the OpenBao client — is installed OS-aware; see the note above.)
 
 # ---- Optional: uncomment what you want; this is your "don't think about it"

@@ -1,0 +1,26 @@
+# signal-cli daemon as a systemd USER service (no sudo) — managed by chezmoi.
+# The Linux counterpart to the macOS launchd LaunchAgent. One warm signal-cli
+# holds the Signal account + a JSON-RPC interface on tcp 127.0.0.1:7583; the
+# Signal MCP is a thin client to it.
+#
+#   enable:  systemctl --user enable --now signal-daemon   (or: signal-daemon start)
+#   logs:    journalctl --user -u signal-daemon -f         (or: signal-daemon log)
+#
+# NOTE: signal-cli must already be LINKED on this host (`signal-cli link` / QR) —
+# linking is interactive and not automated by chezmoi. Until then this unit will
+# fail to start, which is expected on a fresh node.
+#
+# A user service runs while you have a session. To keep it running when you are
+# NOT logged in (optional, needs sudo ONCE):  sudo loginctl enable-linger {{ .chezmoi.username }}
+[Unit]
+Description=signal-cli daemon (JSON-RPC backend for the Signal MCP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={{ lookPath "signal-cli" | default "/usr/local/bin/signal-cli" }} -d %h/.local/share/signal-cli -a +12062257886 daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

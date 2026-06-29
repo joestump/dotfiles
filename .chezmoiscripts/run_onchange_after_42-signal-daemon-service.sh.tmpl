@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Bring up the signal-cli daemon that backs the Signal MCP — NO sudo.
+#   macOS:  (re)load the launchd LaunchAgent (rocks.stump.signal-daemon)
+#   Linux:  enable + start the systemd --user service (signal-daemon)
+# Re-runs whenever the plist OR the unit file changes (hashes embedded below).
+#
+# plist hash: {{ include "Library/LaunchAgents/rocks.stump.signal-daemon.plist.tmpl" | sha256sum }}
+# unit hash:  {{ include "dot_config/systemd/user/signal-daemon.service.tmpl" | sha256sum }}
+set -euo pipefail
+
+# signal-cli must be installed AND linked for the daemon to run. If the binary is
+# missing (fresh node, not yet linked), skip cleanly — nothing to supervise.
+if ! command -v signal-cli >/dev/null 2>&1; then
+  echo "signal-cli not installed yet; skipping signal-daemon (link it, then re-run 'chezmoi apply')"
+  exit 0
+fi
+
+case "$(uname -s)" in
+  Darwin)
+    plist="$HOME/Library/LaunchAgents/rocks.stump.signal-daemon.plist"
+    if [ ! -f "$plist" ]; then
+      echo "WARN: $plist not found (is Library/ applied?); skipping"
+      exit 0
+    fi
+    # Reload so updated args take effect; tolerate 'not loaded' on first run.
+    launchctl unload "$plist" 2>/dev/null || true
+    if launchctl load -w "$plist" 2>/dev/null; then
+      echo "signal-daemon (launchd) loaded — JSON-RPC on tcp 127.0.0.1:7583"
+    else
+      echo "WARN: couldn't load signal-daemon; start it later with 'signal-daemon start'."
+    fi
+    ;;
+  Linux)
+    command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping signal-daemon service"; exit 0; }
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if ! systemctl --user daemon-reload 2>/dev/null; then
+      echo "WARN: no user systemd bus right now — run 'signal-daemon start' in a login session."
+      exit 0
+    fi
+    if systemctl --user enable --now signal-daemon 2>/dev/null; then
+      echo "signal-daemon (systemd --user) enabled + started"
+    else
+      echo "WARN: couldn't start signal-daemon (is signal-cli linked here?); try 'signal-daemon start'."
+    fi
+    ;;
+esac

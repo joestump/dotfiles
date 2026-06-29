@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>rocks.stump.signal-daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ lookPath "signal-cli" }}</string>
+        <string>-d</string>
+        <string>{{ .chezmoi.homeDir }}/.local/share/signal-cli</string>
+        <string>-a</string>
+        <string>+12062257886</string>
+        <string>daemon</string>
+        <string>--tcp</string>
+        <string>127.0.0.1:7583</string>
+        <string>--receive-mode</string>
+        <string>on-start</string>
+        <string>--no-receive-stdout</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- signal-cli is a JVM app; launchd's PATH is minimal, so point it at java + brew. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/signal-cli/daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/signal-cli/daemon.log</string>
+</dict>
+</plist>
