@@ -5,6 +5,11 @@
 # `$(go env GOBIN)` (or $GOPATH/bin) whenever you `chezmoi apply`. Add a line
 # here and it shows up everywhere — no remembering `go install ...`.
 #
+# The gitea MCP server. The Claude config launches it with `go run …@latest`,
+# which recompiles (~12s) on a cold cache and overruns Claude's MCP startup
+# window. Installing it here warms the build cache so `go run` starts instantly.
+gitea.com/gitea/gitea-mcp@latest
+
 # Examples (uncomment or add your own):
 # github.com/jesseduffield/lazygit@latest
 # mvdan.cc/gofumpt@latest

@@ -29,6 +29,18 @@ desired="$(mcp_base | jq --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" '
   # outline: native http + a STATIC Bearer token (no OAuth/refresh tokens), baked.
   | .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
                 headers:{"Authorization": ("Bearer " + $ot)}}
+{{- if ne .chezmoi.os "darwin" }}
+  | del(.signal)   # signal-cli daemon (+ uv/signal-cli) is macOS-only
+{{- end }}
 ')"
 
 mcp_merge "$CJ" "$desired"
+{{- if ne .chezmoi.os "darwin" }}
+
+# signal is macOS-only (signal-cli daemon + uv). mcp_merge preserves existing
+# servers, so explicitly drop any stale signal entry on Linux. Idempotent.
+if jq -e '.mcpServers.signal' "$CJ" >/dev/null 2>&1; then
+  t="$(mktemp)" && jq 'del(.mcpServers.signal)' "$CJ" > "$t" && chmod 600 "$t" && mv "$t" "$CJ" \
+    && echo "  $CJ: dropped macOS-only signal server"
+fi
+{{- end }}
