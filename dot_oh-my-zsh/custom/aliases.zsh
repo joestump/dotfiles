@@ -1,9 +1,10 @@
 # Shell aliases & small shortcuts.
 
-# reset — make it a FULL reset: reinitialize the terminal (the real `reset`) AND
-# reload the shell, so both the display and the shell's env/config are a clean
-# slate. `command reset` calls the actual reset binary (no function recursion).
+# reset — make it a FULL reset: reinitialize the terminal (the real `reset`), then
+# run `cu` (chezmoi update + vault-agent restart + exec zsh) so config, secrets,
+# the shell, AND the terminal all come back current. `command reset` calls the
+# actual reset binary (no function recursion); `cu` is defined in chezmoi.zsh.
 reset() {
   command reset "$@"
-  [[ -o interactive ]] && exec zsh
+  [[ -o interactive ]] && cu
 }
