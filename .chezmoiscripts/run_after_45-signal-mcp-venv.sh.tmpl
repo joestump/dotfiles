@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Warm the Signal MCP's uv venv (Linux only) so the FIRST Claude launch doesn't
+# cold-resolve `mcp` + its transitive deps and overrun the MCP init window — the
+# same class of slow-first-start we warm away for gitea-mcp via go-tools.txt.
+#
+# Runs on every apply (cheap: a directory test once warm). On macOS this is Joe's
+# own dev checkout of signal-mcp, so we never touch its venv.
+set -euo pipefail
+{{- if ne .chezmoi.os "darwin" }}
+repo="$HOME/src/signal-mcp"
+# uv installs to ~/.local/bin; chezmoi may run from a shell that hasn't sourced it.
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv >/dev/null 2>&1 || { echo "uv absent; skipping signal-mcp venv warm"; exit 0; }
+[ -d "$repo" ] || { echo "no $repo yet (external not cloned?); skipping venv warm"; exit 0; }
+
+if [ -d "$repo/.venv" ]; then
+  echo "signal-mcp venv already warm"
+else
+  echo "==> warming signal-mcp uv venv ($repo)"
+  uv sync --directory "$repo" || echo "WARN: uv sync failed; first Claude launch may cold-start"
+fi
+{{- else }}
+:  # macOS: signal-mcp is a dev checkout — leave its venv alone.
+{{- end }}
