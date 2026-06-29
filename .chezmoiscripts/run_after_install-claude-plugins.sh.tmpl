@@ -18,6 +18,11 @@
 # immediate pull+propagate after pushing skills: `chezmoi apply --refresh-externals`.
 set -euo pipefail
 
+# claude installs to ~/.local/bin. chezmoi may be invoked from a shell that
+# hasn't put that on PATH (e.g. a still-open login shell from before env.zsh
+# added it), which would make us wrongly skip "claude absent". Add it here.
+export PATH="$HOME/.local/bin:$PATH"
+
 command -v claude >/dev/null 2>&1 || { echo "claude CLI absent; skipping plugins"; exit 0; }
 LIST="$HOME/.config/dotfiles/claude-plugins.tsv"
 [ -f "$LIST" ] || { echo "no claude-plugins.tsv; skipping"; exit 0; }
