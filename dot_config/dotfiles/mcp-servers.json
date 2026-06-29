@@ -2,7 +2,7 @@
   "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. Secret env values (gitea/github/karakeep tokens) are injected at apply time from OpenBao by the merge scripts; outline is added per-app (http for Code, mcp-remote bridge for Desktop). Edit here, then chezmoi apply.",
   "chrome-devtools": {
     "command": "npx",
-    "args": ["chrome-devtools-mcp@latest"],
+    "args": ["-y", "chrome-devtools-mcp@latest"],
     "env": {}
   },
   "gitea": {
@@ -17,7 +17,7 @@
   },
   "karakeep": {
     "command": "npx",
-    "args": ["@karakeep/mcp"],
+    "args": ["-y", "@karakeep/mcp"],
     "env": { "KARAKEEP_API_ADDR": "https://karakeep.stump.rocks" }
   },
   "signal": {
