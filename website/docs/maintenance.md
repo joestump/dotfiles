@@ -33,8 +33,8 @@ chezmoi apply
 ## Add a Claude MCP server or plugin
 
 Edit `~/.config/dotfiles/mcp-servers.json` (+ its OpenBao secret) or
-`claude-plugins.tsv`, then `chezmoi apply`. Full reference: [Claude (MCP +
-Plugins)](claude).
+`claude-plugins.tsv`, then `chezmoi apply`. Full reference:
+[MCP servers](claude/mcp).
 
 ## Link Signal on a new node
 
@@ -44,7 +44,7 @@ Plugins)](claude).
 signal-link        # scan the QR from Signal → Linked Devices
 ```
 
-Details (daemon control, troubleshooting): [Signal](signal).
+Details (daemon control, troubleshooting): [Signal](claude/signal).
 
 ## Add a prompt glyph
 
@@ -62,7 +62,7 @@ brew bundle --global                   # macOS tools
 Claude **plugins** update themselves — the `run_after_` script reinstalls the
 local-path marketplace and updates remotes on every apply. There's no bulk
 `claude plugin update`; to force one by hand it's `claude plugin update
-<plugin>@<marketplace>` (e.g. `qmd@qmd`). See [Claude](claude#plugins).
+<plugin>@<marketplace>` (e.g. `qmd@qmd`). See [Plugins](claude/plugins).
 
 ## CI
 

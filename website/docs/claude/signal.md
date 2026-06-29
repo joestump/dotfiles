@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 4
 title: Signal
 ---
 
@@ -101,12 +101,12 @@ The same `signal-daemon` verbs work on both OSes (launchd under the hood on macO
 
 `~/src/signal-mcp` is the fork **`github.com/joestump/signal-mcp`** (default branch
 `main`, which carries the JSON-RPC daemon client, reaction parsing, and the
-trusted-recipients allowlist). On macOS this is **your own working checkout** — chezmoi
-deliberately doesn't manage it. On Linux it's a chezmoi **external** that tracks
-`main` (ff-only pulls, refreshed weekly). The MCP is launched with
+trusted-recipients allowlist). On macOS this is **your own working checkout** —
+chezmoi deliberately doesn't manage it. On Linux it's a chezmoi **external** that
+tracks `main` (ff-only pulls, refreshed weekly). The MCP is launched with
 `uv run --directory ~/src/signal-mcp server --user-id <number> --transport stdio`;
 the per-OS `uv` path and `PATH` are injected by the
-[MCP merge scripts](claude#the-servers).
+[MCP merge scripts](./mcp#the-servers).
 
 > **Note-to-self number:** `+12062257886`. Signal renders **no markdown** — plain
 > text, emoji, and bare `https://` URLs only.
