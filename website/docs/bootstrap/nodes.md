@@ -10,6 +10,18 @@ workers. They're lean and **apt-only**: no Homebrew, no laptop-grade tooling.
 
 ## From the mothership (recommended)
 
+> ⚡ **One shot: `czinit <host>`** — the fastest path. In a single command it seeds
+> the node's Gitea credentials, installs chezmoi and runs `init --apply`, then logs
+> the box into OpenBao over OIDC so secrets render. You only click **Authorize** when
+> the browser tab opens:
+>
+> ```bash
+> czinit joestump@ie02.stump.rocks
+> ```
+>
+> Everything below — the SSH clone, the credential note, and the [secrets](#then-secrets)
+> step — is what `czinit` automates, shown here for when you need to run a piece by hand.
+
 `chezmoi ssh` does the whole thing over SSH and drops you into a shell on the box:
 
 ```bash
