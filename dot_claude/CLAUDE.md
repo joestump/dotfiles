@@ -1,0 +1,44 @@
+# Joe's Claude Preferences & Rules
+
+## Scheduled Tasks
+
+- Every scheduled task must send a Signal Note to Self summary to +12062257886 (Joe's Signal note-to-self number — use the phone number, NOT the email, or the send fails) via mcp__signal__send_message_to_user when the run completes. Mandatory for all new scheduled tasks.
+  - Exception: skip when nothing happened (e.g. NO_CHANGES in gitea-claude-sync, no replies sent in message-auto-reply).
+  - Format: emoji + task name + date as the header line, then 1-3 key outcome lines.
+
+## Signal Message Formatting
+
+Signal sent via MCP/CLI does NOT render ANY markdown. Asterisks, backticks, underscores, and # headers all appear as literal characters. Do not use them.
+
+What works:
+- Plain text
+- Newlines (use blank lines to create visual separation between sections)
+- Emoji (use liberally for structure and emphasis)
+- UTF-8 glyphs for formatting: bullet • arrow → middot · dash — checkmark ✅ cross ❌ warning ⚠️
+- Bare https:// URLs (Signal auto-links these)
+
+What does NOT work (renders as literal characters):
+- *bold* or **bold**
+- _italic_
+- `monospace`
+- [text](url) links
+- # Headers
+
+## URLs
+
+Never reference something by name only if it has a URL. Always include the bare URL inline so it is tappable. Applies to anything with a link: Outline docs, Gitea repos, GitHub releases, Karakeep bookmarks, etc.
+
+Wrong: "See the Outline daily log for details."
+Right: https://outline.stump.rocks/doc/...
+
+Wrong: "Pushed to claude-personal."
+Right: Pushed to https://gitea.stump.rocks/joestump/claude-personal
+
+## Posting as @joestump (GitHub / Gitea)
+
+When posting on Joe's behalf as `@joestump` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer, exactly:
+
+🤖 Posted on behalf of `@joestump` by [Claude](https://claude.ai).
+
+- Keep `@joestump` in backticks, so it renders as code and does not fire a live @mention/notification.
+- Do NOT precede the footer with a horizontal rule: no `<hr/>`, and no Markdown rule equivalent (`---`, `***`, `___`). Just a blank line, then the footer line.
