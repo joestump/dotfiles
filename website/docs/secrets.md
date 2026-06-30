@@ -14,14 +14,13 @@ shell sources the result.
 
 ## The flow
 
-```
-OpenBao  ──►  Vault Agent (launchd: rocks.stump.vault-agent)  ──►  files
- KV: secret/personal/*      token_file auth (~/.vault-token)        │
- renders every 5 min        renews the token                       ▼
-                                          ~/.config/vault/secrets-*.env  (0600)
-                                          ~/.ssh/id_rsa{,.pub}
-                                                   │  source
-                                          ~/.oh-my-zsh/custom/00-secrets.zsh
+```mermaid
+flowchart TD
+    bao["OpenBao<br/>KV: secret/personal/*"]
+    agent["Vault Agent (launchd: rocks.stump.vault-agent)<br/>token_file auth (~/.vault-token) · renews the token · renders every ~5 min"]
+    files["~/.config/vault/secrets-*.env (0600)<br/>~/.ssh/id_rsa + id_rsa.pub"]
+    shell["~/.oh-my-zsh/custom/00-secrets.zsh"]
+    bao --> agent --> files -->|source| shell
 ```
 
 - **Env secrets** — the static template **dynamically** exports *every* field of

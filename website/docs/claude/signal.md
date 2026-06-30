@@ -16,10 +16,13 @@ Claude does **not** spawn `signal-cli` per call. A single long-running **signal-
 daemon** holds the account and exposes JSON-RPC on `tcp 127.0.0.1:7583`; the MCP is
 a thin client to it.
 
-```
-Claude  ──stdio──►  signal-mcp  ──JSON-RPC──►  signal-cli daemon  ──►  Signal
-(MCP client)        (uv run …)   127.0.0.1:7583   (one warm JVM,        servers
-                                                   holds the account)
+```mermaid
+flowchart TD
+    claude["Claude (MCP client)"]
+    mcp["signal-mcp (uv run …)"]
+    daemon["signal-cli daemon<br/>127.0.0.1:7583 · one warm JVM, holds the account"]
+    signal["Signal servers"]
+    claude -->|stdio| mcp -->|JSON-RPC| daemon --> signal
 ```
 
 Why a daemon? signal-cli holds an exclusive lock on its data dir, and the JVM is

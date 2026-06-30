@@ -9,22 +9,14 @@ slug: /overview
 These dotfiles turn a fresh machine into **my** machine with one command. Everything
 is declarative, backed by self-hosted infrastructure, and the same on every box.
 
-```
-        ┌──────────────────────────── chezmoi ────────────────────────────┐
-        │  gitea.stump.rocks/joestump/dotfiles  (private, the source)      │
-        └───────────────┬───────────────────────────────┬─────────────────┘
-                        │ chezmoi init --apply           │
-              ┌─────────▼─────────┐             ┌─────────▼──────────┐
-              │   MOTHERSHIP      │             │   UTILITY NODES    │
-              │   macOS laptop    │             │   ie01, ie02, …    │
-              │   Homebrew        │             │   Ubuntu / apt     │
-              └─────────┬─────────┘             └─────────┬──────────┘
-                        │  Oh My Zsh + helpers + tooling   │
-                        └───────────────┬──────────────────┘
-                              ┌─────────▼─────────┐
-                              │  OpenBao + Vault  │  secrets, never in the repo
-                              │  Agent → env/files│
-                              └───────────────────┘
+```mermaid
+flowchart TD
+    src["gitea.stump.rocks/joestump/dotfiles<br/>(private — the source)"]
+    src -->|"chezmoi init --apply"| mother["MOTHERSHIP<br/>macOS laptop · Homebrew"]
+    src -->|"chezmoi init --apply"| nodes["UTILITY NODES<br/>ie01, ie02, … · Ubuntu / apt"]
+    mother --> omz["Oh My Zsh + helpers + tooling"]
+    nodes --> omz
+    omz --> bao["OpenBao + Vault Agent<br/>secrets → env/files · never in the repo"]
 ```
 
 ## The pieces

@@ -19,13 +19,17 @@ apply`, and every app on every box converges.
 
 ## One source, every app
 
-```
-~/.config/dotfiles/mcp-servers.json    (non-secret server defs — the source)
-~/.config/dotfiles/claude-plugins.tsv  (the plugin list)
-        │   run_onchange_ merge scripts  +  OpenBao secrets (baked at apply)
-        ▼
-~/.claude.json              ~/Library/Application Support/Claude/…
-(Code — macOS + Linux)      (Desktop — macOS)
+```mermaid
+flowchart TD
+    src["mcp-servers.json — server defs<br/>claude-plugins.tsv — plugin list"]
+    bao["OpenBao secrets<br/>(baked at apply)"]
+    merge["run_onchange_ merge scripts"]
+    code["~/.claude.json<br/>Claude Code — macOS + Linux"]
+    desk["claude_desktop_config.json<br/>Claude Desktop — macOS"]
+    src --> merge
+    bao --> merge
+    merge --> code
+    merge --> desk
 ```
 
 The merge handles the things that *must* differ, so you don't have to:

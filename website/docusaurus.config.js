@@ -13,7 +13,8 @@ const config = {
   organizationName: 'joestump',
   projectName: 'dotfiles',
   onBrokenLinks: 'warn',
-  markdown: {hooks: {onBrokenMarkdownLinks: 'warn'}},
+  markdown: {mermaid: true, hooks: {onBrokenMarkdownLinks: 'warn'}},
+  themes: ['@docusaurus/theme-mermaid'],
 
   future: {v4: true},
 
@@ -39,6 +40,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       colorMode: {defaultMode: 'dark', disableSwitch: true, respectPrefersColorScheme: false},
+      mermaid: {theme: {light: 'dark', dark: 'dark'}},
       navbar: {
         title: 'DOTFILES',
         items: [
