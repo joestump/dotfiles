@@ -53,17 +53,15 @@ Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
 
 ## Update everything
 
-:::tip One step: `czu`
-`czu` brings this machine fully current in a single command — it runs `chezmoi
-update` (git pull + apply), then `vault-agent restart` (re-render secrets from
-OpenBao **now** instead of waiting ~5 min), then `exec zsh` to reload the shell so
-new config + secrets take effect. Extra args pass straight through, so
-**`czu --refresh-externals`** also re-pulls themes, plugins, marketplaces, and the
-`signal-mcp` clone.
-
-(Bootstrapping a *fresh* node instead? `czinit <host>` does the whole thing over
-SSH — see [Bootstrap a Node](bootstrap/nodes).)
-:::
+> 💡 **One step: `czu`** — brings this machine fully current in a single command: it
+> runs `chezmoi update` (git pull + apply), then `vault-agent restart` (re-render
+> secrets from OpenBao **now** instead of waiting ~5 min), then `exec zsh` to reload
+> the shell so new config + secrets take effect. Extra args pass straight through, so
+> **`czu --refresh-externals`** also re-pulls themes, plugins, marketplaces, and the
+> `signal-mcp` clone.
+>
+> Bootstrapping a *fresh* node instead? `czinit <host>` does the whole thing over SSH
+> — see [Bootstrap a Node](bootstrap/nodes).
 
 Under the hood, or to run the pieces by hand:
 

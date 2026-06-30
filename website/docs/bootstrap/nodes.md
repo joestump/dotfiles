@@ -16,14 +16,12 @@ workers. They're lean and **apt-only**: no Homebrew, no laptop-grade tooling.
 chezmoi ssh <host> https://gitea.stump.rocks/joestump/dotfiles.git
 ```
 
-:::warning Private repo over SSH
-The repo is private, so the clone needs credentials on the node. If `chezmoi ssh`
-fails with `could not read Username for https://gitea.stump.rocks`, either use the
-**SSH clone URL** (`git@gitea.stump.rocks:joestump/dotfiles.git`) if that box's key
-is on your Gitea account, or stash a Gitea token in git's credential store there once.
-Also: `<host>` must actually resolve from your laptop — use a Tailscale name or FQDN
-like `ie01.stump.rocks`, not a bare `ie01`.
-:::
+> ⚠️ **Private repo over SSH** — the clone needs credentials on the node. If `chezmoi
+> ssh` fails with `could not read Username for https://gitea.stump.rocks`, either use
+> the **SSH clone URL** (`git@gitea.stump.rocks:joestump/dotfiles.git`) if that box's
+> key is on your Gitea account, or stash a Gitea token in git's credential store there
+> once. Also: `<host>` must actually resolve from your laptop — use a Tailscale name or
+> FQDN like `ie01.stump.rocks`, not a bare `ie01`.
 
 ## On the box directly
 
@@ -51,11 +49,10 @@ vault login -method=oidc      # over SSH? see the tunnel note in Secrets
 vault-agent start
 ```
 
-:::tip Re-bootstrapping a node
-If a node gets into a weird state, nuke chezmoi's cache and re-run — it re-clones
-HEAD cleanly:
-```bash
-rm -rf ~/.local/share/chezmoi ~/.config/chezmoi ~/.cache/chezmoi
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
-```
-:::
+> 💡 **Re-bootstrapping a node** — if a node gets into a weird state, nuke chezmoi's
+> cache and re-run; it re-clones HEAD cleanly:
+>
+> ```bash
+> rm -rf ~/.local/share/chezmoi ~/.config/chezmoi ~/.cache/chezmoi
+> sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+> ```
