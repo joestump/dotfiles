@@ -1,5 +1,5 @@
 {
-  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. Secret env values (gitea/github/karakeep tokens) are injected at apply time from OpenBao by the merge scripts; outline is added per-app (http for Code, mcp-remote bridge for Desktop). signal is OS-specific (uv path + repo dir differ macOS vs Linux), so it is NOT listed here — the merge scripts inject the .signal entry from chezmoi template values. It's a thin JSON-RPC client for the signal-cli daemon (tcp 127.0.0.1:7583; LaunchAgent rocks.stump.signal-daemon on macOS, systemd --user signal-daemon on Linux). Edit here, then chezmoi apply.",
+  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. NO Docker: every server here is a plain stdio launcher (npx/go). Secret env values (karakeep token) are injected at apply time from OpenBao by the merge scripts. Three servers are NOT listed here because their shape differs per-app or per-OS and the merge scripts inject them: github + outline are remote HTTP (http for Code, npx mcp-remote bridge for Desktop) with a baked Bearer token; signal is a per-OS stdio launcher (uv path + repo dir differ macOS vs Linux) talking to the signal-cli daemon (tcp 127.0.0.1:7583). Edit here, then chezmoi apply.",
   "chrome-devtools": {
     "command": "npx",
     "args": ["-y", "chrome-devtools-mcp@latest"],
@@ -10,14 +10,9 @@
     "args": ["run", "gitea.com/gitea/gitea-mcp@latest", "-t", "stdio"],
     "env": { "GITEA_HOST": "https://gitea.stump.rocks" }
   },
-  "github": {
-    "command": "docker",
-    "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"],
-    "env": {}
-  },
   "karakeep": {
-    "command": "docker",
-    "args": ["run", "-i", "--rm", "--platform", "linux/amd64", "-e", "KARAKEEP_API_ADDR", "-e", "KARAKEEP_API_KEY", "gitea.stump.rocks/joestump/karakeep-mcp:latest"],
+    "command": "npx",
+    "args": ["-y", "@karakeep/mcp"],
     "env": { "KARAKEEP_API_ADDR": "https://karakeep.stump.rocks" }
   }
 }

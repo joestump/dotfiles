@@ -11,7 +11,10 @@ DC="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 echo "==> Claude Desktop mcpServers merge"
 
 GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.gitea.env.GITEA_ACCESS_TOKEN // ""'        "$DC")")"
-GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // ""' "$DC")")"
+# github is the REMOTE hosted GitHub MCP, reached via the npx mcp-remote bridge with
+# a PAT Bearer (no Docker). Fallback extracts the prior token from the bridge's
+# --header arg (ltrimstr no-ops on a bare pre-migration env value).
+GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '(([.mcpServers.github.args[]?] | map(select(startswith("Authorization:Bearer ")))[0]) // .mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // "") | ltrimstr("Authorization:Bearer ")' "$DC")")"
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$DC")")"
 # Desktop is GUI-launched (no shell env to inherit), so outline's Bearer token is
 # baked here at apply time — read straight from the Vault-Agent-rendered secrets
@@ -36,8 +39,10 @@ desired="$(mcp_base | jq \
   --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
     .gitea.env.GITEA_ACCESS_TOKEN              = $gt
-  | .github.env.GITHUB_PERSONAL_ACCESS_TOKEN   = $gh
   | .karakeep.env.KARAKEEP_API_KEY             = $kk
+  # github: REMOTE hosted MCP via the mcp-remote stdio bridge + PAT Bearer (no Docker).
+  | .github = {command:"npx", args:["-y","mcp-remote","https://api.githubcopilot.com/mcp/",
+                                     "--header", ("Authorization:Bearer " + $gh)]}
   | .outline = {command:"npx", args:["-y","mcp-remote","https://outline.stump.rocks/mcp",
                                       "--header", ("Authorization:Bearer " + $ot)]}
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
