@@ -19,3 +19,8 @@ email: "joe@stump.rocks"
 # this repo? Set this to your own handle and everything re-points. Distinct from
 # {{ .chezmoi.username }} (the OS login user), which stays machine-derived.
 githubUser: "joestump"
+
+# Shlink (URL shortener) base URL — non-secret config for the shlink OMZ plugin,
+# exported as SHLINK_API_URL from env.zsh. The API KEY is the secret half and comes
+# from OpenBao (secret/personal/shlink → SHLINK_API_KEY), NOT here.
+shlinkApiUrl: "https://u.stu.mp"
