@@ -21,7 +21,7 @@ Wants=network-online.target
 # No -d: signal-cli uses its default data dir ($XDG_DATA_HOME/signal-cli, i.e.
 # ~/.local/share/signal-cli) — the same place `signal-cli link` writes.
 # Path is deterministic: the package script installs signal-cli to ~/.local/bin.
-ExecStart={{ .chezmoi.homeDir }}/.local/bin/signal-cli -a +12062257886 daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
+ExecStart={{ .chezmoi.homeDir }}/.local/bin/signal-cli -a {{ .signalNumber }} daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
 Restart=on-failure
 RestartSec=5
 

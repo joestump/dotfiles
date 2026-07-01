@@ -1,0 +1,15 @@
+# Non-secret template data, shared across every machine. Reference these in any
+# `.tmpl` file as {{ .signalNumber }} etc. This file is committed and NOT encrypted
+# — it's for config, not secrets (secrets come from OpenBao at runtime).
+#
+# Single source of truth for values that were previously hardcoded in many places.
+# To change one, edit here and `chezmoi apply`.
+
+# Joe's Signal note-to-self number (E.164). Backs the signal-cli daemon + the Signal
+# MCP (--user-id) + scheduled-task summaries. Quoted so YAML keeps it a string.
+signalNumber: "+12062257886"
+
+# Contact email. Not currently referenced anywhere (the repo had no real email — the
+# joestump@host strings are SSH targets), but kept here as the single place to set it
+# if a template ever needs {{ .email }}.
+email: "joe@stump.rocks"
