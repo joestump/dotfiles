@@ -34,6 +34,18 @@ Right: https://outline.stump.rocks/doc/...
 Wrong: "Pushed to claude-personal."
 Right: Pushed to https://gitea.stump.rocks/{{ .githubUser }}/claude-personal
 
+## Outline Daily Log — link real operations
+
+When any scheduled task or skill appends a run entry to an Outline daily log (the "Scheduled Tasks" collection, "Automation Run Reports", or similar), every operation mentioned must link to the actual artifact, not just name it:
+
+- Commits → link the specific commit, not just the repo (e.g. `https://gitea.stump.rocks/<owner>/<repo>/commit/<sha>`).
+- Pull/merge requests → link the specific PR.
+- Issues → link the specific issue created/updated.
+- Gitea Actions / GitHub Actions workflow runs → link the specific run.
+- Documents (Outline, wiki, etc.) → link the specific doc URL.
+
+This follows the general "never reference something by name only if it has a URL" rule above. If an operation truly has no URL (e.g. a local file count, a purge summary), plain text is fine — this rule only applies when a linkable artifact exists.
+
 ## Posting as @{{ .githubUser }} (GitHub / Gitea)
 
 When posting on Joe's behalf as `@{{ .githubUser }}` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer, exactly:
