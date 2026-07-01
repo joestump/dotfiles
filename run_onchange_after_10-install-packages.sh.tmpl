@@ -127,8 +127,34 @@ ensure_claude() {
   if command -v claude >/dev/null 2>&1 || [ -x "$HOME/.local/bin/claude" ]; then
     echo "claude CLI present"
   else
-    echo "==> installing Claude Code CLI (native)"
-    curl -fsSL https://claude.ai/install.sh | bash || echo "WARN: claude install failed"
+    # Claude Code ships as a Bun-compiled binary, and Bun requires AVX2 on x86-64. On a
+    # host without it — classically a KVM guest exposing the generic "qemu64"/"Common KVM
+    # processor" model instead of host CPU passthrough — the runtime doesn't error, it
+    # SPINS forever in a userspace busy-loop at startup (100% CPU, no syscalls). The
+    # installer's final `claude install` step then hangs indefinitely, wedging the whole
+    # `chezmoi apply`, and every retry leaks another orphaned spinner. Guard both ways:
+    # (1) refuse up front on x86-64 without AVX2, and (2) bound the installer with a hard
+    # timeout that kills the entire process tree on expiry so nothing is left spinning.
+    if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ] && ! grep -qm1 avx2 /proc/cpuinfo; then
+      echo "WARN: skipping Claude Code — this x86-64 host lacks AVX2 (Bun requires it)."
+      echo "      Likely a VM using a generic CPU model; set the guest CPU to host"
+      echo "      passthrough (or an x86-64-v3 model) and reboot, then re-run 'chezmoi apply'."
+    else
+      echo "==> installing Claude Code CLI (native)"
+      # Run in a new session so the whole installer tree (curl | bash → claude install)
+      # shares one process group we can signal; a watchdog TERM/KILLs that group if the
+      # install runs long, instead of us orphaning a hung child like the old code could.
+      setsid bash -c 'curl -fsSL https://claude.ai/install.sh | bash' </dev/null &
+      local ci_pgid=$! ci_rc=0
+      { sleep 180; kill -TERM -"$ci_pgid" 2>/dev/null; sleep 5; kill -KILL -"$ci_pgid" 2>/dev/null; } &
+      local ci_wd=$!
+      wait "$ci_pgid" 2>/dev/null || ci_rc=$?
+      kill "$ci_wd" 2>/dev/null || true; wait "$ci_wd" 2>/dev/null || true
+      if [ "$ci_rc" -ne 0 ]; then
+        echo "WARN: claude install did not complete (rc=$ci_rc) — likely timed out."
+        echo "      Check that this host can run the binary (needs AVX2 on x86-64)."
+      fi
+    fi
   fi
   # The MCP merge scripts skip when ~/.claude.json is absent, and claude only creates
   # it on first run — seed an empty one so a fresh node's MCP config populates in the
