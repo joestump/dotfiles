@@ -32,13 +32,13 @@ Wrong: "See the Outline daily log for details."
 Right: https://outline.stump.rocks/doc/...
 
 Wrong: "Pushed to claude-personal."
-Right: Pushed to https://gitea.stump.rocks/joestump/claude-personal
+Right: Pushed to https://gitea.stump.rocks/{{ .githubUser }}/claude-personal
 
-## Posting as @joestump (GitHub / Gitea)
+## Posting as @{{ .githubUser }} (GitHub / Gitea)
 
-When posting on Joe's behalf as `@joestump` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer, exactly:
+When posting on Joe's behalf as `@{{ .githubUser }}` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer, exactly:
 
-🤖 Posted on behalf of `@joestump` by [Claude](https://claude.ai).
+🤖 Posted on behalf of `@{{ .githubUser }}` by [Claude](https://claude.ai).
 
-- Keep `@joestump` in backticks, so it renders as code and does not fire a live @mention/notification.
+- Keep `@{{ .githubUser }}` in backticks, so it renders as code and does not fire a live @mention/notification.
 - Do NOT precede the footer with a horizontal rule: no `<hr/>`, and no Markdown rule equivalent (`---`, `***`, `___`). Just a blank line, then the footer line.

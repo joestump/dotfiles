@@ -13,3 +13,9 @@ signalNumber: "+12062257886"
 # joestump@host strings are SSH targets), but kept here as the single place to set it
 # if a template ever needs {{ .email }}.
 email: "joe@stump.rocks"
+
+# Forge username — the Gitea AND GitHub handle (same on both). Used in repo/external
+# URLs, the Gitea git-credential helper, czinit, and the claude-plugins sources. Fork
+# this repo? Set this to your own handle and everything re-points. Distinct from
+# {{ .chezmoi.username }} (the OS login user), which stays machine-derived.
+githubUser: "joestump"

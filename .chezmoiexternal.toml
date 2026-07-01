@@ -26,7 +26,7 @@
 # per-machine via $SHLINK_API_KEY (OpenBao). Anyone can reuse it with their own key.
 [".oh-my-zsh/custom/plugins/shlink"]
     type = "git-repo"
-    url = "https://gitea.stump.rocks/joestump/shlink-zsh.git"
+    url = "https://gitea.stump.rocks/{{ .githubUser }}/shlink-zsh.git"
     refreshPeriod = "168h"
 
 # ---------- Themes (install many, swap via ZSH_THEME in ~/.zshrc) ----------
@@ -56,7 +56,7 @@
 # install script adds it as a local-path marketplace.
 [".config/claude-marketplaces/claude-personal"]
     type = "git-repo"
-    url = "https://gitea.stump.rocks/joestump/claude-personal.git"
+    url = "https://gitea.stump.rocks/{{ .githubUser }}/claude-personal.git"
     # 24h so newly-pushed skills propagate within a day; the plugin install
     # script reinstalls when this clone's HEAD moves. For an immediate pull:
     # `chezmoi apply --refresh-externals`.
@@ -71,7 +71,7 @@
 # reactions + trusted-recipients allowlist. ff-only pull keeps the clone clean.
 ["src/signal-mcp"]
     type = "git-repo"
-    url = "https://github.com/joestump/signal-mcp.git"
+    url = "https://github.com/{{ .githubUser }}/signal-mcp.git"
     refreshPeriod = "168h"
 ["src/signal-mcp".pull]
     args = ["--ff-only"]

@@ -6,7 +6,7 @@
 # Host-scoped credential helper: supplies the Gitea token (from OpenBao via the
 # Vault Agent) on demand, so private clones need no token in the URL:
 #
-#     git clone https://gitea.stump.rocks/joestump/claude-personal.git
+#     git clone https://gitea.stump.rocks/{{ .githubUser }}/claude-personal.git
 #
 [credential "https://gitea.stump.rocks"]
 	# Empty value resets the helper list for this host, so inherited global

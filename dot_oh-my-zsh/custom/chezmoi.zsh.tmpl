@@ -23,7 +23,7 @@ czinit() {
   emulate -L zsh
   local host=$1
   [[ -z $host ]] && { print -u2 "usage: czinit <host>   e.g. czinit joestump@ie02.stump.rocks"; return 2 }
-  local repo="https://gitea.stump.rocks/joestump/dotfiles.git"
+  local repo="https://gitea.stump.rocks/{{ .githubUser }}/dotfiles.git"
 
   # Resolve a Gitea token locally to seed the node (env, then rendered secrets).
   local tok="${GITEA_TOKEN:-}"
@@ -33,7 +33,7 @@ czinit() {
 
   print -u2 "→ seeding Gitea credentials on ${host} …"
   ssh "$host" 'umask 077; cat > ~/.git-credentials && git config --global credential.helper store' \
-    <<< "https://joestump:${tok}@gitea.stump.rocks" \
+    <<< "https://{{ .githubUser }}:${tok}@gitea.stump.rocks" \
     || { print -u2 "czinit: could not seed credentials on ${host}"; return 1 }
 
   print -u2 "→ installing chezmoi + applying dotfiles on ${host} (sudo may prompt) …"
