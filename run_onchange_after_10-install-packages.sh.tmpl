@@ -118,10 +118,30 @@ install_linux() {
   ensure_signal_cli_linux
 }
 
+# Claude Code CLI — install if absent (native installer → ~/.local/bin, versioned
+# under ~/.local/share/claude). Cross-platform + idempotent. Must land before the
+# claude-*-mcp-merge and plugin scripts that need `claude`; this script runs at "10",
+# ahead of them.
+ensure_claude() {
+  export PATH="$HOME/.local/bin:$PATH"
+  if command -v claude >/dev/null 2>&1 || [ -x "$HOME/.local/bin/claude" ]; then
+    echo "claude CLI present"
+  else
+    echo "==> installing Claude Code CLI (native)"
+    curl -fsSL https://claude.ai/install.sh | bash || echo "WARN: claude install failed"
+  fi
+  # The MCP merge scripts skip when ~/.claude.json is absent, and claude only creates
+  # it on first run — seed an empty one so a fresh node's MCP config populates in the
+  # same apply.
+  [ -f "$HOME/.claude.json" ] || { echo '{}' > "$HOME/.claude.json" && chmod 600 "$HOME/.claude.json"; }
+}
+
 case "$OS" in
   Darwin) install_macos ;;
   Linux)  install_linux ;;
 esac
+
+ensure_claude
 
 # ---- Go tools (either OS, only if `go` is present) ----
 GO_TOOLS="$HOME/.config/dotfiles/go-tools.txt"
