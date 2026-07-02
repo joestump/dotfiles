@@ -15,7 +15,10 @@ export ZSH="$HOME/.oh-my-zsh"
 #   quantum-zsh/quantum
 #   comfyline_prompt/comfyline      (needs a Powerline/Nerd font)
 #   robbyrussell                    (OMZ built-in fallback)
-ZSH_THEME="spaceship-prompt/spaceship"
+# The `theme` helper (dot.zsh) can override this per-machine by writing a theme name
+# to ~/.config/dotfiles/zsh-theme — a local file that's NOT chezmoi-managed, so your
+# pick survives `chezmoi apply` and can differ per box. Falls back to spaceship.
+ZSH_THEME="$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/zsh-theme 2>/dev/null || echo spaceship-prompt/spaceship)"
 
 # Prompt-character glyphs: ~/.oh-my-zsh/custom/spaceship.zsh picks one at random
 # each time a shell starts. Add/remove glyphs here (needs a Nerd Font). Must be

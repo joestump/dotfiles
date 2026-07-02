@@ -55,6 +55,17 @@ ensure_vault_linux() {
   sudo apt-get update -y && sudo apt-get install -y vault || echo "WARN: vault install failed"
 }
 
+ensure_gum_linux() {
+  command -v gum >/dev/null 2>&1 && return 0
+  echo "==> installing gum (charm apt repo)"
+  sudo mkdir -p /etc/apt/keyrings
+  curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+  sudo chmod go+r /etc/apt/keyrings/charm.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" \
+    | sudo tee /etc/apt/sources.list.d/charm.list >/dev/null
+  sudo apt-get update -y && sudo apt-get install -y gum || echo "WARN: gum install failed"
+}
+
 # uv — Python runner that launches the Signal MCP (`uv run --directory ~/src/signal-mcp`).
 # Astral's installer drops it in ~/.local/bin; NO_MODIFY_PATH so it never edits the
 # chezmoi-managed shell rc (PATH already includes ~/.local/bin via env.zsh/.profile).
@@ -114,6 +125,7 @@ install_linux() {
   fi
   ensure_gh_linux
   ensure_vault_linux
+  ensure_gum_linux
   ensure_uv_linux
   ensure_signal_cli_linux
 }

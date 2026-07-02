@@ -7,8 +7,11 @@
 # Extra args pass through to chezmoi update (e.g. `czu --refresh-externals`).
 czu() {
   emulate -L zsh
+  # A little flourish — never hides `chezmoi update`'s output (it can prompt for sudo).
+  _have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "  ⟳ czu · updating ${HOST%%.*}"
   chezmoi update "$@" || return        # stop on failure so the error is visible
   vault-agent restart 2>/dev/null      # best-effort; ok if the agent isn't set up
+  _have gum && [[ -t 1 ]] && gum style --foreground 150 "  ✓ ${HOST%%.*} up to date — reloading shell"
   [[ -o interactive ]] && exec zsh
 }
 

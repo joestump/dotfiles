@@ -34,6 +34,7 @@ brew "chroma"                  # syntax highlighter — backend for the colorize
 brew "signal-cli"              # Signal client; runs as a daemon (rocks.stump.signal-daemon) backing the Signal MCP
 brew "qrencode"                # terminal QR for `signal-link` (link a new Signal device)
 brew "uv"                      # Python runner — launches the Signal MCP (uv run --directory ~/src/signal-mcp)
+brew "gum"                     # charm TUI toolkit — powers the `dot`/`theme`/`status` helpers
 # (vault — the OpenBao client — is installed OS-aware; see the note above.)
 
 # ---- Optional: uncomment what you want; this is your "don't think about it"
