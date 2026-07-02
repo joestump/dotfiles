@@ -12,6 +12,13 @@ OS="$(uname -s)"
 # `chezmoi apply` re-runs this script (run_onchange keys on its rendered content).
 SIGNAL_CLI_VER="0.14.5"
 
+# Clean progress via the shared UI lib (spinner on a TTY, quiet "→ … ok" otherwise);
+# fallback keeps the script working if the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  step() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
 # ---------------------------------------------------------------- macOS -------
 ensure_vault_macos() {
   command -v vault >/dev/null 2>&1 && return 0
@@ -26,8 +33,7 @@ install_macos() {
     [ -x "$p" ] && eval "$("$p" shellenv)" && break
   done
   if command -v brew >/dev/null 2>&1 && [ -f "$HOME/.Brewfile" ]; then
-    echo "==> brew bundle (~/.Brewfile)"
-    brew bundle --global || echo "WARN: brew bundle had failures"
+    step "Homebrew packages" -- brew bundle --global || warn "brew bundle had failures"
   fi
   ensure_vault_macos
 }
@@ -114,14 +120,15 @@ install_linux() {
       [ -n "$p" ] && pkgs+=("$p")           # skip blank/comment-only lines
     done < "$list"
   fi
-  echo "==> apt-get install: ${pkgs[*]:-(none)}"
-  sudo apt-get update -y
+  sudo -v 2>/dev/null || true   # prime sudo so a spinner never hides a password prompt
+  step "apt · refresh indexes" -- sudo apt-get update -y || warn "apt update failed"
   if [ "${#pkgs[@]}" -gt 0 ]; then
     # A transient apt/network blip during bootstrap must not silently leave packages
     # missing — run_onchange won't retry on a stable hash. Retry once after a refresh.
-    sudo apt-get install -y "${pkgs[@]}" \
-      || { echo "apt install failed — refreshing indexes and retrying…"; sudo apt-get update -y; sudo apt-get install -y "${pkgs[@]}"; } \
-      || echo "WARN: some apt packages still failed — install by hand, or re-run 'chezmoi apply --force'."
+    step "apt · ${#pkgs[@]} packages" -- sudo apt-get install -y "${pkgs[@]}" \
+      || { warn "apt install failed — refreshing + retrying"; sudo apt-get update -y >>"${UI_LOG:-/dev/null}" 2>&1; \
+           step "apt · retry" -- sudo apt-get install -y "${pkgs[@]}"; } \
+      || warn "some apt packages still failed — install by hand, or 'chezmoi apply --force'"
   fi
   ensure_gh_linux
   ensure_vault_linux
@@ -137,7 +144,7 @@ install_linux() {
 ensure_claude() {
   export PATH="$HOME/.local/bin:$PATH"
   if command -v claude >/dev/null 2>&1 || [ -x "$HOME/.local/bin/claude" ]; then
-    echo "claude CLI present"
+    :   # already installed — stay quiet
   else
     # Claude Code ships as a Bun-compiled binary, and Bun requires AVX2 on x86-64. On a
     # host without it — classically a KVM guest exposing the generic "qemu64"/"Common KVM
@@ -184,12 +191,8 @@ ensure_claude
 # ---- Go tools (either OS, only if `go` is present) ----
 GO_TOOLS="$HOME/.config/dotfiles/go-tools.txt"
 if command -v go >/dev/null 2>&1 && [ -f "$GO_TOOLS" ]; then
-  echo "==> go install (from go-tools.txt)"
   while IFS= read -r mod; do
     case "$mod" in ''|\#*) continue ;; esac
-    echo "   go install $mod"
-    go install "$mod" || echo "   WARN: go install $mod failed"
+    step "go · ${mod##*/}" -- go install "$mod" || warn "go install $mod failed"
   done < "$GO_TOOLS"
 fi
-
-echo "==> packages installed"
