@@ -17,7 +17,13 @@ step() {
   local title="$1"; shift
   [ "${1:-}" = "--" ] && shift
   if have gum && [ -t 1 ]; then
-    gum spin --show-error --spinner minidot --title "$title" -- "$@"
+    # Spinner while it runs, then a PERSISTENT ✓/✗ so the section leaves a trace.
+    # --show-error dumps the command's output inline only when it fails.
+    if gum spin --show-error --spinner minidot --title "$title" -- "$@"; then
+      gum style --foreground 150 "  ✓ $title"
+    else
+      local rc=$?; gum style --foreground 210 "  ✗ $title"; return "$rc"
+    fi
   else
     printf '  → %s … ' "$title"
     if "$@" >>"$UI_LOG" 2>&1; then echo "ok"; else local rc=$?; echo "FAILED (see $UI_LOG)"; return "$rc"; fi
