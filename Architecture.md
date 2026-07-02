@@ -72,6 +72,7 @@ automatically.)
 | Repo visibility | private | dotfiles are personal |
 | Secret-scan hook | committed `.githooks/` + `core.hooksPath` | reproducible without the `pre-commit` Python framework |
 | direnv hook location | `custom/direnv.zsh` | keeps `.zshrc` untouched |
+| Outline MCP capability boundary | text-only docs + presigned URLs; no byte uploads via MCP | Outline MCP server exposes `create_attachment` (presign-only), `fetch`, `create_document`, `update_document`, etc., but **cannot upload file bytes via MCP**; `create_attachment` returns a presigned URL and fallback `files.create` requires the API token in the shell. Until upstream Outline ships `upload_attachment` tool (outline/outline#11823), agents degrade to text-only docs + scratchpad screenshot references by design. Remove this caveat when the updated Outline lands. |
 
 ## Helpers (current)
 
