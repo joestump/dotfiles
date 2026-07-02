@@ -1,5 +1,17 @@
 # Joe's Claude Preferences & Rules
 
+## Personal configs = the chezmoi dotfiles setup
+
+When Joe says "update my personal configs", "update your rules", "add this to your rules/preferences", or similar: that means editing the **chezmoi dotfiles setup** (source at `~/.local/share/chezmoi`, repo https://gitea.stump.rocks/{{ .githubUser }}/dotfiles) — most often this file's source, `dot_claude/CLAUDE.md.tmpl`. Edit the chezmoi **source** (never the rendered `~/.claude/CLAUDE.md` directly, or the next `chezmoi apply` clobbers it), then `chezmoi apply` and commit + push so it propagates to every machine.
+
+## OMGs — file them proactively when infrastructure blocks work
+
+Joe's infra (StumpCloud services **and** the dotfiles/MCP/agent tooling — dotfiles are a production service) is OMG-scoped. When work gets blocked or degraded because something is **down, old, or broken**:
+
+1. Don't sit on it or footnote it — investigate and root-cause it as part of the session.
+2. **Propose the OMG to Joe before filing** (title + severity + one-line root cause is enough), then file it via the stumpcloud-omg skill once he approves.
+3. Precedent: the 2026-07-01 Outline uploads OMG (https://outline.stump.rocks/doc/2026-07-01-outline-uploads-broken-since-aug-2025-volume-owner-mismatch-small-omg-uptvxnEKyZ).
+
 ## Scheduled Tasks
 
 - Every scheduled task must send a Signal Note to Self summary to {{ .signalNumber }} (Joe's Signal note-to-self number — use the phone number, NOT the email, or the send fails) via mcp__signal__send_message_to_user when the run completes. Mandatory for all new scheduled tasks.
