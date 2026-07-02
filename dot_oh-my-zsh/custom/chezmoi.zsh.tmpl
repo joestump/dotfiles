@@ -7,11 +7,23 @@
 # Extra args pass through to chezmoi update (e.g. `czu --refresh-externals`).
 czu() {
   emulate -L zsh
-  # A little flourish — never hides `chezmoi update`'s output (it can prompt for sudo).
-  _have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "  ⟳ czu · updating ${HOST%%.*}"
-  chezmoi update "$@" || return        # stop on failure so the error is visible
-  vault-agent restart 2>/dev/null      # best-effort; ok if the agent isn't set up
-  _have gum && [[ -t 1 ]] && gum style --foreground 150 "  ✓ ${HOST%%.*} up to date — reloading shell"
+  local fancy=0; if _have gum && [[ -t 1 ]]; then fancy=1; fi
+  (( fancy )) && gum style --foreground 213 --bold "  ⟳ czu · updating ${HOST%%.*}"
+  # Split `chezmoi update` (= git pull + apply): the pull gets its own ✓; `apply`
+  # then streams the per-phase headings/lists from the run scripts (never hidden — it
+  # can prompt for sudo).
+  if (( fancy )); then
+    if gum spin --show-error --spinner minidot --title "syncing dotfiles" -- chezmoi git pull -- --ff-only; then
+      gum style --foreground 150 "  ✓ dotfiles synced"
+    else
+      gum style --foreground 210 "  ✗ sync failed"; return 1
+    fi
+  else
+    chezmoi git pull -- --ff-only || return
+  fi
+  chezmoi apply "$@" || return
+  vault-agent restart >/dev/null 2>&1
+  (( fancy )) && gum style --foreground 150 "  ✓ secrets rendered · ${HOST%%.*} up to date — reloading"
   [[ -o interactive ]] && exec zsh
 }
 

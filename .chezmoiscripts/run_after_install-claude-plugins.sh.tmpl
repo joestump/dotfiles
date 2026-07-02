@@ -34,10 +34,12 @@ installed="$(claude plugin list 2>/dev/null || true)"
 # fallback keeps the script working if the lib hasn't been applied yet.
 . "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
   step() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
   say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
 }
 
-n_present=0 n_changed=0
+heading "🔌 Claude plugins"
 while read -r src plugin _rest; do
   case "$src" in ''|\#*) continue ;; esac
   [ -n "${plugin:-}" ] || continue
@@ -52,14 +54,12 @@ while read -r src plugin _rest; do
 
   if ! grep -qF "$plugin" <<<"$installed"; then
     claude plugin marketplace add "$src" >/dev/null 2>&1 || claude plugin marketplace update "$mp" >/dev/null 2>&1 || true
-    if step "installing $plugin" -- claude plugin install "$plugin"; then printf '%s' "$head" >"$sentinel"; n_changed=$((n_changed+1)); else warn "install $plugin failed"; fi
+    if step "$plugin" -- claude plugin install "$plugin"; then printf '%s' "$head" >"$sentinel"; else warn "install $plugin failed"; fi
   elif [ -n "$head" ] && [ "$head" != "$(cat "$sentinel" 2>/dev/null || true)" ]; then
     claude plugin marketplace update "$mp" >/dev/null 2>&1 || true
     claude plugin uninstall "$plugin" >/dev/null 2>&1 || true
-    if step "refreshing $plugin (${head:0:7})" -- claude plugin install "$plugin"; then printf '%s' "$head" >"$sentinel"; n_changed=$((n_changed+1)); else warn "refresh $plugin failed"; fi
+    if step "$plugin → ${head:0:7}" -- claude plugin install "$plugin"; then printf '%s' "$head" >"$sentinel"; else warn "refresh $plugin failed"; fi
   else
-    n_present=$((n_present+1))
+    item ok "$plugin"
   fi
 done < "$LIST"
-
-if [ "$n_changed" -gt 0 ]; then say "Claude plugins · ${n_present} current, ${n_changed} updated"; else say "Claude plugins · ${n_present} current"; fi

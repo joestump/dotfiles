@@ -16,6 +16,9 @@ SIGNAL_CLI_VER="0.14.5"
 # fallback keeps the script working if the lib hasn't been applied yet.
 . "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
   step() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  spin() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
   say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
 }
 
@@ -33,7 +36,10 @@ install_macos() {
     [ -x "$p" ] && eval "$("$p" shellenv)" && break
   done
   if command -v brew >/dev/null 2>&1 && [ -f "$HOME/.Brewfile" ]; then
-    step "Homebrew packages" -- brew bundle --global || warn "brew bundle had failures"
+    heading "📦 Homebrew"
+    spin "brew bundle" -- brew bundle --global || warn "brew bundle had failures"
+    while IFS= read -r f; do item ok "$f"; done \
+      < <(sed -nE 's/^[[:space:]]*(brew|cask) "([^"]+)".*/\2/p' "$HOME/.Brewfile")
   fi
   ensure_vault_macos
 }
@@ -120,15 +126,19 @@ install_linux() {
       [ -n "$p" ] && pkgs+=("$p")           # skip blank/comment-only lines
     done < "$list"
   fi
+  heading "📦 apt"
   sudo -v 2>/dev/null || true   # prime sudo so a spinner never hides a password prompt
-  step "apt · refresh indexes" -- sudo apt-get update -y || warn "apt update failed"
+  spin "apt-get update" -- sudo apt-get update -y || warn "apt update failed"
   if [ "${#pkgs[@]}" -gt 0 ]; then
     # A transient apt/network blip during bootstrap must not silently leave packages
     # missing — run_onchange won't retry on a stable hash. Retry once after a refresh.
-    step "apt · ${#pkgs[@]} packages" -- sudo apt-get install -y "${pkgs[@]}" \
-      || { warn "apt install failed — refreshing + retrying"; sudo apt-get update -y >>"${UI_LOG:-/dev/null}" 2>&1; \
-           step "apt · retry" -- sudo apt-get install -y "${pkgs[@]}"; } \
-      || warn "some apt packages still failed — install by hand, or 'chezmoi apply --force'"
+    if spin "installing ${#pkgs[@]} packages" -- sudo apt-get install -y "${pkgs[@]}" \
+       || { warn "apt install failed — refreshing + retrying"; sudo apt-get update -y >>"${UI_LOG:-/dev/null}" 2>&1; \
+            spin "retry" -- sudo apt-get install -y "${pkgs[@]}"; }; then
+      for p in "${pkgs[@]}"; do item ok "$p"; done
+    else
+      warn "some apt packages still failed — install by hand, or 'chezmoi apply --force'"
+    fi
   fi
   ensure_gh_linux
   ensure_vault_linux
@@ -191,8 +201,9 @@ ensure_claude
 # ---- Go tools (either OS, only if `go` is present) ----
 GO_TOOLS="$HOME/.config/dotfiles/go-tools.txt"
 if command -v go >/dev/null 2>&1 && [ -f "$GO_TOOLS" ]; then
+  heading "🐹 Go tools"
   while IFS= read -r mod; do
     case "$mod" in ''|\#*) continue ;; esac
-    step "go · ${mod##*/}" -- go install "$mod" || warn "go install $mod failed"
+    step "${mod##*/}" -- go install "$mod" || warn "go install $mod failed"
   done < "$GO_TOOLS"
 fi
