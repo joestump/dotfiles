@@ -137,8 +137,10 @@ plugins=(
 # alias-finder: whenever a typed command has a shorter alias, say so. All the
 # alias-heavy plugins above (git, docker, kubectl, brew...) make this the
 # cheapest way to actually learn them.
+# NOTE: `longer` is intentionally OFF — it strips the word-end anchor to match
+# *longer* aliases, which dumps all the `cd -1..-9` dir-stack aliases (OMZ core) on a
+# bare `cd`. We only want the shorter-alias hint, which is `cheaper`.
 zstyle ':omz:plugins:alias-finder' autoload yes
-zstyle ':omz:plugins:alias-finder' longer yes
 zstyle ':omz:plugins:alias-finder' cheaper yes
 
 # eza: modern ls (aliases ls/l/ll/la to eza). Icons need the Nerd Font from the
