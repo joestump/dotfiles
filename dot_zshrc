@@ -29,7 +29,7 @@ PROMPT_GLYPHS=(
   $''   # heart
   $''   # paw
   $''   # rocket
-  $''   # coffee
+  $''   # cloud (StumpCloud!)
 )
 
 # Set list of themes to pick from when loading at random
