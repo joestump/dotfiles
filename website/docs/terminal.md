@@ -5,6 +5,8 @@ title: Terminal & Prompt
 
 # Terminal & Prompt
 
+![The `dot` action hub and the `status` health panel — gum-powered TUI helpers](/img/screenshots/menus.png)
+
 ## Prompt — spaceship
 
 Two-line spaceship prompt with the hostname always shown (so you know which box

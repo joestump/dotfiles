@@ -14,6 +14,8 @@ every box. Fork-friendly: change `githubUser` in `.chezmoidata.yaml` and point
 It's a **hub-and-spoke model**: one macOS hub you author from, any number of
 Linux spokes provisioned from it.
 
+![The StumpCloud MOTD greeting a new shell — host facts and the vault lock in the status dock](/img/screenshots/motd.png)
+
 ```mermaid
 flowchart TD
     src["gitea.stump.rocks/joestump/dotfiles<br/>(the source)"]

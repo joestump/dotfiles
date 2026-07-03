@@ -31,6 +31,51 @@ function Term() {
   );
 }
 
+const SHOTS = [
+  {src: require('@site/static/img/screenshots/motd.png').default,  alt: 'StumpCloud login banner (MOTD)',
+   cap: 'The StumpCloud MOTD — dynamic host facts on every new shell, with the vault lock in the status dock.'},
+  {src: require('@site/static/img/screenshots/czu.png').default,   alt: 'czu update output',
+   cap: 'czu — one command syncs, applies, and re-renders secrets, with clean per-phase checks.'},
+  {src: require('@site/static/img/screenshots/menus.png').default, alt: 'the dot menu and status dashboard',
+   cap: 'The dot action hub and status health panel — gum-powered TUI helpers.'},
+];
+
+function Carousel() {
+  const [i, setI] = React.useState(0);
+  const n = SHOTS.length;
+  const go = (d) => setI((x) => (x + d + n) % n);
+  React.useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % n), 6000);
+    return () => clearInterval(t);
+  }, [n]);
+  return (
+    <div className={styles.carousel}>
+      <div className={styles.carFrame}>
+        <div className={styles.termBar}>
+          <span className={styles.dot} style={{background:'#ff5f56'}} />
+          <span className={styles.dot} style={{background:'#ffbd2e'}} />
+          <span className={styles.dot} style={{background:'#27c93f'}} />
+        </div>
+        <div className={styles.carViewport}>
+          {SHOTS.map((s, idx) => (
+            <img key={idx} src={s.src} alt={s.alt} className={styles.carImg}
+                 style={{opacity: idx === i ? 1 : 0}} />
+          ))}
+          <button className={`${styles.carNav} ${styles.carPrev}`} onClick={() => go(-1)} aria-label="Previous">&#8249;</button>
+          <button className={`${styles.carNav} ${styles.carNext}`} onClick={() => go(1)} aria-label="Next">&#8250;</button>
+        </div>
+      </div>
+      <p className={styles.carCap}>{SHOTS[i].cap}</p>
+      <div className={styles.carDots}>
+        {SHOTS.map((_, idx) => (
+          <button key={idx} aria-label={`Slide ${idx + 1}`}
+                  className={idx === i ? styles.carDotOn : styles.carDot} onClick={() => setI(idx)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <Layout title="StumpCloud Dotfiles" description="chezmoi + Oh My Zsh + OpenBao — one command, any machine.">
@@ -59,6 +104,11 @@ export default function Home() {
           </Link>
         ))}
       </main>
+
+      <section className={styles.gallery}>
+        <p className={styles.kicker}>// SEE IT IN ACTION</p>
+        <Carousel />
+      </section>
     </Layout>
   );
 }

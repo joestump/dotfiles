@@ -63,6 +63,8 @@ Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
 > Installing a *fresh* spoke instead? `czinit <host>` does the whole thing over SSH
 > — see [Install a Spoke](install/nodes).
 
+![czu bringing a machine fully up to date, with per-phase checked sections](/img/screenshots/czu.png)
+
 Under the hood, or to run the pieces by hand:
 
 ```bash
