@@ -35,7 +35,8 @@ czu() {
     item no "Vault Agent — check 'vault-agent status'"
   fi
 
-  _have gum && [[ -t 1 ]] && gum style --foreground 150 "✓ ${HOST%%.*} up to date — reloading"
+  # No footer line: the all-✓ sections already say "up to date", and the fresh MOTD +
+  # prompt after `exec zsh` are the natural "done, new shell" signal.
   [[ -o interactive ]] && exec zsh
 }
 
