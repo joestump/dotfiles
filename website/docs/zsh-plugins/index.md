@@ -12,17 +12,16 @@ machine gets the identical set from `chezmoi apply`.
 
 ## The full roster
 
+Every plugin has its own pro-tips page — the table links them all.
+
 | Group | Plugins |
 |---|---|
-| Git & forges | `git`, `git-auto-fetch`, `gh` |
-| Cloud & infra | `aws`, `terraform`, `kubectl`, `kubectx`, `helm`, `docker`, `docker-compose` |
-| Languages & packages | `brew`, `python`, `pip`, `virtualenv`, `npm` |
-| Navigation & files | `zoxide`, `dirhistory`, [`eza`](eza.md), [`copypath`](copypath.md), [`copyfile`](copyfile.md), `extract` |
-| History & typing | `zsh-autosuggestions`, [`history-substring-search`](history-substring-search.md), [`sudo`](sudo.md), [`alias-finder`](alias-finder.md) |
-| Data munging | `jsontools`, [`urltools`](urltools.md) |
-| Eye candy & safety | `colored-man-pages`, `colorize`, `zsh-syntax-highlighting` |
-| Search | `fzf` |
-| Mine / external | `shlink`, `zsh-ai`, `macos` |
+| Git & forges | [`git`](git.md), [`git-auto-fetch`](git-auto-fetch.md), [`gh`](gh.md), [`shlink`](shlink.md) |
+| Containers & cloud | [`docker`](docker.md), [`docker-compose`](docker-compose.md), [`aws`](aws.md), [`terraform`](terraform.md), [`kubectl`](kubectl.md), [`kubectx`](kubectx.md), [`helm`](helm.md) |
+| Languages & packages | [`brew`](brew.md), [`macos`](macos.md), [`python`](python.md), [`pip`](pip.md), [`virtualenv`](virtualenv.md), [`npm`](npm.md) |
+| Navigation & files | [`zoxide`](zoxide.md), [`eza`](eza.md), [`dirhistory`](dirhistory.md), [`copypath`](copypath.md), [`copyfile`](copyfile.md), [`extract`](extract.md) |
+| History & typing | [`zsh-autosuggestions`](zsh-autosuggestions.md), [`history-substring-search`](history-substring-search.md), [`fzf`](fzf.md), [`sudo`](sudo.md), [`alias-finder`](alias-finder.md), [`zsh-ai`](zsh-ai.md) |
+| Data & display | [`jsontools`](jsontools.md), [`urltools`](urltools.md), [`zsh-syntax-highlighting`](zsh-syntax-highlighting.md), [`colored-man-pages`](colored-man-pages.md), [`colorize`](colorize.md) |
 
 **Load-order rules** (encoded as comments in `dot_zshrc` — don't reorder casually):
 
@@ -42,5 +41,7 @@ machine gets the identical set from `chezmoi apply`.
 | `web-search` | `zsh-ai` answers from the terminal already. |
 | `command-not-found` | On macOS it needs the `homebrew-command-not-found` tap; this repo deliberately avoids tap-trust friction. |
 
-The pages in this section cover the plugins added in the July 2026 review, each
-with the pro tips worth actually remembering.
+Each page keeps to the pro tips worth actually remembering — the aliases and
+keybinds that earn their muscle memory, aimed at how this setup is actually
+used (Compose-based StumpCloud ops, Gitea + GitHub, OpenBao secrets, the
+Docusaurus site, and a lot of Claude).

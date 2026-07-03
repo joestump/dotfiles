@@ -60,8 +60,8 @@ Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
 > **`czu --refresh-externals`** also re-pulls themes, plugins, marketplaces, and the
 > `signal-mcp` clone.
 >
-> Bootstrapping a *fresh* node instead? `czinit <host>` does the whole thing over SSH
-> — see [Bootstrap a Node](bootstrap/nodes).
+> Installing a *fresh* spoke instead? `czinit <host>` does the whole thing over SSH
+> — see [Install a Spoke](install/nodes).
 
 Under the hood, or to run the pieces by hand:
 

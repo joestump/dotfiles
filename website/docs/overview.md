@@ -6,14 +6,20 @@ slug: /overview
 
 # How it all works
 
-These dotfiles turn a fresh machine into **my** machine with one command. Everything
-is declarative, backed by self-hosted infrastructure, and the same on every box.
+These dotfiles turn a fresh machine into a fully-configured one with one command.
+Everything is declarative, backed by self-hosted infrastructure, and the same on
+every box. Fork-friendly: change `githubUser` in `.chezmoidata.yaml` and point
+`VAULT_ADDR` at your own OpenBao, and the whole setup is yours.
+
+It's a **hub-and-spoke model**: one macOS hub you author from, any number of
+Linux spokes provisioned from it.
 
 ```mermaid
 flowchart TD
-    src["gitea.stump.rocks/joestump/dotfiles<br/>(private — the source)"]
-    src -->|"chezmoi init --apply"| mother["MOTHERSHIP<br/>macOS laptop · Homebrew"]
-    src -->|"chezmoi init --apply"| nodes["UTILITY NODES<br/>ie01, ie02, … · Ubuntu / apt"]
+    src["gitea.stump.rocks/joestump/dotfiles<br/>(the source)"]
+    src -->|"chezmoi init --apply"| mother["HUB (the mothership)<br/>macOS · Homebrew · required"]
+    src -->|"czinit / chezmoi init --apply"| nodes["SPOKES<br/>ie01, ie02, … · Ubuntu / apt"]
+    mother -->|"provisions (czinit)"| nodes
     mother --> omz["Oh My Zsh + helpers + tooling"]
     nodes --> omz
     omz --> bao["OpenBao + Vault Agent<br/>secrets → env/files · never in the repo"]
@@ -32,10 +38,13 @@ flowchart TD
 
 ## Two kinds of machine
 
-- **The Mothership** — my macOS laptop. Full setup: Homebrew, the Vault Agent, SSH
-  keys, Claude config, the works. → [Bootstrap the Mothership](bootstrap/mothership).
-- **Utility Nodes** — Linux boxes I spin up and tear down (`ie01`, `ie02`, …). Lean,
-  apt-based, **no Homebrew**. → [Bootstrap a Node](bootstrap/nodes).
+- **The Hub** (a.k.a. the mothership) — a macOS machine, and it **must** be macOS:
+  some of the stack (Claude Desktop, the launchd services) has no Linux desktop
+  equivalent. Full setup: Homebrew, the Vault Agent, SSH keys, Claude config, the
+  works. → [Install the Hub](install/mothership).
+- **Spokes** — Linux utility nodes you spin up and tear down (`ie01`, `ie02`, …).
+  Lean, apt-based, **no Homebrew**, provisioned from the hub with `czinit`.
+  → [Install a Spoke](install/nodes).
 
 ## The golden rule
 

@@ -40,10 +40,10 @@ export default function Home() {
           <h1 className={styles.title}>DOT<span className={styles.mag}>FILES</span></h1>
           <p className={styles.tagline}>
             chezmoi &middot; Oh My Zsh &middot; OpenBao &middot; Garage Pages.<br/>
-            One command boots the <span className={styles.cyan}>mothership</span> or a throwaway <span className={styles.mag}>utility node</span>.
+            One command installs the <span className={styles.cyan}>hub</span> (macOS) or a throwaway <span className={styles.mag}>Linux spoke</span>.
           </p>
           <div className={styles.cta}>
-            <Link className={styles.btnPrimary} to="/docs/bootstrap/mothership">▶ Boot the Mothership</Link>
+            <Link className={styles.btnPrimary} to="/docs/install/mothership">▶ Install</Link>
             <Link className={styles.btnGhost} to="/docs/overview">Read the docs</Link>
           </div>
           <Term />

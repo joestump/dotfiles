@@ -45,7 +45,7 @@ const config = {
         title: 'DOTFILES',
         items: [
           {type: 'docSidebar', sidebarId: 'main', position: 'left', label: 'Docs'},
-          {to: '/docs/bootstrap/mothership', label: 'Bootstrap', position: 'left'},
+          {to: '/docs/install/mothership', label: 'Install', position: 'left'},
           {to: '/docs/maintenance', label: 'Maintain', position: 'left'},
           {href: 'https://gitea.stump.rocks/joestump/dotfiles', label: 'Gitea', position: 'right'},
         ],
@@ -54,11 +54,11 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: 'Boot',
+            title: 'Install',
             items: [
               {label: 'Overview', to: '/docs/overview'},
-              {label: 'Mothership (macOS)', to: '/docs/bootstrap/mothership'},
-              {label: 'Utility Nodes (Linux)', to: '/docs/bootstrap/nodes'},
+              {label: 'The Hub (macOS)', to: '/docs/install/mothership'},
+              {label: 'Spokes (Linux)', to: '/docs/install/nodes'},
             ],
           },
           {

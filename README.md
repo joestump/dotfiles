@@ -1,8 +1,11 @@
 # dotfiles
 
 Personal dotfiles, managed with [chezmoi](https://www.chezmoi.io/), backed by
-self-hosted Gitea at <https://gitea.stump.rocks/joestump/dotfiles> (private), and
-layered on an existing [Oh My Zsh](https://ohmyz.sh/) install.
+self-hosted Gitea at <https://gitea.stump.rocks/joestump/dotfiles>, and
+layered on an existing [Oh My Zsh](https://ohmyz.sh/) install. Hub-and-spoke:
+one macOS hub (required — parts of the stack have no Linux desktop apps), any
+number of Linux spokes. Full docs, including install:
+<https://joestump.pages.stump.rocks/dotfiles/>
 
 chezmoi manages **only** `~/.zshrc` and `~/.oh-my-zsh/custom/`. Oh My Zsh
 self-updates the rest of its tree and is never touched by chezmoi.

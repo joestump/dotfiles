@@ -1,12 +1,21 @@
 ---
 sidebar_position: 1
-title: The Mothership (macOS)
+title: The Hub — macOS (required)
 ---
 
-# Bootstrapping the Mothership
+# Installing the Hub
 
-The mothership is the macOS laptop — the machine I author from. It gets the full
-stack: Homebrew, Oh My Zsh, the Vault Agent, SSH keys, Claude config.
+This setup is a **hub-and-spoke model**. The hub — affectionately, *the
+mothership* — is the machine you author from: dotfiles get edited and pushed
+here, secrets get seeded here, and Linux spokes get provisioned *from* here
+with one command ([`czinit`](nodes.md)).
+
+:::warning The hub must be macOS
+Parts of this stack depend on desktop apps that don't exist for Linux —
+Claude Desktop and the macOS-side Signal pairing among them — and the hub
+runs the launchd services (Vault Agent, signal-cli daemon) the rest of the
+tooling assumes. Spokes can be Linux; the hub can't.
+:::
 
 ## One command
 
@@ -15,9 +24,13 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- \
   init --apply https://gitea.stump.rocks/joestump/dotfiles.git
 ```
 
-This installs `chezmoi`, clones the private repo, and runs the bootstrap end-to-end.
-You'll be prompted **once** for Gitea credentials (HTTPS) — cached in the login
-keychain after that.
+This installs `chezmoi`, clones the repo, and runs the install end-to-end.
+
+> **Installing this as your own?** Fork it and change one value —
+> `githubUser` in `.chezmoidata.yaml` — and every repo URL, credential
+> helper, and plugin source re-points to your handle. Secrets come from an
+> OpenBao/Vault server at runtime (`VAULT_ADDR`), so point that at your own
+> instance; nothing secret lives in this repo.
 
 ### What runs, in order
 
@@ -35,7 +48,7 @@ keychain after that.
 The agent needs your identity once:
 
 ```bash
-export VAULT_ADDR=https://vault.stump.rocks
+export VAULT_ADDR=https://vault.stump.rocks   # or your own OpenBao
 vault login -method=oidc      # seeds ~/.vault-token; the agent renews it
 vault-agent start             # launchd job renders ~/.config/vault/secrets-*.env
 exec zsh
@@ -62,4 +75,4 @@ chezmoi apply                  # write it live
 chezmoi cd && git add -A && git commit -m "…" && git push && exit
 ```
 
-Other machines pull it with `chezmoi update`.
+Spokes pull it with `chezmoi update`.
