@@ -39,8 +39,8 @@ SPACESHIP_DOCKER_COMPOSE_SHOW=false
 # is up and rendering secrets; red = it's down (run `vault-agent start` / re-login).
 # NOTE: this reflects the AGENT being up, not whether the OIDC token is still valid —
 # see the note in commit for a stricter "needs re-login" heartbeat option.
-SPACESHIP_VAULT_SYMBOL_OK="${SPACESHIP_VAULT_SYMBOL_OK=$''}"    #  fa-lock (closed = secure)
-SPACESHIP_VAULT_SYMBOL_BAD="${SPACESHIP_VAULT_SYMBOL_BAD=$''}"  #  fa-unlock (open = exposed)
+SPACESHIP_VAULT_SYMBOL_OK="${SPACESHIP_VAULT_SYMBOL_OK=}"    # U+F023 fa-lock (closed = secure)
+SPACESHIP_VAULT_SYMBOL_BAD="${SPACESHIP_VAULT_SYMBOL_BAD=}"   # U+F09C fa-unlock (open = exposed)
 SPACESHIP_VAULT_COLOR_OK="${SPACESHIP_VAULT_COLOR_OK=green}"          # named → the terminal theme's green
 SPACESHIP_VAULT_COLOR_BAD="${SPACESHIP_VAULT_COLOR_BAD=red}"          # named → the terminal theme's red
 
@@ -51,11 +51,15 @@ spaceship_vault() {
   else
     systemctl --user is-active --quiet vault-agent 2>/dev/null || ok=0
   fi
-  if (( ok )); then
-    spaceship::section --color "$SPACESHIP_VAULT_COLOR_OK"  "$SPACESHIP_VAULT_SYMBOL_OK"
-  else
-    spaceship::section --color "$SPACESHIP_VAULT_COLOR_BAD" "$SPACESHIP_VAULT_SYMBOL_BAD"
-  fi
+  local sym col
+  if (( ok )); then sym=$SPACESHIP_VAULT_SYMBOL_OK  col=$SPACESHIP_VAULT_COLOR_OK
+  else              sym=$SPACESHIP_VAULT_SYMBOL_BAD col=$SPACESHIP_VAULT_COLOR_BAD; fi
+  # --suffix supplies the trailing space; omitting it defaults to empty, which jams
+  # the glyph against the next section (that was the "🔒in ~").
+  spaceship::section \
+    --color "$col" \
+    --suffix "$SPACESHIP_PROMPT_DEFAULT_SUFFIX" \
+    "$sym"
 }
 
 # Insert `vault` right after `user` in the prompt order. spaceship fills in its
