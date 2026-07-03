@@ -1,0 +1,11 @@
+# Stale-secret detector for the Vault Agent — systemd USER oneshot (no sudo).
+# Fired by vault-agent-stale.timer every ~15m. macOS uses the launchd equivalent.
+# Managed by chezmoi. Pairs with dotfiles#3 (detect) + dotfiles#4 (expiry warning).
+[Unit]
+Description=Vault Agent stale-secret detector (Signal alert on dead auth)
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=VAULT_ADDR=https://vault.stump.rocks
+ExecStart=/bin/bash %h/.config/vault/vault-agent-stale.sh

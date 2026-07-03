@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Enable the Vault Agent stale-secret detector (dotfiles#3).
+#   Linux: systemd --user timer.   macOS: launchd LaunchAgent (StartInterval).
+# Re-runs whenever the detector or its units change (hashes embedded below).
+#
+# detector hash: {{ include "dot_config/vault/vault-agent-stale.sh.tmpl" | sha256sum }}
+# service hash:  {{ include "dot_config/systemd/user/vault-agent-stale.service.tmpl" | sha256sum }}
+# timer hash:    {{ include "dot_config/systemd/user/vault-agent-stale.timer.tmpl" | sha256sum }}
+# plist hash:    {{ include "Library/LaunchAgents/rocks.stump.vault-agent-stale.plist.tmpl" | sha256sum }}
+set -euo pipefail
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  plist="$HOME/Library/LaunchAgents/rocks.stump.vault-agent-stale.plist"
+  if [ -f "$plist" ]; then
+    launchctl unload "$plist" 2>/dev/null || true
+    launchctl load -w "$plist" 2>/dev/null && echo "vault-agent-stale (launchd) loaded" \
+      || echo "WARN: could not load vault-agent-stale plist"
+  fi
+  exit 0
+fi
+
+command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping stale detector"; exit 0; }
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if ! systemctl --user daemon-reload 2>/dev/null; then
+  echo "WARN: no user systemd bus right now — enable later with: systemctl --user enable --now vault-agent-stale.timer"
+  exit 0
+fi
+if systemctl --user enable --now vault-agent-stale.timer 2>/dev/null; then
+  echo "vault-agent-stale.timer (systemd --user) enabled + started"
+else
+  echo "WARN: couldn't enable vault-agent-stale.timer yet."
+fi

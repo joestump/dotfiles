@@ -1,9 +1,22 @@
 # Vault Agent config — managed by chezmoi (source: dot_config/vault/agent.hcl.tmpl).
-# Runs continuously under launchd: auto-auths with a token you seed via OIDC,
-# renews it, and re-renders the secrets files on a schedule / on secret change.
+# Runs continuously under launchd (macOS) / systemd --user (Linux): authenticates,
+# renews, and re-renders the secrets files on a schedule / on secret change.
 #
 # The brace expressions below are resolved by chezmoi at `chezmoi apply` (they
 # fill in your home dir). The Consul-Template logic lives in the *.ctmpl files.
+#
+# AUTH MODE is chosen at apply time by whether an AppRole secret-id has been
+# provisioned on this host:
+#
+#   ~/.config/vault/approle/secret-id EXISTS  ->  method "approle"  (self-renewing
+#       machine identity — periodic token + non-expiring secret_id, so the agent
+#       re-authenticates FOREVER with no human. Provisioned by `czapprole <host>`
+#       or `czinit`.)  This is the durable design (OMG 2026-07-01 / dotfiles#1).
+#
+#   otherwise  ->  method "token_file"  (legacy: you `vault login -method=oidc`
+#       once; the agent renews that token until its max-TTL, then it DIES with no
+#       way to re-auth. Kept only as the pre-provisioning fallback so a fresh host
+#       still renders secrets before AppRole is wired up.)
 
 pid_file = "{{ .chezmoi.homeDir }}/.config/vault/agent.pid"
 
@@ -11,10 +24,36 @@ vault {
   address = "https://vault.stump.rocks"
 }
 
+{{ $approleSecretId := joinPath .chezmoi.homeDir ".config/vault/approle/secret-id" -}}
+{{ if stat $approleSecretId -}}
 auto_auth {
-  # token_file: you run `vault login -method=oidc` once; the agent reads that
-  # token from ~/.vault-token, uses it, and keeps it renewed. Re-run the login
-  # only when the token hits its max TTL.
+  # AppRole: self-renewing machine identity. role_id + secret_id live in files
+  # (0600) provisioned by `czapprole`/`czinit` from an authenticated laptop. The
+  # agent logs in, gets a periodic token it renews forever, and re-logs-in with
+  # role_id+secret_id if the token is ever lost. No human, no max-TTL cliff.
+  method "approle" {
+    mount_path = "auth/approle"
+    config = {
+      role_id_file_path                   = "{{ .chezmoi.homeDir }}/.config/vault/approle/role-id"
+      secret_id_file_path                 = "{{ .chezmoi.homeDir }}/.config/vault/approle/secret-id"
+      # MUST stay false — the agent re-reads secret-id to re-authenticate.
+      remove_secret_id_file_after_reading = false
+    }
+  }
+
+  sink "file" {
+    config = {
+      path = "{{ .chezmoi.homeDir }}/.config/vault/agent-token"
+      mode = 0600
+    }
+  }
+}
+{{ else -}}
+auto_auth {
+  # token_file (legacy fallback): you run `vault login -method=oidc` once; the
+  # agent reads that token from ~/.vault-token, uses it, and keeps it renewed.
+  # It CANNOT re-authenticate — at the token's max-TTL it dies. Provision AppRole
+  # (`czapprole <host>`) to get a self-renewing agent instead.
   method "token_file" {
     config = {
       token_file_path = "{{ .chezmoi.homeDir }}/.vault-token"
@@ -28,6 +67,7 @@ auto_auth {
     }
   }
 }
+{{ end -}}
 
 # Keep running and retrying even if a template can't render yet (e.g. the AWS
 # secrets engine isn't configured during initial bring-up).

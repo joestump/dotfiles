@@ -47,3 +47,23 @@ vsr() {
   done
   [[ -o interactive ]] && exec zsh
 }
+
+# czrefresh — STOPGAP for token_file hosts (pre-AppRole): re-authenticate to
+# OpenBao and re-render secrets in one command, instead of remembering the
+# `vault login -method=oidc` + `vault-agent restart` incantation. On AppRole
+# hosts the agent renews itself, so this just forces a fresh render.
+#
+# Proactive "your login is about to expire" warnings are handled by the stale-
+# secret detector (vault-agent-stale, dotfiles#3), not here.
+czrefresh() {
+  emulate -L zsh
+  if [[ -f "$HOME/.config/vault/approle/secret-id" ]]; then
+    print -u2 "ℹ️  This host uses AppRole auth — the agent renews itself, no re-login needed."
+    print -u2 "    Forcing a re-render anyway…"
+    vsr
+    return
+  fi
+  print -u2 "→ re-authenticating to OpenBao (OIDC) — this is the token_file stopgap."
+  print -u2 "  For a permanent fix, provision AppRole:  czapprole --local   (or czapprole <host>)"
+  vault-oidc-login && vsr
+}

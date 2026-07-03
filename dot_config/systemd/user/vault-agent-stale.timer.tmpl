@@ -1,0 +1,12 @@
+# Timer for the Vault Agent stale-secret detector — systemd USER (no sudo).
+# Runs ~2m after login, then every 15m. Managed by chezmoi.
+[Unit]
+Description=Run the Vault Agent stale-secret detector every 15m
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

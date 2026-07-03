@@ -55,16 +55,22 @@ czinit() {
   ssh -t "$host" "sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- init --apply '${repo}'" \
     || { print -u2 "czinit: bootstrap failed on ${host}"; return 1; }
 
-  # Log in to OpenBao right here. OIDC needs one browser click to authorize, but
-  # vault-login handles the rest: opens the localhost:8250 tunnel, runs the login
-  # on the node, and kicks the Vault Agent so secrets render.
-  if (( $+functions[vault-login] )); then
-    print -u2 "→ authenticating to OpenBao (OIDC) — click Authorize in the browser tab when it opens …"
+  # Provision the Vault Agent's machine identity so it renders secrets AND renews
+  # itself forever — no interactive OIDC, no max-TTL death (dotfiles#1, OMG
+  # 2026-07-01). czapprole mints a fresh secret_id from your (already authenticated)
+  # laptop session and ships role_id+secret_id to the node; the agent takes it from
+  # there. Falls back to the OIDC login path if AppRole can't be provisioned.
+  if (( $+functions[czapprole] )); then
+    print -u2 "→ provisioning AppRole machine identity on ${host} (self-renewing, no browser) …"
+    czapprole "$host" \
+      || print -u2 "czinit: AppRole step failed — run 'czapprole ${host}' later (or 'vault-login ${host}' for the OIDC fallback)."
+  elif (( $+functions[vault-login] )); then
+    print -u2 "→ authenticating to OpenBao (OIDC fallback) — click Authorize when the browser opens …"
     vault-login "$host" \
       || print -u2 "czinit: OIDC step skipped/failed — run 'vault-login ${host}' later to render secrets."
   else
-    print -u2 "→ final step — run: vault-login ${host}"
+    print -u2 "→ final step — run: czapprole ${host}"
   fi
 
-  print -u2 "\n✓ ${host} bootstrapped — dotfiles applied and (once authorized) secrets rendered."
+  print -u2 "\n✓ ${host} bootstrapped — dotfiles applied and Vault Agent provisioned (self-renewing)."
 }

@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# vault-agent-stale — detect a Vault Agent whose auth has died and Signal-alert.
+# Managed by chezmoi (source: dot_config/vault/vault-agent-stale.sh.tmpl).
+#
+# WHY: when the agent's token dies it logs 403s to the log and backs off, but
+# nothing reaches you — and already-rendered secrets-*.env persist at last-good
+# values, so the outage is invisible until a downstream command fails (OMG
+# 2026-07-01 / dotfiles#3). This runs on a timer and pings Signal the moment the
+# agent can no longer authenticate, and warns BEFORE a token_file login expires
+# (the reminder half of dotfiles#4).
+#
+# Transition-based: it alerts once when going stale/expiring and once when it
+# recovers — not every tick. State stamp lives in ~/.config/vault/.stale-state.
+set -uo pipefail
+
+VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"; export VAULT_ADDR
+SIGNAL_NUMBER="{{ .signalNumber }}"
+HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
+VDIR="$HOME/.config/vault"
+SINK="$VDIR/agent-token"
+STAMP="$VDIR/.stale-state"          # holds: ok | stale | expiring
+WARN_TTL_SECONDS=$(( 2 * 3600 ))    # warn when a token_file login has <2h left
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- is the agent even supposed to be running? If not, this isn't our alert. ---
+agent_running() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    # Capture first: `launchctl list | grep -q` under `set -o pipefail` fails
+    # spuriously — grep -q exits on match, launchctl gets SIGPIPE (141), and
+    # pipefail propagates that as failure. So match against a captured string.
+    local out; out="$(launchctl list 2>/dev/null)" || out=""
+    case "$out" in
+      *rocks.stump.vault-agent$'\n'*|*rocks.stump.vault-agent) return 0 ;;
+      *) return 1 ;;
+    esac
+  else
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    systemctl --user is-active --quiet vault-agent 2>/dev/null
+  fi
+}
+
+# Send to the warm signal-cli daemon (JSON-RPC on 127.0.0.1:7583). Uses python3
+# for a BOUNDED socket exchange — raw `nc` half-closes and hangs on BSD/macOS
+# because the daemon keeps the connection open. Returns 0 only on a JSON-RPC result.
+send_via_daemon() {
+  have python3 || return 1
+  python3 - "$SIGNAL_NUMBER" "$1" <<'PY'
+import socket, json, sys
+num, msg = sys.argv[1], sys.argv[2]
+try:
+    s = socket.create_connection(("127.0.0.1", 7583), timeout=5)
+    s.settimeout(8)
+    s.sendall((json.dumps({"jsonrpc":"2.0","method":"send",
+        "params":{"recipient":[num],"message":msg},"id":1})+"\n").encode())
+    buf = b""
+    while b"\n" not in buf:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+    s.close()
+    for line in buf.decode(errors="replace").splitlines():
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if d.get("id") == 1:
+            sys.exit(0 if "result" in d else 1)
+    sys.exit(1)
+except Exception:
+    sys.exit(1)
+PY
+}
+
+notify() {
+  local msg="$1"
+  # 1) warm signal-cli daemon — fast, no cold JVM.
+  send_via_daemon "$msg" && return 0
+  # 2) cold signal-cli send (note-to-self) — reliable where the daemon isn't up.
+  if have signal-cli; then
+    signal-cli -a "$SIGNAL_NUMBER" send -m "$msg" "$SIGNAL_NUMBER" >/dev/null 2>&1 && return 0
+  fi
+  # 3) last resort so it is at least discoverable in the system log.
+  have logger && logger -t vault-agent-stale "$msg"
+  return 1
+}
+
+get_state() { [ -r "$STAMP" ] && cat "$STAMP" || echo ok; }
+set_state() { printf '%s' "$1" > "$STAMP"; }
+
+agent_running || exit 0
+prev="$(get_state)"
+
+# --- definitive probe: can the agent's own sink token still authenticate? ---
+if [ ! -r "$SINK" ] || ! have vault; then
+  # Can't probe cleanly (no sink yet / no CLI) — stay quiet rather than false-alarm.
+  exit 0
+fi
+
+tok="$(cat "$SINK" 2>/dev/null)"
+if [ -z "$tok" ]; then exit 0; fi
+
+if lookup="$(VAULT_TOKEN="$tok" vault token lookup -format=json 2>/dev/null)"; then
+  # Authenticated. Check remaining TTL for a proactive expiry warning, but ONLY
+  # for token_file hosts — AppRole hosts renew/re-login themselves.
+  if [ ! -f "$VDIR/approle/secret-id" ] && have python3; then
+    ttl="$(printf '%s' "$lookup" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"].get("ttl",0))' 2>/dev/null || echo 0)"
+    if [ "${ttl:-0}" -gt 0 ] && [ "${ttl:-0}" -lt "$WARN_TTL_SECONDS" ]; then
+      if [ "$prev" != "expiring" ]; then
+        notify "🔑 Vault Agent on ${HOST_SHORT}: OIDC login expires in ~$(( ttl / 60 ))m and can't self-renew. Run czrefresh (or czapprole --local for a permanent fix) before secrets go stale."
+        set_state expiring
+      fi
+      exit 0
+    fi
+  fi
+  # Healthy — announce recovery once if we were previously alerting.
+  if [ "$prev" != "ok" ]; then
+    notify "✅ Vault Agent on ${HOST_SHORT}: authentication restored — secrets rendering again."
+    set_state ok
+  fi
+  exit 0
+fi
+
+# --- lookup failed while the agent is running: auth is DEAD. ---
+if [ "$prev" != "stale" ]; then
+  notify "🚨 Vault Agent on ${HOST_SHORT}: auth is DEAD (token 403) — secret/personal/* is going stale and rendered secrets are frozen at last-good values. Fix: czapprole --local  (or czrefresh for the OIDC stopgap)."
+  set_state stale
+fi
+exit 0
