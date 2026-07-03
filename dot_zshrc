@@ -94,8 +94,9 @@ PROMPT_GLYPHS=(
 # Add wisely, as too many plugins slow down shell startup.
 # Bundled OMZ plugins + two external ones (zsh-autosuggestions,
 # zsh-syntax-highlighting) cloned via chezmoi externals.
-# NOTE: zsh-syntax-highlighting MUST stay last. direnv is intentionally absent
-# here — it is hooked via ~/.oh-my-zsh/custom/direnv.zsh instead.
+# NOTE: zsh-syntax-highlighting MUST stay last — except history-substring-search,
+# which its README requires to load AFTER syntax-highlighting. direnv is
+# intentionally absent here — it is hooked via ~/.oh-my-zsh/custom/direnv.zsh instead.
 plugins=(
   git
   git-auto-fetch
@@ -118,13 +119,33 @@ plugins=(
   dirhistory
   extract
   jsontools
+  urltools
   fzf
   zoxide
+  eza
+  sudo
+  alias-finder
+  copypath
+  copyfile
   shlink
   zsh-ai
   zsh-autosuggestions
   zsh-syntax-highlighting
+  history-substring-search
 )
+
+# alias-finder: whenever a typed command has a shorter alias, say so. All the
+# alias-heavy plugins above (git, docker, kubectl, brew...) make this the
+# cheapest way to actually learn them.
+zstyle ':omz:plugins:alias-finder' autoload yes
+zstyle ':omz:plugins:alias-finder' longer yes
+zstyle ':omz:plugins:alias-finder' cheaper yes
+
+# eza: modern ls (aliases ls/l/ll/la to eza). Icons need the Nerd Font from the
+# Brewfile; git column shows per-file status inside repos.
+zstyle ':omz:plugins:eza' 'icons' yes
+zstyle ':omz:plugins:eza' 'git-status' yes
+zstyle ':omz:plugins:eza' 'dirs-first' yes
 
 # zsh-ai (matheusml/zsh-ai): type `# describe what you want` + Enter to turn it
 # into a shell command. API keys come from the environment — OPENAI_API_KEY,

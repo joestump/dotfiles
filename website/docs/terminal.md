@@ -31,9 +31,12 @@ chezmoi externals).
 ## Plugins
 
 Curated OMZ set — `git`, `gh`, `aws`, `kubectl`, `docker`, `colorize`,
-`git-auto-fetch`, `zsh-autosuggestions`, `zsh-syntax-highlighting` (last), plus
-`zsh-ai` (type `# describe a command` + Enter). External plugins clone via chezmoi
-externals. `Tab` accepts the autosuggestion.
+`git-auto-fetch`, `zsh-autosuggestions`, `zsh-syntax-highlighting`, plus
+`zsh-ai` (type `# describe a command` + Enter) and quality-of-life picks like
+`history-substring-search`, `eza`, `sudo`, and `alias-finder`. External plugins
+clone via chezmoi externals. `Tab` accepts the autosuggestion.
+
+Full roster, load-order rules, and per-plugin pro tips: [Zsh Plugins](zsh-plugins/index.md).
 
 ## Ghostty
 
