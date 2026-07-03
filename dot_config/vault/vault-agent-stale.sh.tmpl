@@ -13,6 +13,13 @@
 # recovers — not every tick. State stamp lives in ~/.config/vault/.stale-state.
 set -uo pipefail
 
+# Run under systemd --user / launchd, whose PATH is minimal — make sure the tools
+# we shell out to (vault, signal-cli, nc, python3) are discoverable no matter where
+# they were installed (Homebrew, ~/.local/bin, ~/bin, system). Without this the
+# detector would bail before probing, or fail to reach Signal (signal-cli commonly
+# lives in ~/.local/bin, which systemd does not include).
+export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"; export VAULT_ADDR
 SIGNAL_NUMBER="{{ .signalNumber }}"
 HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
