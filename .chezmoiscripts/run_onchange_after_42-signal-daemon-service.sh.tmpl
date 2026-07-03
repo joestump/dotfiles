@@ -34,7 +34,7 @@ case "$(uname -s)" in
     # Reload so updated args take effect; tolerate 'not loaded' on first run.
     launchctl unload "$plist" 2>/dev/null || true
     if launchctl load -w "$plist" 2>/dev/null; then
-      echo "signal-daemon (launchd) loaded — JSON-RPC on tcp 127.0.0.1:7583"
+      :   # quiet on success
     else
       echo "WARN: couldn't load signal-daemon; start it later with 'signal-daemon start'."
     fi
@@ -47,7 +47,7 @@ case "$(uname -s)" in
       exit 0
     fi
     if systemctl --user enable --now signal-daemon 2>/dev/null; then
-      echo "signal-daemon (systemd --user) enabled + started"
+      :   # quiet on success
     else
       echo "WARN: couldn't start signal-daemon (is signal-cli linked here?); try 'signal-daemon start'."
     fi

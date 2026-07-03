@@ -7,23 +7,35 @@
 # Extra args pass through to chezmoi update (e.g. `czu --refresh-externals`).
 czu() {
   emulate -L zsh
-  local fancy=0; if _have gum && [[ -t 1 ]]; then fancy=1; fi
-  (( fancy )) && gum style --foreground 213 --bold "  ⟳ czu · updating ${HOST%%.*}"
-  # Split `chezmoi update` (= git pull + apply): the pull gets its own ✓; `apply`
-  # then streams the per-phase headings/lists from the run scripts (never hidden — it
-  # can prompt for sudo).
-  if (( fancy )); then
-    if gum spin --show-error --spinner minidot --title "syncing dotfiles" -- chezmoi git pull -- --ff-only; then
-      gum style --foreground 150 "  ✓ dotfiles synced"
-    else
-      gum style --foreground 210 "  ✗ sync failed"; return 1
-    fi
+  # Reuse the shared UI helpers (heading/item/step) so czu's own sections match the
+  # ones the apply scripts stream — uniform headings + ticked items throughout.
+  if [[ -r "$HOME/.config/dotfiles/ui-lib.sh" ]]; then
+    . "$HOME/.config/dotfiles/ui-lib.sh"
   else
-    chezmoi git pull -- --ff-only || return
+    heading() { print -r -- ""; print -r -- "== $* =="; }
+    item() { shift; print -r -- "    - $*"; }
+    step() { local t="$1"; shift; [[ "$1" == "--" ]] && shift; "$@"; }
   fi
+
+  _have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "⟳ czu · updating ${HOST%%.*}"
+
+  # git pull (its own ✓), then apply — which streams 📦 / 🐹 / 🔌 sections. Apply is
+  # never hidden behind a spinner: it can prompt for sudo.
+  heading "📥 Sync"
+  step "dotfiles" -- chezmoi git pull -- --ff-only || return
   chezmoi apply "$@" || return
-  vault-agent restart >/dev/null 2>&1
-  (( fancy )) && gum style --foreground 150 "  ✓ secrets rendered · ${HOST%%.*} up to date — reloading"
+
+  # Secrets is its own section. vault-agent is a shell function (gum spin can't wrap
+  # it), so run it directly with output suppressed and report with ticks.
+  heading "🔐 Secrets"
+  if vault-agent restart >/dev/null 2>&1; then
+    item ok "Vault Agent reloaded"
+    item ok "secrets re-rendered"
+  else
+    item no "Vault Agent — check 'vault-agent status'"
+  fi
+
+  _have gum && [[ -t 1 ]] && gum style --foreground 150 "✓ ${HOST%%.*} up to date — reloading"
   [[ -o interactive ]] && exec zsh
 }
 

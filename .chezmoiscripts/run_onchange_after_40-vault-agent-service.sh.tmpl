@@ -19,7 +19,7 @@ if ! systemctl --user daemon-reload 2>/dev/null; then
 fi
 
 if systemctl --user enable --now vault-agent 2>/dev/null; then
-  echo "vault-agent (systemd --user) enabled + started"
+  :   # quiet on success — czu's 🔐 Secrets section reports the live state
 else
   echo "WARN: couldn't enable vault-agent yet; run 'vault-agent start' after 'vault login'."
 fi

@@ -13,7 +13,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
   plist="$HOME/Library/LaunchAgents/rocks.stump.vault-agent-stale.plist"
   if [ -f "$plist" ]; then
     launchctl unload "$plist" 2>/dev/null || true
-    launchctl load -w "$plist" 2>/dev/null && echo "vault-agent-stale (launchd) loaded" \
+    launchctl load -w "$plist" 2>/dev/null \
       || echo "WARN: could not load vault-agent-stale plist"
   fi
   exit 0
@@ -26,7 +26,7 @@ if ! systemctl --user daemon-reload 2>/dev/null; then
   exit 0
 fi
 if systemctl --user enable --now vault-agent-stale.timer 2>/dev/null; then
-  echo "vault-agent-stale.timer (systemd --user) enabled + started"
+  :   # quiet on success
 else
   echo "WARN: couldn't enable vault-agent-stale.timer yet."
 fi
