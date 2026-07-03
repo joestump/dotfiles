@@ -34,11 +34,11 @@ SPACESHIP_CHAR_COLOR_SUCCESS=213   # pink (256-color); red still shows on error
 # the docker section already shows the engine version. Turn it off.
 SPACESHIP_DOCKER_COMPOSE_SHOW=false
 
-# ---- Vault Agent lock -------------------------------------------------------
-# A single padlock right after the username: green (theme green) = the Vault Agent
-# is up and rendering secrets; red = it's down (run `vault-agent start` / re-login).
-# NOTE: this reflects the AGENT being up, not whether the OIDC token is still valid —
-# see the note in commit for a stricter "needs re-login" heartbeat option.
+# ---- Vault Agent lock (a dock icon; see the status dock below) --------------
+# A single padlock: green (theme green) = the Vault Agent is up and rendering secrets;
+# red = it's down (run `vault-agent start` / re-login). NOTE: reflects the AGENT being
+# up, not whether the OIDC token is still valid — the vault-agent-stale detector is the
+# stricter "needs re-login" signal we could point it at.
 SPACESHIP_VAULT_SYMBOL_OK="${SPACESHIP_VAULT_SYMBOL_OK=}"    # U+F023 fa-lock (closed = secure)
 SPACESHIP_VAULT_SYMBOL_BAD="${SPACESHIP_VAULT_SYMBOL_BAD=}"   # U+F09C fa-unlock (open = exposed)
 SPACESHIP_VAULT_COLOR_OK="${SPACESHIP_VAULT_COLOR_OK=green}"          # named → the terminal theme's green
@@ -62,18 +62,31 @@ spaceship_vault() {
     "$sym"
 }
 
-# Insert `vault` right after `user` in the prompt order. spaceship fills in its
-# default order only AFTER this file loads (the theme loads after $ZSH_CUSTOM), so do
-# it once the array exists — from a cheap, idempotent precmd — instead of freezing the
-# whole ~60-section default list here.
+# ---- Right-side status dock -------------------------------------------------
+# Single-icon, glanceable statuses live on the RIGHT prompt (right-adjusted on the top
+# line) instead of cluttering the left. spaceship renders SPACESHIP_RPROMPT_ORDER on
+# the right; setting it here (before the theme loads) beats spaceship's empty default.
+#   vault  = the Vault Agent lock (always shown)
+#   jobs   = background job count (only when > 0)
+#   exit_code = ✘<code> of the last command (only when it failed)
+#   battery   = charge indicator (only when low)
+SPACESHIP_RPROMPT_ORDER=( vault jobs exit_code battery )
+SPACESHIP_EXIT_CODE_SHOW="${SPACESHIP_EXIT_CODE_SHOW=true}"
+
+# vault/battery/jobs/exit_code also sit in spaceship's default LEFT order — pull them
+# off the left so they appear ONLY in the dock. Also add `kubectl_context` to the left
+# (the default order carries `kubectl` = the version section, off by default — not the
+# useful current-cluster/namespace one). spaceship fills its default order after
+# $ZSH_CUSTOM loads, so mutate it from a cheap, idempotent precmd.
 autoload -Uz add-zsh-hook
-_spaceship_insert_vault() {
-  (( ${SPACESHIP_PROMPT_ORDER[(Ie)vault]} )) && return   # already inserted
-  local i=${SPACESHIP_PROMPT_ORDER[(Ie)user]}
-  if (( i )); then
-    SPACESHIP_PROMPT_ORDER=( ${SPACESHIP_PROMPT_ORDER[1,i]} vault ${SPACESHIP_PROMPT_ORDER[i+1,-1]} )
-  else
-    SPACESHIP_PROMPT_ORDER=( vault $SPACESHIP_PROMPT_ORDER )
+_spaceship_dock() {
+  local s
+  for s in vault battery jobs exit_code; do
+    SPACESHIP_PROMPT_ORDER=("${(@)SPACESHIP_PROMPT_ORDER:#$s}")
+  done
+  if ! (( ${SPACESHIP_PROMPT_ORDER[(Ie)kubectl_context]} )); then
+    local i=${SPACESHIP_PROMPT_ORDER[(Ie)host]}
+    (( i )) && SPACESHIP_PROMPT_ORDER=( ${SPACESHIP_PROMPT_ORDER[1,i]} kubectl_context ${SPACESHIP_PROMPT_ORDER[i+1,-1]} )
   fi
 }
-add-zsh-hook precmd _spaceship_insert_vault
+add-zsh-hook precmd _spaceship_dock

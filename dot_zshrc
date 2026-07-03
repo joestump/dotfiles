@@ -162,6 +162,12 @@ export ZSH_AI_OPENAI_MODEL="gpt-oss:120b"
 
 source $ZSH/oh-my-zsh.sh
 
+# Right-side status dock: some OMZ plugins (e.g. `aws`) set their own RPROMPT at load,
+# which clobbers spaceship's dock. Assert spaceship's last so the dock wins — its own
+# `aws` section already shows the profile on the left. Guarded so a non-spaceship theme
+# (picked via the `theme` helper) is left alone.
+(( $+functions[spaceship::rprompt] )) && RPROMPT='$(spaceship::rprompt)'
+
 # User configuration
 
 # export MANPATH="/usr/local/man:$MANPATH"
