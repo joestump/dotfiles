@@ -29,6 +29,11 @@ macos-option-as-alt = true
 mouse-hide-while-typing = true
 copy-on-select = clipboard
 
+# No "close this surface? there are running processes" nag — zsh/tmux/etc. always
+# look like "running processes" to the shell-integration check, and the confirm
+# dialog fires on every tab close. Off.
+confirm-close-surface = false
+
 # SSH: auto-install Ghostty's terminfo on remote hosts (fixes "xterm-ghostty:
 # unknown terminal type" + garbled input over SSH) and propagate a sane TERM.
 # Same as the default feature set with ssh-env/ssh-terminfo flipped on.
