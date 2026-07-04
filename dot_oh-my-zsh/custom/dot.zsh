@@ -71,7 +71,12 @@ status() {
     systemctl --user is-active --quiet vault-agent 2>/dev/null && va=up || va=down
   fi
   nc -z 127.0.0.1 7583 2>/dev/null && sd=up || sd=down
-  pend=$(chezmoi status 2>/dev/null | grep -c . | tr -d ' ')
+  # --exclude=scripts: plain run_after_ scripts (45-signal-mcp-venv,
+  # install-claude-plugins) are UNCONDITIONAL by design — they always show as "R"
+  # in plain `chezmoi status` with no persisted skip-state, which would otherwise
+  # make this row permanently read "N pending" even on a fully-synced machine.
+  # We only want genuine FILE drift here.
+  pend=$(chezmoi status --exclude=scripts 2>/dev/null | grep -c . | tr -d ' ')
   { [[ -z "$pend" || "$pend" == 0 ]] && df=clean } || df="${pend} pending"
   skills=$(_skills_freshness)
   disk=$(df -h / 2>/dev/null | awk 'NR==2{print $5" used"}')
