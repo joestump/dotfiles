@@ -1,0 +1,99 @@
+" ~/.vimrc — managed by chezmoi. Lean & fast: vim-plug + curated plugins.
+"
+" plug.vim itself is a chezmoi external (~/.vim/autoload/plug.vim); a `run_onchange_`
+" script runs `vim +'PlugInstall --sync' +qall` when this file changes, so adding a
+" `Plug '…'` line + `chezmoi apply` installs it without opening vim manually.
+
+" ---- Plugins (vim-plug) ---------------------------------------------------
+call plug#begin()
+
+" Core UX — the tpope suite: everything below makes vim feel right.
+Plug 'tpope/vim-sensible'         " sane defaults so we're not fighting 1978
+Plug 'tpope/vim-surround'         " cs'\"  ds(  ysiw]  — change/delete/add surroundings
+Plug 'tpope/vim-commentary'       " gcc / gc<motion> to toggle comments
+Plug 'tpope/vim-repeat'           " make . repeat plugin actions
+Plug 'tpope/vim-fugitive'         " :Git blame / status / diff / etc.
+Plug 'airblade/vim-gitgutter'     " ± markers in the gutter for git diffs
+
+" Fuzzy finder — fzf is installed via Homebrew/apt; these are the vim bindings.
+Plug 'junegunn/fzf'               " runtime files that ship with fzf
+Plug 'junegunn/fzf.vim'           " :Files :Rg :GFiles :Buffers commands
+
+" Statusline: lightline — lightweight and configurable.
+Plug 'itchyny/lightline.vim'
+
+" Colorscheme — solarized-dark, the classic.
+Plug 'lifepillar/vim-solarized8'
+
+" Languages I actually touch.
+Plug 'fatih/vim-go', { 'tag': '*' }   " the Go plugin for vim (goimports, :GoTest, etc.)
+Plug 'hashivim/vim-terraform'          " Terraform/HCL
+Plug 'pearofducks/ansible-vim'         " Ansible playbooks / roles / inventory
+Plug 'sheerun/vim-polyglot'            " one-plugin syntax pack (TS, MDX, HTMX, YAML, TOML…)
+Plug 'mattn/emmet-vim'                 " HTML/HTMX expansion: div.card>ul>li*3<C-y>,
+
+call plug#end()
+
+" ---- General settings -----------------------------------------------------
+set number relativenumber              " hybrid line numbers
+set laststatus=2                        " lightline needs this
+set background=dark
+set clipboard^=unnamed,unnamedplus      " share yank with system clipboard on mac + linux
+set mouse=a                             " mouse in terminal vim (drop 'a' if you loathe it)
+
+" State — swap / backup / undo files go under ~/.local/state/vim, never in $CWD.
+" The trailing '//' encodes the full path in the swap/undo filename, so files with
+" the same basename in different dirs don't collide.
+silent! call mkdir(expand('~/.local/state/vim/undo'),   'p')
+silent! call mkdir(expand('~/.local/state/vim/backup'), 'p')
+silent! call mkdir(expand('~/.local/state/vim/swap'),   'p')
+set undofile
+set undodir=~/.local/state/vim/undo//
+set backupdir=~/.local/state/vim/backup//
+set directory=~/.local/state/vim/swap//
+
+" ---- Colorscheme ----------------------------------------------------------
+" Wrapped in try/catch because on the very first launch (before PlugInstall runs)
+" the colorscheme plugin isn't there yet.
+try
+  colorscheme solarized8_high
+catch
+  colorscheme default
+endtry
+
+" ---- Lightline ------------------------------------------------------------
+let g:lightline = {
+      \ 'colorscheme': 'wombat',
+      \ 'active': {
+      \   'right': [ [ 'lineinfo' ],
+      \              [ 'percent' ],
+      \              [ 'fileformat', 'fileencoding', 'filetype' ] ]
+      \ },
+      \ }
+
+" ---- fzf mappings ---------------------------------------------------------
+nnoremap <silent> <leader>f :Files<CR>
+nnoremap <silent> <leader>b :Buffers<CR>
+nnoremap <silent> <leader>r :Rg<CR>
+nnoremap <silent> <leader>g :GFiles<CR>
+
+" ---- Go -------------------------------------------------------------------
+let g:go_fmt_command   = "goimports"
+let g:go_fmt_autosave  = 1
+
+" ---- Ansible --------------------------------------------------------------
+au BufRead,BufNewFile */playbooks/**.yaml set filetype=yaml.ansible
+au BufRead,BufNewFile inventory.yaml       set filetype=yaml.ansible
+
+" ---- Filetype tweaks ------------------------------------------------------
+autocmd FileType tf   setlocal shiftwidth=2 tabstop=2
+autocmd FileType json setlocal shiftwidth=2 tabstop=2
+autocmd FileType yaml setlocal shiftwidth=2 tabstop=2
+
+" ---- Handy commands -------------------------------------------------------
+fun! TrimWhitespace()
+    let l:save = winsaveview()
+    keeppatterns %s/\s\+$//e
+    call winrestview(l:save)
+endfun
+command! TrimWhitespace call TrimWhitespace()

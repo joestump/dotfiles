@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Install vim plugins declared in ~/.vimrc via vim-plug — headless, on every apply
+# where the vimrc changed. Cheap: PlugInstall skips plugins already present.
+#
+# vimrc hash: {{ include "dot_vimrc" | sha256sum }}
+set -euo pipefail
+
+# Shared UI helpers (heading / step); fallback so this still works if ui-lib.sh
+# hasn't been deployed yet on a first apply.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  say() { echo "  $*"; }
+  warn() { echo "  WARN: $*" >&2; }
+}
+
+command -v vim >/dev/null 2>&1 || { say "vim not installed; skipping vim-plug"; exit 0; }
+[ -r "$HOME/.vimrc" ] || { say "no ~/.vimrc; skipping vim-plug"; exit 0; }
+[ -r "$HOME/.vim/autoload/plug.vim" ] || { warn "plug.vim missing — chezmoi external hasn't landed yet"; exit 0; }
+
+heading "🧩 Vim plugins"
+# `-e -s`: silent Ex mode (no ui) — but that skips ~/.vimrc, so we don't use it.
+# Instead, run a normal (non-Ex) vim with commands, redirected. PlugInstall --sync
+# blocks until installs finish; +qall exits when done.
+if step "vim-plug PlugInstall" -- vim +'PlugInstall --sync' +qall; then
+  :
+else
+  warn "vim +PlugInstall failed — run it by hand in vim to see plug's log"
+fi

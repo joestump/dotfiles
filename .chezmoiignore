@@ -18,6 +18,14 @@ test/
 website/
 dist/
 
+# Vim runtime state — installed by vim-plug (~/.vim/plugged/) or created by vim
+# itself (undo/backup/swap in ~/.local/state/vim/). chezmoi manages ~/.vimrc and
+# the plug.vim external only.
+.vim/plugged/
+.vim/.netrwhist
+.viminfo
+.local/state/vim/
+
 # OS-specific Vault Agent supervisor: launchd LaunchAgent on macOS, systemd
 # --user service on Linux. Ignore the one that doesn't apply to this machine.
 {{ if ne .chezmoi.os "darwin" -}}

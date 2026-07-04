@@ -7,7 +7,7 @@ zsh
 git
 curl
 wget
-vim
+vim-gtk3           # the fat vim build (+clipboard, +python3) — headless Ubuntu vim is too minimal for vim-plug
 jq
 fzf
 zoxide
