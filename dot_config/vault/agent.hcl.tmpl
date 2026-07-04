@@ -47,6 +47,20 @@ auto_auth {
       mode = 0600
     }
   }
+
+  # Mirror the token to the CLI's default location so bare `vault` commands (and
+  # anything that reads ~/.vault-token) ride the self-renewing AppRole identity
+  # instead of a stale interactive OIDC token (dotfiles#1 follow-up). Only on the
+  # AppRole path — the token_file path below already authenticates FROM this file.
+  # Note: while this sink is active a plain `vault login -method=oidc` won't stick
+  # (the agent overwrites it); pause the agent (`vault-agent stop`) for a genuine
+  # full-OIDC session.
+  sink "file" {
+    config = {
+      path = "{{ .chezmoi.homeDir }}/.vault-token"
+      mode = 0600
+    }
+  }
 }
 {{ else -}}
 auto_auth {
