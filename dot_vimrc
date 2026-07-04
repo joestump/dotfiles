@@ -35,11 +35,24 @@ Plug 'mattn/emmet-vim'                 " HTML/HTMX expansion: div.card>ul>li*3<C
 call plug#end()
 
 " ---- General settings -----------------------------------------------------
-set number relativenumber              " hybrid line numbers
+set number                              " absolute line numbers only — no relativenumber
+set signcolumn=number                   " draw signs (git-gutter) INSIDE the number column — one column total
+set cursorline                          " ...but highlight ONLY the number, not the whole line ↓
+silent! set cursorlineopt=number        " (vim 8.1.2019+; silent! keeps older builds quiet)
 set laststatus=2                        " lightline needs this
 set background=dark
 set clipboard^=unnamed,unnamedplus      " share yank with system clipboard on mac + linux
 set mouse=a                             " mouse in terminal vim (drop 'a' if you loathe it)
+
+" A subtle magenta accent on the CURRENT line number. Wrapped in a ColorScheme
+" autocmd so it re-applies whenever the colorscheme reloads — colorschemes reset
+" user-set highlights, and solarized8 is loaded below. `ctermfg=magenta` picks up
+" the terminal palette (your Ghostty Catppuccin Mocha) so it tracks the terminal
+" theme; `guifg` is the solarized magenta for gvim/MacVim.
+augroup UserColors
+  autocmd!
+  autocmd ColorScheme * highlight CursorLineNr cterm=bold ctermfg=magenta gui=bold guifg=#D33682
+augroup END
 
 " State — swap / backup / undo files go under ~/.local/state/vim, never in $CWD.
 " The trailing '//' encodes the full path in the swap/undo filename, so files with
