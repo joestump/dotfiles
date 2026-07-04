@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Enable the scheduled czu (dotfiles sync + apply + secrets refresh, every 6h).
+#   Linux: systemd --user timer.   macOS: launchd LaunchAgent (StartInterval).
+# Re-runs whenever the runner or its units change (hashes embedded below).
+#
+# runner hash:  {{ include "dot_config/dotfiles/executable_czu-run.zsh" | sha256sum }}
+# service hash: {{ include "dot_config/systemd/user/czu.service.tmpl" | sha256sum }}
+# timer hash:   {{ include "dot_config/systemd/user/czu.timer.tmpl" | sha256sum }}
+# plist hash:   {{ include "Library/LaunchAgents/rocks.stump.czu.plist.tmpl" | sha256sum }}
+set -euo pipefail
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  plist="$HOME/Library/LaunchAgents/rocks.stump.czu.plist"
+  if [ -f "$plist" ]; then
+    launchctl unload "$plist" 2>/dev/null || true
+    launchctl load -w "$plist" 2>/dev/null \
+      || echo "WARN: could not load the scheduled-czu plist"
+  fi
+  exit 0
+fi
+
+command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping scheduled czu"; exit 0; }
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if ! systemctl --user daemon-reload 2>/dev/null; then
+  echo "WARN: no user systemd bus right now — enable later with: systemctl --user enable --now czu.timer"
+  exit 0
+fi
+if systemctl --user enable --now czu.timer 2>/dev/null; then
+  :   # quiet on success
+else
+  echo "WARN: couldn't enable czu.timer yet."
+fi

@@ -5,36 +5,14 @@
 #   2. vault-agent restart   → re-render secrets from OpenBao now (don't wait ~5m)
 #   3. exec zsh              → reload the shell so new config + secrets take effect
 # Extra args pass through to chezmoi update (e.g. `czu --refresh-externals`).
+#
+# The actual logic lives in czu-run.sh so the SAME implementation backs both an
+# interactive `czu` and the scheduled czu timer/launchd job (every 6h, headless) —
+# see dot_config/dotfiles/executable_czu-run.sh. This wrapper just adds the
+# `exec zsh` reload, which only makes sense in an interactive shell.
 czu() {
   emulate -L zsh
-  # Reuse the shared UI helpers (heading/item/step) so czu's own sections match the
-  # ones the apply scripts stream — uniform headings + ticked items throughout.
-  if [[ -r "$HOME/.config/dotfiles/ui-lib.sh" ]]; then
-    . "$HOME/.config/dotfiles/ui-lib.sh"
-  else
-    heading() { print -r -- ""; print -r -- "== $* =="; }
-    item() { shift; print -r -- "    - $*"; }
-    step() { local t="$1"; shift; [[ "$1" == "--" ]] && shift; "$@"; }
-  fi
-
-  _have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "⟳ czu · updating ${HOST%%.*}"
-
-  # git pull (its own ✓), then apply — which streams 📦 / 🐹 / 🔌 sections. Apply is
-  # never hidden behind a spinner: it can prompt for sudo.
-  heading "📥 Sync"
-  step "dotfiles" -- chezmoi git pull -- --ff-only || return
-  chezmoi apply "$@" || return
-
-  # Secrets is its own section. vault-agent is a shell function (gum spin can't wrap
-  # it), so run it directly with output suppressed and report with ticks.
-  heading "🔐 Secrets"
-  if vault-agent restart >/dev/null 2>&1; then
-    item ok "Vault Agent reloaded"
-    item ok "secrets re-rendered"
-  else
-    item no "Vault Agent — check 'vault-agent status'"
-  fi
-
+  "$HOME/.config/dotfiles/czu-run.zsh" "$@" || return
   # No footer line: the all-✓ sections already say "up to date", and the fresh MOTD +
   # prompt after `exec zsh` are the natural "done, new shell" signal.
   [[ -o interactive ]] && exec zsh

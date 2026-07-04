@@ -1,0 +1,13 @@
+# Timer for the scheduled czu (dotfiles sync + apply + secrets refresh) —
+# systemd USER (no sudo). Runs shortly after login, then every 6h. Managed by
+# chezmoi.
+[Unit]
+Description=Run czu (dotfiles sync + apply + secrets refresh) every 6h
+
+[Timer]
+OnStartupSec=5min
+OnUnitActiveSec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

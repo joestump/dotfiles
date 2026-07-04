@@ -62,6 +62,11 @@ Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
 >
 > Installing a *fresh* spoke instead? `czinit <host>` does the whole thing over SSH
 > — see [Install a Spoke](install/nodes).
+>
+> `czu` also runs **on its own, every 6 hours** (launchd on macOS, a systemd --user
+> timer on Linux) — every box stays current without you typing anything. It stays
+> silent on success; a failed scheduled run sends a Signal note-to-self once (not
+> every retry), and another once it recovers.
 
 ![czu bringing a machine fully up to date, with per-phase checked sections](/img/screenshots/czu.png)
 

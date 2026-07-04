@@ -1,0 +1,12 @@
+# Scheduled czu — systemd USER oneshot (no sudo). Fired by czu.timer every ~6h.
+# macOS uses the launchd equivalent (rocks.stump.czu.plist). Managed by chezmoi.
+[Unit]
+Description=Scheduled czu (dotfiles sync + apply + secrets refresh)
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=VAULT_ADDR=https://vault.stump.rocks
+ExecStart=/bin/zsh %h/.config/dotfiles/czu-run.zsh
+StandardOutput=append:%h/.cache/czu-scheduled.log
+StandardError=append:%h/.cache/czu-scheduled.log

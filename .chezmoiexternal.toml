@@ -5,22 +5,33 @@
 #
 # Update them on demand with:  chezmoi apply --refresh-externals
 # (or they auto-refresh after the refreshPeriod elapses).
+#
+# Every git-repo external gets `[X.pull] args = ["--ff-only", "--quiet"]` so the
+# apply-time refresh is silent — the raw `remote:` / `From …` / `Fast-forward`
+# git-pull chatter is what makes `czu` look messy (dotfiles#…). Adding a new
+# external? Copy the pull block too. chezmoi has no global default for pull.args.
 
 # ---------- External Oh My Zsh plugins (not bundled with OMZ) ----------
 [".oh-my-zsh/custom/plugins/zsh-autosuggestions"]
     type = "git-repo"
     url = "https://github.com/zsh-users/zsh-autosuggestions.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/plugins/zsh-autosuggestions".pull]
+    args = ["--ff-only", "--quiet"]
 
 [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
     type = "git-repo"
     url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/plugins/zsh-syntax-highlighting".pull]
+    args = ["--ff-only", "--quiet"]
 
 [".oh-my-zsh/custom/plugins/zsh-ai"]
     type = "git-repo"
     url = "https://github.com/matheusml/zsh-ai.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/plugins/zsh-ai".pull]
+    args = ["--ff-only", "--quiet"]
 
 # shlink — my Shlink (URL shortener) CLI plugin; public Gitea repo, key supplied
 # per-machine via $SHLINK_API_KEY (OpenBao). Anyone can reuse it with their own key.
@@ -28,27 +39,37 @@
     type = "git-repo"
     url = "https://gitea.stump.rocks/{{ .githubUser }}/shlink-zsh.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/plugins/shlink".pull]
+    args = ["--ff-only", "--quiet"]
 
 # ---------- Themes (install many, swap via ZSH_THEME in ~/.zshrc) ----------
 [".oh-my-zsh/custom/themes/spaceship-prompt"]
     type = "git-repo"
     url = "https://github.com/spaceship-prompt/spaceship-prompt.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/themes/spaceship-prompt".pull]
+    args = ["--ff-only", "--quiet"]
 
 [".oh-my-zsh/custom/themes/powerlevel10k"]
     type = "git-repo"
     url = "https://github.com/romkatv/powerlevel10k.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/themes/powerlevel10k".pull]
+    args = ["--ff-only", "--quiet"]
 
 [".oh-my-zsh/custom/themes/quantum-zsh"]
     type = "git-repo"
     url = "https://github.com/calebephrem/quantum-zsh.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/themes/quantum-zsh".pull]
+    args = ["--ff-only", "--quiet"]
 
 [".oh-my-zsh/custom/themes/comfyline_prompt"]
     type = "git-repo"
     url = "https://gitlab.com/imnotpua/comfyline_prompt.git"
     refreshPeriod = "168h"
+[".oh-my-zsh/custom/themes/comfyline_prompt".pull]
+    args = ["--ff-only", "--quiet"]
 
 # ---------- Private Claude skills marketplace (Gitea) ----------
 # Cloned locally because `claude plugin marketplace add` can't HTTP-fetch a
@@ -61,6 +82,8 @@
     # script reinstalls when this clone's HEAD moves. For an immediate pull:
     # `chezmoi apply --refresh-externals`.
     refreshPeriod = "24h"
+[".config/claude-marketplaces/claude-personal".pull]
+    args = ["--ff-only", "--quiet"]
 
 # ---------- vim-plug (single-file plugin manager for classic vim) ----------
 # The `plug.vim` runtime file; declared in ~/.vimrc via `call plug#begin()`. A
@@ -82,5 +105,5 @@
     url = "https://github.com/{{ .githubUser }}/signal-mcp.git"
     refreshPeriod = "168h"
 ["src/signal-mcp".pull]
-    args = ["--ff-only"]
+    args = ["--ff-only", "--quiet"]
 {{ end -}}

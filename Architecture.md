@@ -80,6 +80,12 @@ automatically.)
   Vault/OpenBao port (default 8250) and runs an OIDC `vault login` on the remote.
   Refuses if the local port is already in use (checked with `lsof`).
 - `direnv.zsh` — hooks direnv into the shell.
+- `czu` — the interactive command IS a thin wrapper around
+  `dot_config/dotfiles/executable_czu-run.zsh`, which also runs unattended every 6h
+  via a launchd LaunchAgent (`rocks.stump.czu`) / systemd --user timer (`czu.timer`)
+  — one implementation, two callers. On failure it Signal-pings once (transition-
+  based, mirrors `vault-agent-stale`, not every tick) via the shared
+  `dot_config/dotfiles/signal-notify.sh.tmpl` lib.
 
 ## Conventions
 

@@ -21,7 +21,6 @@ set -uo pipefail
 export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"; export VAULT_ADDR
-SIGNAL_NUMBER="{{ .signalNumber }}"
 HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
 VDIR="$HOME/.config/vault"
 SINK="$VDIR/agent-token"
@@ -47,51 +46,10 @@ agent_running() {
   fi
 }
 
-# Send to the warm signal-cli daemon (JSON-RPC on 127.0.0.1:7583). Uses python3
-# for a BOUNDED socket exchange — raw `nc` half-closes and hangs on BSD/macOS
-# because the daemon keeps the connection open. Returns 0 only on a JSON-RPC result.
-send_via_daemon() {
-  have python3 || return 1
-  python3 - "$SIGNAL_NUMBER" "$1" <<'PY'
-import socket, json, sys
-num, msg = sys.argv[1], sys.argv[2]
-try:
-    s = socket.create_connection(("127.0.0.1", 7583), timeout=5)
-    s.settimeout(8)
-    s.sendall((json.dumps({"jsonrpc":"2.0","method":"send",
-        "params":{"recipient":[num],"message":msg},"id":1})+"\n").encode())
-    buf = b""
-    while b"\n" not in buf:
-        chunk = s.recv(4096)
-        if not chunk:
-            break
-        buf += chunk
-    s.close()
-    for line in buf.decode(errors="replace").splitlines():
-        try:
-            d = json.loads(line)
-        except ValueError:
-            continue
-        if d.get("id") == 1:
-            sys.exit(0 if "result" in d else 1)
-    sys.exit(1)
-except Exception:
-    sys.exit(1)
-PY
-}
-
-notify() {
-  local msg="$1"
-  # 1) warm signal-cli daemon — fast, no cold JVM.
-  send_via_daemon "$msg" && return 0
-  # 2) cold signal-cli send (note-to-self) — reliable where the daemon isn't up.
-  if have signal-cli; then
-    signal-cli -a "$SIGNAL_NUMBER" send -m "$msg" "$SIGNAL_NUMBER" >/dev/null 2>&1 && return 0
-  fi
-  # 3) last resort so it is at least discoverable in the system log.
-  have logger && logger -t vault-agent-stale "$msg"
-  return 1
-}
+# Signal-send helper (send_via_daemon → cold signal-cli → syslog), shared with
+# czu-run.sh's failure alert. Provides `notify()`.
+# shellcheck source=/dev/null
+. "$HOME/.config/dotfiles/signal-notify.sh"
 
 get_state() { [ -r "$STAMP" ] && cat "$STAMP" || echo ok; }
 set_state() { printf '%s' "$1" > "$STAMP"; }

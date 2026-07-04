@@ -40,7 +40,7 @@ jobs:
 
       - name: zsh -n — shell config
         run: |
-          for f in $(git ls-files 'dot_oh-my-zsh/custom/*.zsh') dot_zshrc; do
+          for f in $(git ls-files 'dot_oh-my-zsh/custom/*.zsh' 'dot_config/dotfiles/*.zsh') dot_zshrc; do
             echo "zsh -n $f"; zsh -n "$f"
           done
 
