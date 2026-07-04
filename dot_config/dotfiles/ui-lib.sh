@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared UI helpers for chezmoi run scripts (bash/sh) — sourced by the package and
 # plugin scripts to render each install phase as a heading + a ticked list.
 #

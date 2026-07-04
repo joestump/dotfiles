@@ -15,8 +15,8 @@ SIGNAL_CLI_VER="0.14.5"
 # Clean progress via the shared UI lib (spinner on a TTY, quiet "→ … ok" otherwise);
 # fallback keeps the script working if the lib hasn't been applied yet.
 . "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
-  step() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
-  spin() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  spin() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
   heading() { printf '\n== %s ==\n' "$*"; }
   item() { shift; echo "    - $*"; }
   say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
@@ -132,6 +132,8 @@ install_linux() {
   if [ "${#pkgs[@]}" -gt 0 ]; then
     # A transient apt/network blip during bootstrap must not silently leave packages
     # missing — run_onchange won't retry on a stable hash. Retry once after a refresh.
+    # SC2024: UI_LOG is in $HOME (invoker-owned), so the append works fine.
+    # shellcheck disable=SC2024
     if spin "installing ${#pkgs[@]} packages" -- sudo apt-get install -y "${pkgs[@]}" \
        || { warn "apt install failed — refreshing + retrying"; sudo apt-get update -y >>"${UI_LOG:-/dev/null}" 2>&1; \
             spin "retry" -- sudo apt-get install -y "${pkgs[@]}"; }; then

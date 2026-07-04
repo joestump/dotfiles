@@ -33,7 +33,7 @@ installed="$(claude plugin list 2>/dev/null || true)"
 # Clean progress via the shared UI lib (spinner on a TTY, quiet line otherwise);
 # fallback keeps the script working if the lib hasn't been applied yet.
 . "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
-  step() { local t="$1"; shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
   heading() { printf '\n== %s ==\n' "$*"; }
   item() { shift; echo "    - $*"; }
   say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }

@@ -49,8 +49,14 @@ jobs:
 
       - name: Validate TOML
         run: |
+          # chezmoi treats `.chezmoi<name>.toml` (e.g. .chezmoiexternal.toml,
+          # .chezmoidata.toml) as templates by rule — they can contain {{ }} and
+          # aren't valid raw TOML. Render every TOML through chezmoi first (non-
+          # template files pass through unchanged) and then validate.
           for f in $(git ls-files '*.toml'); do
-            echo "$f"; python3 -c 'import tomllib,sys; tomllib.load(open(sys.argv[1],"rb"))' "$f"
+            echo "$f"
+            chezmoi execute-template --source "$PWD" < "$f" \
+              | python3 -c 'import tomllib,sys; tomllib.load(sys.stdin.buffer)'
           done
 
       - name: yamllint — workflows
