@@ -1,6 +1,7 @@
 # Repo-only files: present in the source repo, never applied to $HOME.
 README.md
 Architecture.md
+CLAUDE.md
 docs/
 examples/
 scripts/
