@@ -38,6 +38,44 @@ setup() { setup_stub_path; }
   [[ "$output" == *"VAULT login -method=oidc"* ]]
 }
 
+@test "flush-dns: refuses on non-macOS" {
+  make_stub sudo 'exit 0'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  run zsh -c 'OSTYPE="linux-gnu"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"macOS only"* ]]
+}
+
+@test "flush-dns: no host arg just flushes" {
+  make_stub sudo '"$@"'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"flushed"* ]]
+}
+
+@test "flush-dns: host responds after flush -> success, notes it was down before" {
+  make_stub sudo '"$@"'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  make_stub ping '[ -f "$BATS_TEST_TMPDIR/ping-marker" ] && exit 0; touch "$BATS_TEST_TMPDIR/ping-marker"; exit 1'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns example.com'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"example.com responds"* ]]
+  [[ "$output" == *"was unreachable before the flush"* ]]
+}
+
+@test "flush-dns: host still unreachable after flush -> failure" {
+  make_stub sudo '"$@"'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  make_stub ping 'exit 1'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns example.com'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"still isn't responding"* ]]
+}
+
+@test "flush-dns: sudo failure is reported and stops before any ping check" {
+  make_stub sudo 'exit 1'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns example.com'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"couldn't flush"* ]]
+}
+
 @test "00-secrets.zsh: sources rendered secrets-*.env files" {
   local fakehome="$BATS_TEST_TMPDIR/home"
   mkdir -p "$fakehome/.config/vault"
