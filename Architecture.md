@@ -133,16 +133,27 @@ Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
   `token_file` (`~/.vault-token`, seeded by an interactive `vault login -method=oidc`),
   renews the token, and renders env files on a schedule. Validated: config parses
   and the agent authenticates against the live server.
+- **Per-user KV layout.** Each identity's secrets live under
+  `secret/users/<os-login>/<category>` (e.g. `secret/users/joestump/gitea`,
+  `secret/users/joestump-agent/gitea`), so hosts sharing one OpenBao never cross
+  identities. The render is scoped by `$USER`, which the Vault Agent service
+  exports (`vault-agent.service.tmpl` / the launchd plist).
 - **Templates** (Consul-Template `*.ctmpl`, kept separate from chezmoi templating):
-  `secrets-static.env` ← KV `secret/personal/*`; `secrets-aws.env` ← dynamic
+  `secrets-static.env` ← KV `secret/users/$USER/*`; `secrets-aws.env` ← dynamic
   `aws/creds/personal-cli`. `exit_on_retry_failure=false` so a not-yet-configured
   engine doesn't crash the agent.
+- **SSH keys use the same auto-discovery as env vars.** `ssh-keys.ctmpl` ranges
+  over every field of `secret/users/$USER/ssh` and `writeToFile`s each to
+  `~/.ssh/<field>` (`*.pub` → 0644, else 0600), so `id_rsa`, `id_ed25519`, or any
+  future key just appears — no per-key template, no gating. An absent/empty ssh
+  bag writes nothing under `~/.ssh` (only a names-only manifest), so it can never
+  clobber a key. `$USER`/`$HOME` come from the Vault Agent service env.
 - **OMZ loader** `custom/00-secrets.zsh` sources `~/.config/vault/secrets-*.env`
   (guarded). `custom/vault-agent.zsh` provides `vault-agent {start|stop|status|log|env}`.
 - Repo holds config + templates + the loader (paths only); rendered `*.env` files
   (0600) are never committed.
 
-Static secrets stay in KV (`secret/personal/{llm,gitea,pocketid,garage}`); **AWS
+Static secrets stay in KV (`secret/users/<you>/{llm,gitea,pocketid,garage}`); **AWS
 moves to dynamic, short-lived credentials** (auto-rotated by the agent), retiring
 the static AWS keys entirely.
 

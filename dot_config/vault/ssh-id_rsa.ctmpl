@@ -1,1 +1,0 @@
-{{- with secret "secret/data/personal/ssh" -}}{{ index .Data.data "id_rsa" }}{{- end -}}

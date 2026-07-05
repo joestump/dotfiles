@@ -20,7 +20,7 @@ set -uo pipefail
 # lives in ~/.local/bin, which systemd does not include).
 export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
-VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"; export VAULT_ADDR
+VAULT_ADDR="${VAULT_ADDR:-{{ .vaultAddr }}}"; export VAULT_ADDR
 HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
 VDIR="$HOME/.config/vault"
 SINK="$VDIR/agent-token"
@@ -89,7 +89,7 @@ fi
 
 # --- lookup failed while the agent is running: auth is DEAD. ---
 if [ "$prev" != "stale" ]; then
-  notify "🚨 Vault Agent on ${HOST_SHORT}: auth is DEAD (token 403) — secret/personal/* is going stale and rendered secrets are frozen at last-good values. Fix: czapprole --local  (or czrefresh for the OIDC stopgap)."
+  notify "🚨 Vault Agent on ${HOST_SHORT}: auth is DEAD (token 403) — secret/users/$USER/* is going stale and rendered secrets are frozen at last-good values. Fix: czapprole --local  (or czrefresh for the OIDC stopgap)."
   set_state stale
 fi
 exit 0

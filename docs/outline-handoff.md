@@ -115,7 +115,7 @@ tool).
 
 ```sh
 vault-agent status        # agent running?
-vault kv put secret/personal/llm OPENAI_API_KEY=sk-new...   # rotate; agent re-renders
+vault kv put secret/users/<you>/llm OPENAI_API_KEY=sk-new...   # rotate; agent re-renders
 ```
 
 Authenticate with `vault login -method=oidc` (seeds the token the agent renews).

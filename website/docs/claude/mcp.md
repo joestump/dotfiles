@@ -36,12 +36,16 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 Four servers need a credential; each is sourced differently so **nothing secret is
 ever written to the chezmoi repo**:
 
+OpenBao credentials are written as **`secret/users/<you>/<category>:<FIELD>`** —
+the KV path, then `:`, then the field (env-var) name. e.g.
+`secret/users/<you>/karakeep:KARAKEEP_API_KEY`.
+
 | Server | Credential | Source |
 | --- | --- | --- |
-| `github` | `Authorization: Bearer …` | OpenBao `secret/personal/github` (`GITHUB_PERSONAL_ACCESS_TOKEN`), baked as a Bearer header — like outline |
-| `karakeep` | `KARAKEEP_API_KEY` | OpenBao `secret/personal/karakeep`, baked into `env` |
-| `gitea` | `GITEA_ACCESS_TOKEN` | **Not in the config** — gitea-mcp inherits it from the login shell (`env.zsh`, exported from OpenBao) |
-| `outline` | `Authorization: Bearer …` | `OUTLINE_API_TOKEN` from the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
+| `github` | `Authorization: Bearer …` | `secret/users/<you>/github:GITHUB_PERSONAL_ACCESS_TOKEN`, baked as a Bearer header — like outline |
+| `karakeep` | `KARAKEEP_API_KEY` | `secret/users/<you>/karakeep:KARAKEEP_API_KEY`, baked into `env` |
+| `gitea` | `GITEA_TOKEN` | **Not in the config** — gitea-mcp inherits it from the login shell (`env.zsh`, from `secret/users/<you>/gitea:GITEA_TOKEN`) |
+| `outline` | `Authorization: Bearer …` | `secret/users/<you>/outline:OUTLINE_API_TOKEN`, via the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
 
 Rotating any of these is just `vault kv put …` then `chezmoi apply` (the merge
 re-reads OpenBao every run).
@@ -63,7 +67,7 @@ A server only connects if its launcher is present on the box:
 
 ```bash
 chezmoi edit ~/.config/dotfiles/mcp-servers.json    # edit the non-secret defs
-vault kv put secret/personal/<svc> <FIELD>=…        # only if it needs a secret
+vault kv put secret/users/<you>/<svc> <FIELD>=…        # only if it needs a secret (ref it as secret/users/<you>/<svc>:<FIELD>)
 chezmoi apply                                        # re-merges BOTH apps
 ```
 

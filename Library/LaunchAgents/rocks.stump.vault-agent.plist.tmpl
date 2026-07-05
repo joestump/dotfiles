@@ -13,7 +13,14 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>VAULT_ADDR</key>
-        <string>https://vault.stump.rocks</string>
+        <string>{{ .vaultAddr }}</string>
+        <!-- USER scopes the render to secret/users/$USER/*; HOME anchors
+             ssh-keys.ctmpl's writeToFile targets at ~/.ssh. Both are read via env
+             in the *.ctmpl files; launchd does not always populate them. -->
+        <key>USER</key>
+        <string>{{ .chezmoi.username }}</string>
+        <key>HOME</key>
+        <string>{{ .chezmoi.homeDir }}</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

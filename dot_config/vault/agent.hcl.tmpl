@@ -21,7 +21,7 @@
 pid_file = "{{ .chezmoi.homeDir }}/.config/vault/agent.pid"
 
 vault {
-  address = "https://vault.stump.rocks"
+  address = "{{ .vaultAddr }}"
 }
 
 {{ $approleSecretId := joinPath .chezmoi.homeDir ".config/vault/approle/secret-id" -}}
@@ -97,22 +97,23 @@ template {
   perms       = "0600"
 }
 
-# Dynamic, short-lived AWS credentials (auto-rotated on lease expiry).
+# Dynamic, short-lived AWS credentials (auto-rotated on lease expiry). Renders
+# empty when the user has no secret/users/$USER/aws — a harmless empty env file,
+# so no gating is needed.
 template {
   source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.env.ctmpl"
   destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.env"
   perms       = "0600"
 }
 
-# SSH keys rendered as FILES (not env). Source of truth = OpenBao
-# secret/personal/ssh. The agent keeps ~/.ssh/id_rsa{,.pub} in sync on a schedule.
+# SSH keys rendered as FILES. Source of truth = OpenBao secret/users/$USER/ssh.
+# ssh-keys.ctmpl auto-discovers EVERY field of that bag and writeToFile()s each to
+# ~/.ssh/<field> (0600, or 0644 for *.pub) — the file-secret analogue of the static
+# env bag. No per-key config, no gating: a user with no ssh bag writes nothing under
+# ~/.ssh (only the manifest below), so it can never clobber a key. The destination
+# is a names-only manifest of what was written.
 template {
-  source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-id_rsa.ctmpl"
-  destination = "{{ .chezmoi.homeDir }}/.ssh/id_rsa"
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-keys.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.config/vault/ssh-keys.manifest"
   perms       = "0600"
-}
-template {
-  source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-id_rsa-pub.ctmpl"
-  destination = "{{ .chezmoi.homeDir }}/.ssh/id_rsa.pub"
-  perms       = "0644"
 }

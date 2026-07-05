@@ -7,5 +7,5 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-Environment=VAULT_ADDR=https://vault.stump.rocks
+Environment=VAULT_ADDR={{ .vaultAddr }}
 ExecStart=/bin/bash %h/.config/vault/vault-agent-stale.sh
