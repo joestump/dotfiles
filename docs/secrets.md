@@ -68,14 +68,8 @@ AppRole secret-id has been provisioned on the host:
 
 > **AWS** is currently **static** KV. To switch to dynamic short-lived creds, run
 > `scripts/openbao-aws-setup.sh` and repoint `secrets-aws.env.ctmpl` at
-> `aws/creds/personal-cli` (`.Data.access_key` / `.Data.secret_key`).
->
-> **SSH keys** are auto-discovered, not hardcoded — `ssh-keys.ctmpl` ranges over
-> *every* field of `secret/users/<you>/ssh` and `writeToFile`s each to `~/.ssh/<field>`
-> (the field name is the filename; `*.pub` → 0644, else 0600). Add a key with
-> `vault kv patch secret/users/<you>/ssh id_foo=@id_foo id_foo.pub=@id_foo.pub` and it
-> lands in `~/.ssh` on the next render — no template edit. (Removing a field does not
-> delete an already-rendered file; `rm` the stale one when rotating a key out.)
+> `aws/creds/personal-cli` (`.Data.access_key` / `.Data.secret_key`). SSH keys have
+> their own section below.
 
 > **Per-user scoping:** secrets are keyed by OS login — `secret/users/<you>/*`,
 > where `<you>` = `$USER` (the Vault Agent service exports it, with `$HOME`). Two
@@ -89,6 +83,43 @@ AppRole secret-id has been provisioned on the host:
 
 > Assumes KV v2 at `secret/`, OIDC auth enabled, and the AWS engine at `aws/`.
 > Adjust paths in the `*.ctmpl` files + scripts together if your mounts differ.
+
+### SSH keys (rendered as files, auto-discovered)
+
+SSH keys work like the env bag, except each field becomes a **file** under
+`~/.ssh/` instead of an exported variable. **The field name in
+`secret/users/<you>/ssh` is the target filename** — so yes, exactly as you'd
+expect:
+
+| KV field | Rendered file | Perms |
+| --- | --- | --- |
+| `secret/users/<you>/ssh:id_rsa` | `$HOME/.ssh/id_rsa` | `0600` |
+| `secret/users/<you>/ssh:id_rsa.pub` | `$HOME/.ssh/id_rsa.pub` | `0644` |
+| `secret/users/<you>/ssh:id_ed25519` | `$HOME/.ssh/id_ed25519` | `0600` |
+| `secret/users/<you>/ssh:id_ed25519.pub` | `$HOME/.ssh/id_ed25519.pub` | `0644` |
+
+`ssh-keys.ctmpl` ranges over **every** field of the `ssh` secret and
+`writeToFile`s each to `$HOME/.ssh/<field>`; any field ending in `.pub` gets mode
+`0644`, everything else `0600`. There is no per-key template and no hardcoded key
+name — add a key type (RSA, ed25519, …) and it just appears on the next render.
+
+**Add or update a key** — the field name sets the filename, and `@` reads the value
+from a file so newlines survive:
+
+```bash
+vault kv patch secret/users/<you>/ssh \
+  id_ed25519=@"$HOME/.ssh/id_ed25519" \
+  id_ed25519.pub=@"$HOME/.ssh/id_ed25519.pub"
+vault-agent restart          # or wait for the next render interval
+```
+
+**Rotate a key out:** delete the field from KV **and** `rm` the stale
+`~/.ssh/<file>` on each host — `writeToFile` only writes fields that exist; it does
+not remove files for fields you deleted.
+
+A host whose `ssh` bag is empty/absent gets **no** `~/.ssh` files written (only a
+names-only `~/.config/vault/ssh-keys.manifest`), so the render can never clobber a
+key you manage by hand.
 
 ## One-time bring-up (the cutover)
 

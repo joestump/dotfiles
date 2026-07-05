@@ -20,7 +20,7 @@ set -uo pipefail
 # lives in ~/.local/bin, which systemd does not include).
 export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
-VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"; export VAULT_ADDR
+VAULT_ADDR="${VAULT_ADDR:-{{ .vaultAddr }}}"; export VAULT_ADDR
 HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
 VDIR="$HOME/.config/vault"
 SINK="$VDIR/agent-token"

@@ -21,7 +21,7 @@
 pid_file = "{{ .chezmoi.homeDir }}/.config/vault/agent.pid"
 
 vault {
-  address = "https://vault.stump.rocks"
+  address = "{{ .vaultAddr }}"
 }
 
 {{ $approleSecretId := joinPath .chezmoi.homeDir ".config/vault/approle/secret-id" -}}

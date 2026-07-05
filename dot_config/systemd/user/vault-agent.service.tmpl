@@ -13,7 +13,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Environment=VAULT_ADDR=https://vault.stump.rocks
+Environment=VAULT_ADDR={{ .vaultAddr }}
 # USER scopes the render to secret/users/$USER/*; HOME anchors ssh-keys.ctmpl's
 # writeToFile targets at ~/.ssh (both read via env in the *.ctmpl files). systemd
 # usually sets them, but set them explicitly so a minimal service env can't make

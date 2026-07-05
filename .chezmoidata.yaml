@@ -24,3 +24,10 @@ githubUser: "joestump"
 # exported as SHLINK_API_URL from env.zsh. The API KEY is the secret half and comes
 # from OpenBao (secret/users/<you>/shlink → SHLINK_API_KEY), NOT here.
 shlinkApiUrl: "https://u.stu.mp"
+
+# OpenBao / Vault server address. Single source of truth for the agent config
+# (agent.hcl), the systemd units + launchd plists that run it, and the czu updater.
+# Referenced as {{ .vaultAddr }} in those *.tmpl files; the Consul-Template *.ctmpl
+# files read it from the agent's env ({{ env "VAULT_ADDR" }}) since chezmoi does not
+# template them.
+vaultAddr: "https://vault.stump.rocks"
