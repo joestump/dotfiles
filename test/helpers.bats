@@ -17,12 +17,25 @@ setup() { setup_stub_path; }
   [[ "$output" == *"usage: vault-agent"* ]]
 }
 
-@test "vault-agent: status dispatches to launchctl" {
+@test "vault-agent: status dispatches to launchctl (macOS)" {
+  # The helper branches on $OSTYPE: launchctl on darwin, systemctl elsewhere.
+  # Gate to macOS so this doesn't fail on a Linux host (where `status` shells out
+  # to the real `systemctl` and shows the live unit instead of "not loaded").
+  [[ "$OSTYPE" == darwin* ]] || skip "launchctl path is macOS-only"
   make_stub launchctl 'echo "LAUNCHCTL $*"'
   run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-agent.zsh"; vault-agent status'
   [ "$status" -eq 0 ]
   # stub output has no matching label, so the helper reports "not loaded"
   [[ "$output" == *"not loaded"* ]]
+}
+
+@test "vault-agent: status dispatches to systemctl (Linux)" {
+  [[ "$OSTYPE" == darwin* ]] && skip "systemctl path is Linux-only"
+  make_stub systemctl 'echo "SYSTEMCTL $*"'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-agent.zsh"; vault-agent status'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SYSTEMCTL --user"* ]]
+  [[ "$output" == *"status vault-agent"* ]]
 }
 
 @test "vault-oidc-login: local path runs 'vault login -method=oidc'" {
