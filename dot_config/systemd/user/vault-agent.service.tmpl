@@ -14,6 +14,10 @@ Wants=network-online.target
 
 [Service]
 Environment=VAULT_ADDR=https://vault.stump.rocks
+# USER scopes the render to secret/users/$USER/* (the *.ctmpl files read env "USER").
+# systemd usually sets it, but set it explicitly so the agent never renders the
+# wrong identity's secrets if the service env is minimal.
+Environment=USER={{ .chezmoi.username }}
 ExecStart={{ lookPath "vault" | default "/usr/bin/vault" }} agent -config=%h/.config/vault/agent.hcl
 Restart=on-failure
 RestartSec=5

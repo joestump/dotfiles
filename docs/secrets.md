@@ -13,7 +13,7 @@ a schedule; an Oh My Zsh file sources those files into your shell.
 
 ```
 OpenBao server  ──►  Vault Agent (launchd: rocks.stump.vault-agent)  ──►  ~/.config/vault/secrets-*.env (0600)
-  KV: secret/personal/*        AppRole auto-auth (self-renewing)             │
+  KV: secret/users/<you>/*        AppRole auto-auth (self-renewing)             │
   AWS: aws/creds/personal-cli  renders + renews on a schedule               ▼
                                                           ~/.oh-my-zsh/custom/00-secrets.zsh  (source)
 ```
@@ -58,26 +58,31 @@ AppRole secret-id has been provisioned on the host:
 
 | Path | Fields |
 | --- | --- |
-| `secret/personal/llm` | `OPENAI_API_KEY`, `LITELLM_API_KEY`, `GEMINI_API_KEY` |
-| `secret/personal/gitea` | `GITEA_TOKEN` |
-| `secret/personal/pocketid` | `POCKETID_API_KEY` |
-| `secret/personal/garage` | `GARAGE_ACCESS_KEY`, `GARAGE_SECRET_KEY` |
-| `secret/personal/outline` | `OUTLINE_API_TOKEN` |
-| `secret/personal/aws` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (static) |
-| `secret/personal/ssh` | `id_rsa`, `id_rsa.pub` → rendered to `~/.ssh/` (files, 0600/0644) |
+| `secret/users/<you>/llm` | `OPENAI_API_KEY`, `LITELLM_API_KEY`, `GEMINI_API_KEY` |
+| `secret/users/<you>/gitea` | `GITEA_TOKEN` |
+| `secret/users/<you>/pocketid` | `POCKETID_API_KEY` |
+| `secret/users/<you>/garage` | `GARAGE_ACCESS_KEY`, `GARAGE_SECRET_KEY` |
+| `secret/users/<you>/outline` | `OUTLINE_API_TOKEN` |
+| `secret/users/<you>/aws` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (static) |
+| `secret/users/<you>/ssh` | `id_rsa`, `id_rsa.pub` → rendered to `~/.ssh/` (files, 0600/0644) |
 
 > **AWS** is currently **static** KV. To switch to dynamic short-lived creds, run
 > `scripts/openbao-aws-setup.sh` and repoint `secrets-aws.env.ctmpl` at
 > `aws/creds/personal-cli` (`.Data.access_key` / `.Data.secret_key`).
 >
 > **SSH keys** are rendered as files, not env vars — the agent keeps
-> `~/.ssh/id_rsa{,.pub}` in sync from `secret/personal/ssh` (note the dotted field
+> `~/.ssh/id_rsa{,.pub}` in sync from `secret/users/<you>/ssh` (note the dotted field
 > `id_rsa.pub` needs `index .Data.data "id_rsa.pub"` in the template).
 
-> **Convention for a new secret:** one path per service, `secret/personal/<service>`,
-> with fields named like the env var. Add it to KV (`vault kv put …`), add a
-> matching `{{ with secret "secret/data/personal/<service>" }}` block to
-> `dot_config/vault/secrets-static.env.ctmpl`, then `vault-agent restart`.
+> **Per-user scoping:** secrets are keyed by OS login — `secret/users/<you>/*`,
+> where `<you>` = `$USER` (the Vault Agent service exports it). Two identities on
+> one OpenBao never see each other's secrets. `ssh` + `aws` render only for users
+> listed in `.vaultSshAwsUsers` (`.chezmoidata.yaml`); everyone gets the static bag.
+>
+> **Convention for a new secret:** one path per service, `secret/users/<you>/<service>`,
+> with fields named like the env var. Just `vault kv put …` then `vault-agent restart`
+> — `secrets-static.env.ctmpl` auto-ranges over *every* secret under
+> `secret/users/$USER/*` (except `ssh`/`aws`), so no template edit is needed.
 
 > Assumes KV v2 at `secret/`, OIDC auth enabled, and the AWS engine at `aws/`.
 > Adjust paths in the `*.ctmpl` files + scripts together if your mounts differ.
@@ -122,7 +127,7 @@ Until step 4 succeeds, `custom/00-secrets.zsh` is a silent no-op and your existi
 
 ## Day-to-day
 
-- **Rotate a static secret:** `vault kv put secret/personal/llm OPENAI_API_KEY=sk-new...`
+- **Rotate a static secret:** `vault kv put secret/users/<you>/llm OPENAI_API_KEY=sk-new...`
   — the agent re-renders within `static_secret_render_interval` (5m); `exec zsh`.
 - **AWS creds expired/odd:** `vault-agent restart` forces a fresh lease.
 - **Auth on an AppRole host:** nothing to do — the agent renews and re-logs-in on

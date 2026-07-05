@@ -97,6 +97,13 @@ template {
   perms       = "0600"
 }
 
+{{ if has .chezmoi.username .vaultSshAwsUsers -}}
+# AWS + SSH file secrets are per-user categories that only some identities have
+# (secret/users/<you>/aws, secret/users/<you>/ssh). Rendering them for a user
+# WITHOUT those categories would write empty files over ~/.ssh/id_rsa etc., so
+# these stanzas are gated on .vaultSshAwsUsers (.chezmoidata.yaml). The static
+# env template above is always rendered — every user has a bag.
+
 # Dynamic, short-lived AWS credentials (auto-rotated on lease expiry).
 template {
   source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.env.ctmpl"
@@ -105,7 +112,7 @@ template {
 }
 
 # SSH keys rendered as FILES (not env). Source of truth = OpenBao
-# secret/personal/ssh. The agent keeps ~/.ssh/id_rsa{,.pub} in sync on a schedule.
+# secret/users/<you>/ssh. The agent keeps ~/.ssh/id_rsa{,.pub} in sync on a schedule.
 template {
   source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-id_rsa.ctmpl"
   destination = "{{ .chezmoi.homeDir }}/.ssh/id_rsa"
@@ -116,3 +123,4 @@ template {
   destination = "{{ .chezmoi.homeDir }}/.ssh/id_rsa.pub"
   perms       = "0644"
 }
+{{ end -}}

@@ -14,6 +14,10 @@
     <dict>
         <key>VAULT_ADDR</key>
         <string>https://vault.stump.rocks</string>
+        <!-- USER scopes the render to secret/users/$USER/* (the *.ctmpl files
+             read env "USER"). launchd does not always populate it. -->
+        <key>USER</key>
+        <string>{{ .chezmoi.username }}</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

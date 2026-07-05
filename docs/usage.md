@@ -135,7 +135,7 @@ CLI (the Homebrew `bao` is the unrelated BLAKE3 tool).
 ```sh
 vault-agent status        # is the agent running?
 vault-agent env           # what it has rendered
-vault kv put secret/personal/llm OPENAI_API_KEY=sk-new...   # rotate a secret
+vault kv put secret/users/<you>/llm OPENAI_API_KEY=sk-new...   # rotate a secret
 ```
 
 Full design + one-time bring-up: **[docs/secrets.md](secrets.md)**. The gitleaks

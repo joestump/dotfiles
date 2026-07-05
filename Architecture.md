@@ -133,16 +133,25 @@ Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
   `token_file` (`~/.vault-token`, seeded by an interactive `vault login -method=oidc`),
   renews the token, and renders env files on a schedule. Validated: config parses
   and the agent authenticates against the live server.
+- **Per-user KV layout.** Each identity's secrets live under
+  `secret/users/<os-login>/<category>` (e.g. `secret/users/joestump/gitea`,
+  `secret/users/joestump-agent/gitea`), so hosts sharing one OpenBao never cross
+  identities. The render is scoped by `$USER`, which the Vault Agent service
+  exports (`vault-agent.service.tmpl` / the launchd plist).
 - **Templates** (Consul-Template `*.ctmpl`, kept separate from chezmoi templating):
-  `secrets-static.env` ← KV `secret/personal/*`; `secrets-aws.env` ← dynamic
+  `secrets-static.env` ← KV `secret/users/$USER/*`; `secrets-aws.env` ← dynamic
   `aws/creds/personal-cli`. `exit_on_retry_failure=false` so a not-yet-configured
   engine doesn't crash the agent.
+- **`ssh` + `aws` are gated.** They are per-user categories some identities lack;
+  `agent.hcl.tmpl` renders the SSH-file + AWS stanzas only for OS users listed in
+  `.vaultSshAwsUsers` (`.chezmoidata.yaml`), so a user without them never writes an
+  empty file over a real `~/.ssh/id_rsa`. The static env bag renders for everyone.
 - **OMZ loader** `custom/00-secrets.zsh` sources `~/.config/vault/secrets-*.env`
   (guarded). `custom/vault-agent.zsh` provides `vault-agent {start|stop|status|log|env}`.
 - Repo holds config + templates + the loader (paths only); rendered `*.env` files
   (0600) are never committed.
 
-Static secrets stay in KV (`secret/personal/{llm,gitea,pocketid,garage}`); **AWS
+Static secrets stay in KV (`secret/users/<you>/{llm,gitea,pocketid,garage}`); **AWS
 moves to dynamic, short-lived credentials** (auto-rotated by the agent), retiring
 the static AWS keys entirely.
 

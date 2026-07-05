@@ -89,7 +89,7 @@ fi
 
 # --- lookup failed while the agent is running: auth is DEAD. ---
 if [ "$prev" != "stale" ]; then
-  notify "🚨 Vault Agent on ${HOST_SHORT}: auth is DEAD (token 403) — secret/personal/* is going stale and rendered secrets are frozen at last-good values. Fix: czapprole --local  (or czrefresh for the OIDC stopgap)."
+  notify "🚨 Vault Agent on ${HOST_SHORT}: auth is DEAD (token 403) — secret/users/$USER/* is going stale and rendered secrets are frozen at last-good values. Fix: czapprole --local  (or czrefresh for the OIDC stopgap)."
   set_state stale
 fi
 exit 0

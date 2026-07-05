@@ -19,7 +19,7 @@ chezmoi cd && git add -A && git commit -m "Add my-helper" && git push && exit
 ## Add a secret
 
 ```bash
-vault kv put secret/personal/myservice MY_TOKEN=…
+vault kv put secret/users/<you>/myservice MY_TOKEN=…
 vault-agent restart && exec zsh        # auto-discovered, no template edits
 ```
 

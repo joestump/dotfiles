@@ -38,8 +38,8 @@ ever written to the chezmoi repo**:
 
 | Server | Credential | Source |
 | --- | --- | --- |
-| `github` | `Authorization: Bearer …` | OpenBao `secret/personal/github` (`GITHUB_PERSONAL_ACCESS_TOKEN`), baked as a Bearer header — like outline |
-| `karakeep` | `KARAKEEP_API_KEY` | OpenBao `secret/personal/karakeep`, baked into `env` |
+| `github` | `Authorization: Bearer …` | OpenBao `secret/users/<you>/github` (`GITHUB_PERSONAL_ACCESS_TOKEN`), baked as a Bearer header — like outline |
+| `karakeep` | `KARAKEEP_API_KEY` | OpenBao `secret/users/<you>/karakeep`, baked into `env` |
 | `gitea` | `GITEA_ACCESS_TOKEN` | **Not in the config** — gitea-mcp inherits it from the login shell (`env.zsh`, exported from OpenBao) |
 | `outline` | `Authorization: Bearer …` | `OUTLINE_API_TOKEN` from the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
 
@@ -63,7 +63,7 @@ A server only connects if its launcher is present on the box:
 
 ```bash
 chezmoi edit ~/.config/dotfiles/mcp-servers.json    # edit the non-secret defs
-vault kv put secret/personal/<svc> <FIELD>=…        # only if it needs a secret
+vault kv put secret/users/<you>/<svc> <FIELD>=…        # only if it needs a secret
 chezmoi apply                                        # re-merges BOTH apps
 ```
 

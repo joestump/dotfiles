@@ -16,7 +16,7 @@ shell sources the result.
 
 ```mermaid
 flowchart TD
-    bao["OpenBao<br/>KV: secret/personal/*"]
+    bao["OpenBao<br/>KV: secret/users/<you>/*"]
     agent["Vault Agent (launchd: rocks.stump.vault-agent)<br/>token_file auth (~/.vault-token) · renews the token · renders every ~5 min"]
     files["~/.config/vault/secrets-*.env (0600)<br/>~/.ssh/id_rsa + id_rsa.pub"]
     shell["~/.oh-my-zsh/custom/00-secrets.zsh"]
@@ -24,15 +24,15 @@ flowchart TD
 ```
 
 - **Env secrets** — the static template **dynamically** exports *every* field of
-  *every* `secret/personal/*` KV secret. Add a new secret → it shows up automatically
+  *every* `secret/users/<you>/*` KV secret. Add a new secret → it shows up automatically
   (next render or `vault-agent restart`). `ssh` is skipped (it's files).
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
-  `secret/personal/ssh`.
+  `secret/users/<you>/ssh`.
 
 ## Add a secret
 
 ```bash
-vault kv put secret/personal/myservice MY_API_KEY=sk-…
+vault kv put secret/users/<you>/myservice MY_API_KEY=sk-…
 # wait ≤5 min (or: vault-agent restart), then:
 exec zsh
 echo $MY_API_KEY      # there it is

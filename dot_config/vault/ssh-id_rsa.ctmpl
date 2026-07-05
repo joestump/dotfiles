@@ -1,1 +1,1 @@
-{{- with secret "secret/data/personal/ssh" -}}{{ index .Data.data "id_rsa" }}{{- end -}}
+{{- with secret (printf "secret/data/users/%s/ssh" (env "USER")) -}}{{ index .Data.data "id_rsa" }}{{- end -}}
