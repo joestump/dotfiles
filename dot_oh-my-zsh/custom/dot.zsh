@@ -89,12 +89,33 @@ status() {
   else
     sk_color=$warn
   fi
+
+  # qmd (~/src search index): count collections + doc/embed totals. Indexed-at-all
+  # is the green bar — semantic embeddings are opt-in, so we annotate "embed
+  # pending" in text rather than colouring the row a warning for it.
+  local qmd_txt q_color qcol qst qtot qemb
+  if _have qmd; then
+    qcol=$(qmd collection list 2>/dev/null | grep -oE 'Collections \([0-9]+\)' | grep -oE '[0-9]+' | head -1)
+    qst=$(qmd status 2>/dev/null)
+    qtot=$(print -r -- "$qst" | awk '/Total:/{print $2; exit}')
+    qemb=$(print -r -- "$qst" | awk '/Vectors:/{print $2; exit}')
+    if [[ -z "$qcol" || "$qcol" == 0 ]]; then
+      q_color=$warn; qmd_txt="no collections (dot → re-index)"
+    else
+      q_color=$ok; qmd_txt="${qcol} cols · ${qtot:-0} docs"
+      [[ -n "$qtot" && "$qtot" != 0 && "$qemb" != "$qtot" ]] && qmd_txt+=" · embed pending"
+    fi
+  else
+    q_color=$dim; qmd_txt="not installed"
+  fi
+
   gum style --foreground "$hl" --bold "📊 status · ${host}"
   gum join --vertical \
     "$(gum style --foreground $([[ $va == up ]] && print $ok || print $bad) "  🔐 vault-agent    ${va}")" \
     "$(gum style --foreground $([[ $sd == up ]] && print $ok || print $bad) "  📡 signal-daemon  ${sd}")" \
     "$(gum style --foreground $([[ $df == clean ]] && print $ok || print $warn) "  📥 dotfiles       ${df}")" \
     "$(gum style --foreground "$sk_color" "  🔌 skills         ${skills}")" \
+    "$(gum style --foreground "$q_color" "  🔎 qmd            ${qmd_txt}")" \
     "$(gum style --foreground $dim "  💾 disk           ${disk:-?}")"
 }
 
@@ -110,6 +131,7 @@ dot() {
     "🔄 Update everything (czu)" \
     "🎨 Switch theme" \
     "📊 Status dashboard" \
+    "🔎 Re-index ~/src (qmd)" \
     "📱 Link Signal device" \
     "🔁 Restart a daemon" \
     "✏️  Edit a config" \
@@ -118,6 +140,8 @@ dot() {
     *Update*)  czu ;;
     *theme*)   theme ;;
     *Status*)  status ;;
+    *qmd*)     local r="$HOME/.config/dotfiles/qmd-index-src.zsh"
+               [[ -x "$r" ]] && "$r" || print -u2 "qmd-index-src unavailable here" ;;
     *Link*)    _have signal-link && signal-link || print -u2 "signal-link unavailable here" ;;
     *Restart*) local d; d=$(gum choose vault-agent signal-daemon) || return; [[ -n "$d" ]] && "$d" restart ;;
     *Edit*)    local rel; rel=$(chezmoi managed --include=files 2>/dev/null | gum filter --placeholder "config to edit…") || return
