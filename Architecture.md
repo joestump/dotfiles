@@ -142,10 +142,12 @@ Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
   `secrets-static.env` ← KV `secret/users/$USER/*`; `secrets-aws.env` ← dynamic
   `aws/creds/personal-cli`. `exit_on_retry_failure=false` so a not-yet-configured
   engine doesn't crash the agent.
-- **`ssh` + `aws` are gated.** They are per-user categories some identities lack;
-  `agent.hcl.tmpl` renders the SSH-file + AWS stanzas only for OS users listed in
-  `.vaultSshAwsUsers` (`.chezmoidata.yaml`), so a user without them never writes an
-  empty file over a real `~/.ssh/id_rsa`. The static env bag renders for everyone.
+- **SSH keys use the same auto-discovery as env vars.** `ssh-keys.ctmpl` ranges
+  over every field of `secret/users/$USER/ssh` and `writeToFile`s each to
+  `~/.ssh/<field>` (`*.pub` → 0644, else 0600), so `id_rsa`, `id_ed25519`, or any
+  future key just appears — no per-key template, no gating. An absent/empty ssh
+  bag writes nothing under `~/.ssh` (only a names-only manifest), so it can never
+  clobber a key. `$USER`/`$HOME` come from the Vault Agent service env.
 - **OMZ loader** `custom/00-secrets.zsh` sources `~/.config/vault/secrets-*.env`
   (guarded). `custom/vault-agent.zsh` provides `vault-agent {start|stop|status|log|env}`.
 - Repo holds config + templates + the loader (paths only); rendered `*.env` files

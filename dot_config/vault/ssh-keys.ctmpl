@@ -1,0 +1,29 @@
+{{- /* Consul-Template, rendered by Vault Agent. NOT a chezmoi template.
+       The file-secret analogue of secrets-static.env.ctmpl: writes EVERY field of
+       secret/users/$USER/ssh to ~/.ssh/<field>. The field name IS the target
+       filename; *.pub → 0644, everything else → 0600. Add a key to your ssh bag
+       (`vault kv patch secret/users/$USER/ssh id_foo=@id_foo id_foo.pub=@id_foo.pub`)
+       and it lands in ~/.ssh automatically — no template or agent.hcl edit, exactly
+       like adding an env-var secret. $HOME/$USER are exported by the Vault Agent
+       service (vault-agent.service.tmpl / the launchd plist).
+
+       Safe by construction: an absent/empty ssh bag makes the `with` block a no-op,
+       so NOTHING is written under ~/.ssh (only this manifest) — it can never clobber
+       a key with an empty render. Note: removing a field from the bag does not delete
+       an already-rendered ~/.ssh file (writeToFile only writes present fields); delete
+       the stale file by hand if you rotate a key out.
+
+       This body (the stanza destination) is a manifest of what was written — key
+       NAMES only, never key material. */ -}}
+# ~/.ssh keys rendered by Vault Agent from secret/users/$USER/ssh. DO NOT EDIT.
+{{- $home := env "HOME" }}
+{{- with secret (printf "secret/data/users/%s/ssh" (env "USER")) }}
+{{- range $name, $content := .Data.data }}
+{{- if $name | regexMatch "\\.pub$" }}
+{{- writeToFile (printf "%s/.ssh/%s" $home $name) "" "" "0644" $content }}
+{{- else }}
+{{- writeToFile (printf "%s/.ssh/%s" $home $name) "" "" "0600" $content }}
+{{- end }}
+{{ $name }}
+{{- end }}
+{{- end }}

@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 # Tests for the per-user OpenBao layout: the Vault Agent renders each identity's
 # secrets from secret/users/$USER/* (not the shared secret/personal/*), scoped by
-# the OS login name exported as $USER. The ssh-key + aws file templates are gated
-# on .vaultSshAwsUsers so a user without those categories never writes an empty
-# file over a real ~/.ssh/id_rsa. See dot_config/vault/*.ctmpl + agent.hcl.tmpl.
+# the OS login exported as $USER. SSH keys follow the same auto-discovery pattern
+# as env vars — ssh-keys.ctmpl writeToFile()s every field of secret/users/$USER/ssh
+# to ~/.ssh/<field>, so no per-key template or gating is needed. See
+# dot_config/vault/*.ctmpl + agent.hcl.tmpl.
 load test_helper
 
 V="$REPO_ROOT/dot_config/vault"
@@ -14,10 +15,8 @@ V="$REPO_ROOT/dot_config/vault"
   run grep -REn 'secret/(data|metadata)/personal/' \
     "$V/secrets-static.env.ctmpl" \
     "$V/secrets-aws.env.ctmpl" \
-    "$V/ssh-id_rsa.ctmpl" \
-    "$V/ssh-id_rsa-pub.ctmpl"
-  # grep exits 1 (no matches) when the path is fully retired.
-  [ "$status" -eq 1 ]
+    "$V/ssh-keys.ctmpl"
+  [ "$status" -eq 1 ]  # grep exits 1 = no matches = path fully retired
 }
 
 @test "secrets-static.env.ctmpl ranges over secret/users/\$USER/*" {
@@ -26,42 +25,56 @@ V="$REPO_ROOT/dot_config/vault"
   grep -q 'env "USER"' "$V/secrets-static.env.ctmpl"
 }
 
-@test "ssh + aws ctmpls read secret/users/\$USER/{ssh,aws}" {
-  grep -q 'secret/data/users/%s/ssh' "$V/ssh-id_rsa.ctmpl"
-  grep -q 'secret/data/users/%s/ssh' "$V/ssh-id_rsa-pub.ctmpl"
+@test "secrets-aws.env.ctmpl reads secret/users/\$USER/aws" {
   grep -q 'secret/data/users/%s/aws' "$V/secrets-aws.env.ctmpl"
   grep -q 'env "USER"' "$V/secrets-aws.env.ctmpl"
 }
 
-# ----- the Vault Agent service must export USER for env "USER" to resolve -----
+# ----- SSH keys: dynamic auto-discovery, like the env bag -----
 
-@test "systemd + launchd units export USER to the agent" {
-  grep -q 'Environment=USER={{ .chezmoi.username }}' \
-    "$REPO_ROOT/dot_config/systemd/user/vault-agent.service.tmpl"
-  grep -q '<string>{{ .chezmoi.username }}</string>' \
-    "$REPO_ROOT/Library/LaunchAgents/rocks.stump.vault-agent.plist.tmpl"
+@test "ssh-keys.ctmpl auto-discovers the whole ssh bag via writeToFile" {
+  grep -q 'secret/data/users/%s/ssh' "$V/ssh-keys.ctmpl"
+  grep -q 'range \$name, \$content' "$V/ssh-keys.ctmpl"   # ranges every field
+  grep -q 'writeToFile' "$V/ssh-keys.ctmpl"
+  grep -q 'env "USER"' "$V/ssh-keys.ctmpl"
+  grep -q 'env "HOME"' "$V/ssh-keys.ctmpl"
 }
 
-# ----- ssh/aws file rendering is gated on .vaultSshAwsUsers -----
-
-@test "agent.hcl.tmpl gates the ssh + aws stanzas on .vaultSshAwsUsers" {
-  grep -q 'has .chezmoi.username .vaultSshAwsUsers' "$V/agent.hcl.tmpl"
+@test "ssh-keys.ctmpl hardcodes no specific key name (no id_rsa/id_ed25519)" {
+  run grep -Eo 'id_(rsa|ed25519|ecdsa|dsa)' "$V/ssh-keys.ctmpl"
+  [ "$status" -eq 1 ]  # none found
 }
 
-@test ".vaultSshAwsUsers is defined in chezmoi data" {
-  grep -q '^vaultSshAwsUsers:' "$REPO_ROOT/.chezmoidata.yaml"
+@test "the hardcoded per-key ssh ctmpls are gone" {
+  [ ! -e "$V/ssh-id_rsa.ctmpl" ]
+  [ ! -e "$V/ssh-id_rsa-pub.ctmpl" ]
 }
 
-# ----- rendered agent.hcl: gate excludes non-listed users, includes listed -----
+@test "*.pub fields get 0644, private keys 0600" {
+  grep -q '"0644"' "$V/ssh-keys.ctmpl"
+  grep -q '"0600"' "$V/ssh-keys.ctmpl"
+}
 
-@test "agent.hcl renders ssh/aws only for a .vaultSshAwsUsers member" {
-  command -v chezmoi >/dev/null || skip "chezmoi not installed"
-  # A user NOT in the list (any CI runner username) gets no ssh/aws stanza.
-  run bash -c 'echo "{{ if has \"nobody-agent\" .vaultSshAwsUsers }}HAS{{ else }}NONE{{ end }}" | chezmoi execute-template --source "'"$REPO_ROOT"'"'
-  [ "$status" -eq 0 ]
-  [[ "$output" == *NONE* ]]
-  # A listed user (joestump) does.
-  run bash -c 'echo "{{ if has \"joestump\" .vaultSshAwsUsers }}HAS{{ else }}NONE{{ end }}" | chezmoi execute-template --source "'"$REPO_ROOT"'"'
-  [ "$status" -eq 0 ]
-  [[ "$output" == *HAS* ]]
+# ----- no gating left: agent.hcl renders unconditionally -----
+
+@test "agent.hcl.tmpl has no vaultSshAwsUsers gating" {
+  run grep -c 'vaultSshAwsUsers' "$V/agent.hcl.tmpl"
+  [[ "$output" == "0" ]]
+  run grep -c 'vaultSshAwsUsers' "$REPO_ROOT/.chezmoidata.yaml"
+  [[ "$output" == "0" ]]
+}
+
+@test "agent.hcl.tmpl registers the ssh-keys template" {
+  grep -q 'ssh-keys.ctmpl' "$V/agent.hcl.tmpl"
+}
+
+# ----- the Vault Agent service must export USER + HOME for the ctmpls -----
+
+@test "systemd + launchd units export USER and HOME to the agent" {
+  local svc="$REPO_ROOT/dot_config/systemd/user/vault-agent.service.tmpl"
+  local plist="$REPO_ROOT/Library/LaunchAgents/rocks.stump.vault-agent.plist.tmpl"
+  grep -q 'Environment=USER={{ .chezmoi.username }}' "$svc"
+  grep -q 'Environment=HOME={{ .chezmoi.homeDir }}' "$svc"
+  grep -q '<key>USER</key>' "$plist"
+  grep -q '<key>HOME</key>' "$plist"
 }

@@ -14,10 +14,12 @@ Wants=network-online.target
 
 [Service]
 Environment=VAULT_ADDR=https://vault.stump.rocks
-# USER scopes the render to secret/users/$USER/* (the *.ctmpl files read env "USER").
-# systemd usually sets it, but set it explicitly so the agent never renders the
-# wrong identity's secrets if the service env is minimal.
+# USER scopes the render to secret/users/$USER/*; HOME anchors ssh-keys.ctmpl's
+# writeToFile targets at ~/.ssh (both read via env in the *.ctmpl files). systemd
+# usually sets them, but set them explicitly so a minimal service env can't make
+# the agent render the wrong identity's secrets or write keys to the wrong place.
 Environment=USER={{ .chezmoi.username }}
+Environment=HOME={{ .chezmoi.homeDir }}
 ExecStart={{ lookPath "vault" | default "/usr/bin/vault" }} agent -config=%h/.config/vault/agent.hcl
 Restart=on-failure
 RestartSec=5

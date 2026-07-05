@@ -64,20 +64,23 @@ AppRole secret-id has been provisioned on the host:
 | `secret/users/<you>/garage` | `GARAGE_ACCESS_KEY`, `GARAGE_SECRET_KEY` |
 | `secret/users/<you>/outline` | `OUTLINE_API_TOKEN` |
 | `secret/users/<you>/aws` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (static) |
-| `secret/users/<you>/ssh` | `id_rsa`, `id_rsa.pub` → rendered to `~/.ssh/` (files, 0600/0644) |
+| `secret/users/<you>/ssh` | any key files, e.g. `id_rsa`+`id_rsa.pub` or `id_ed25519`+`id_ed25519.pub` → each rendered to `~/.ssh/<field>` (0600, `*.pub` 0644) |
 
 > **AWS** is currently **static** KV. To switch to dynamic short-lived creds, run
 > `scripts/openbao-aws-setup.sh` and repoint `secrets-aws.env.ctmpl` at
 > `aws/creds/personal-cli` (`.Data.access_key` / `.Data.secret_key`).
 >
-> **SSH keys** are rendered as files, not env vars — the agent keeps
-> `~/.ssh/id_rsa{,.pub}` in sync from `secret/users/<you>/ssh` (note the dotted field
-> `id_rsa.pub` needs `index .Data.data "id_rsa.pub"` in the template).
+> **SSH keys** are auto-discovered, not hardcoded — `ssh-keys.ctmpl` ranges over
+> *every* field of `secret/users/<you>/ssh` and `writeToFile`s each to `~/.ssh/<field>`
+> (the field name is the filename; `*.pub` → 0644, else 0600). Add a key with
+> `vault kv patch secret/users/<you>/ssh id_foo=@id_foo id_foo.pub=@id_foo.pub` and it
+> lands in `~/.ssh` on the next render — no template edit. (Removing a field does not
+> delete an already-rendered file; `rm` the stale one when rotating a key out.)
 
 > **Per-user scoping:** secrets are keyed by OS login — `secret/users/<you>/*`,
-> where `<you>` = `$USER` (the Vault Agent service exports it). Two identities on
-> one OpenBao never see each other's secrets. `ssh` + `aws` render only for users
-> listed in `.vaultSshAwsUsers` (`.chezmoidata.yaml`); everyone gets the static bag.
+> where `<you>` = `$USER` (the Vault Agent service exports it, with `$HOME`). Two
+> identities on one OpenBao never see each other's secrets. No gating: a category a
+> user lacks (`ssh`, `aws`, …) simply renders nothing for them.
 >
 > **Convention for a new secret:** one path per service, `secret/users/<you>/<service>`,
 > with fields named like the env var. Just `vault kv put …` then `vault-agent restart`

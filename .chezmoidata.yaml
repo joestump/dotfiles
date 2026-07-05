@@ -24,12 +24,3 @@ githubUser: "joestump"
 # exported as SHLINK_API_URL from env.zsh. The API KEY is the secret half and comes
 # from OpenBao (secret/users/<you>/shlink → SHLINK_API_KEY), NOT here.
 shlinkApiUrl: "https://u.stu.mp"
-
-# OS login users whose OpenBao bag (secret/users/<user>/*) includes the `ssh`
-# keypair and `aws` credential categories. agent.hcl.tmpl gates the SSH-file and
-# AWS Vault Agent template stanzas on membership here: a user NOT listed renders
-# only the static env bag, so the agent never writes an empty ~/.ssh/id_rsa over a
-# real key. The static env template is always rendered for everyone. Add an OS
-# username here once you've populated secret/users/<user>/{ssh,aws}.
-vaultSshAwsUsers:
-  - joestump
