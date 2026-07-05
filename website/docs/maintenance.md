@@ -65,6 +65,12 @@ status        # → the 🔎 qmd row: collection count, doc total, embed state
 chezmoi apply # runs the same indexer (a run_onchange_after_ hook)
 ```
 
+It also re-indexes **on its own, daily** (launchd on macOS, a systemd --user
+timer on Linux — the same mechanism as scheduled `czu`), so markdown that lands
+in `~/src` without a `chezmoi apply` still gets picked up. The scheduled run logs
+to `~/.cache/qmd-index-src.log` and, being idempotent, is safe to overlap with a
+manual re-index.
+
 Dirs with **no markdown** are skipped (no empty collections), and re-indexing is
 idempotent — existing collections are refreshed incrementally, not recreated. Only
 the BM25 (keyword) index is built automatically; the ~2GB embedding models are
