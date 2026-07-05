@@ -7,9 +7,10 @@
        like adding an env-var secret. $HOME/$USER are exported by the Vault Agent
        service (vault-agent.service.tmpl / the launchd plist).
 
-       Safe by construction: an absent/empty ssh bag makes the `with` block a no-op,
-       so NOTHING is written under ~/.ssh (only this manifest) — it can never clobber
-       a key with an empty render. Note: removing a field from the bag does not delete
+       Safe by construction: the outer loop ranges the metadata LISTING, so a user
+       with no ssh bag never does a fixed-path read (no 404 retry-loop) and NOTHING is
+       written under ~/.ssh (only this manifest) — it can never clobber a key with an
+       empty render. Note: removing a field from the bag does not delete
        an already-rendered ~/.ssh file (writeToFile only writes present fields); delete
        the stale file by hand if you rotate a key out.
 
@@ -17,6 +18,8 @@
        NAMES only, never key material. */ -}}
 # ~/.ssh keys rendered by Vault Agent from secret/users/$USER/ssh. DO NOT EDIT.
 {{- $home := env "HOME" }}
+{{- range secrets (printf "secret/metadata/users/%s/" (env "USER")) -}}
+{{- if eq (. | trimSuffix "/") "ssh" -}}
 {{- with secret (printf "secret/data/users/%s/ssh" (env "USER")) }}
 {{- range $name, $content := .Data.data }}
 {{- if $name | regexMatch "\\.pub$" }}
@@ -25,5 +28,7 @@
 {{- writeToFile (printf "%s/.ssh/%s" $home $name) "" "" "0600" $content }}
 {{- end }}
 {{ $name }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}

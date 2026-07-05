@@ -30,6 +30,15 @@ V="$REPO_ROOT/dot_config/vault"
   grep -q 'env "USER"' "$V/secrets-aws.env.ctmpl"
 }
 
+# A fixed `with secret ".../aws"` read 404-loops (and leaves a stale file) for a
+# user without an aws bag; aws + ssh must gate on the metadata LISTING instead.
+@test "aws + ssh templates guard on the metadata listing (no fixed-path 404)" {
+  grep -q 'range secrets (printf "secret/metadata/users/%s/"' "$V/secrets-aws.env.ctmpl"
+  grep -q 'eq (. | trimSuffix "/") "aws"' "$V/secrets-aws.env.ctmpl"
+  grep -q 'range secrets (printf "secret/metadata/users/%s/"' "$V/ssh-keys.ctmpl"
+  grep -q 'eq (. | trimSuffix "/") "ssh"' "$V/ssh-keys.ctmpl"
+}
+
 # ----- SSH keys: dynamic auto-discovery, like the env bag -----
 
 @test "ssh-keys.ctmpl auto-discovers the whole ssh bag via writeToFile" {
