@@ -23,9 +23,20 @@ setopt no_nomatch          # an empty ~/src/*/ glob must not abort the loop
 # Match czu-run: give the scheduled/headless path a sane PATH so `qmd` resolves.
 export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
+# Clean progress via the shared UI lib (heading + ticked items — gum on a TTY,
+# plain lines otherwise), so an on-apply index reads like every other czu phase.
+# zsh fallback keeps the runner working if the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  have() { command -v "$1" >/dev/null 2>&1 }
+  heading() { print -r -- ""; print -r -- "== $* ==" }
+  item() { shift; print -r -- "    - $*" }
+  warn() { print -u2 -- "  WARN: $*" }
+}
+
 SRC="$HOME/src"
-[[ -d "$SRC" ]] || { print -r -- "qmd-index-src: no $SRC — nothing to index."; exit 0 }
-command -v qmd >/dev/null 2>&1 || { print -r -- "qmd-index-src: qmd not installed — skipping."; exit 0 }
+heading "🔎 qmd index"
+[[ -d "$SRC" ]] || { item dim "no $SRC — nothing to index"; exit 0 }
+command -v qmd >/dev/null 2>&1 || { item dim "qmd not installed — skipping"; exit 0 }
 
 # Snapshot existing collections once so the add-if-missing check is a cheap
 # substring match (a collection prints as "name (qmd://name/)").
@@ -48,17 +59,17 @@ for d in "$SRC"/*(/N); do          # (/N): directories only, null glob if none
     continue
   fi
 
-  print -r -- "qmd-index-src: adding collection '${name}' → ${d}"
   if ( cd "$d" && qmd collection add . >/dev/null 2>&1 ); then
+    item ok "added collection ${name}"
     added+="$name"
   else
-    print -u2 -- "qmd-index-src: WARN failed to add '${name}' (continuing)"
+    warn "failed to add collection '${name}' (continuing)"
   fi
 done
 
 # Refresh every collection (incremental — only changed files are re-read).
-qmd update >/dev/null 2>&1 || print -u2 -- "qmd-index-src: WARN 'qmd update' returned non-zero"
+qmd update >/dev/null 2>&1 || warn "'qmd update' returned non-zero"
 
-print -r -- "qmd-index-src: done — ${#added} added, ${#skipped} skipped (no markdown)."
-(( ${#skipped} )) && print -r -- "qmd-index-src: skipped: ${skipped[*]}"
+item ok "${#added} added, ${#skipped} skipped (no markdown)"
+(( ${#skipped} )) && item dim "skipped: ${skipped[*]}"
 exit 0
