@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Merge Joe's Claude Code permission posture into ~/.claude/settings.json.
+#
+# settings.json is co-owned: Claude Code itself writes enabledPlugins,
+# extraKnownMarketplaces, theme, etc. So — like the MCP merge into ~/.claude.json —
+# we rewrite ONLY our permission keys with jq and leave every other key untouched.
+#
+# The values come from .chezmoidata.yaml (shared attended defaults), overridable
+# per-machine via the chezmoi config's [data.claude] table. Because the values are
+# baked into this rendered script, run_onchange re-fires whenever they change:
+#   mode=auto skipAuto=true skipWorkflow=true skipDangerous=true  (on an agent box)
+#   mode=default skipAuto=false skipWorkflow=false skipDangerous=false  (a laptop)
+set -euo pipefail
+
+CJ="$HOME/.claude/settings.json"
+command -v jq >/dev/null 2>&1 || { echo "  jq required for claude-settings merge; skipping"; exit 0; }
+
+MODE="{{ .claude.permissionMode }}"
+SKIP_AUTO={{ .claude.skipAutoPermissionPrompt }}
+SKIP_WORKFLOW={{ .claude.skipWorkflowUsageWarning }}
+SKIP_DANGEROUS={{ .claude.skipDangerousModePermissionPrompt }}
+
+echo "==> Claude Code settings merge (permissionMode=${MODE})"
+
+# Create a minimal file if Claude hasn't written one yet — the posture should apply
+# on a fresh box too. mkdir -p in case ~/.claude doesn't exist.
+mkdir -p "$HOME/.claude"
+[ -f "$CJ" ] || echo '{}' > "$CJ"
+
+# Rewrite only our keys. .permissions.defaultMode is set while preserving any other
+# .permissions subkeys (allow/deny/ask). All other top-level keys pass through.
+new="$(jq \
+  --arg mode "$MODE" \
+  --argjson skipAuto "$SKIP_AUTO" \
+  --argjson skipWorkflow "$SKIP_WORKFLOW" \
+  --argjson skipDangerous "$SKIP_DANGEROUS" '
+    .permissions = ((.permissions // {}) | .defaultMode = $mode)
+    | .skipAutoPermissionPrompt = $skipAuto
+    | .skipWorkflowUsageWarning = $skipWorkflow
+    | .skipDangerousModePermissionPrompt = $skipDangerous
+  ' "$CJ")"
+
+# Idempotent: no write when already current (keeps run_onchange quiet + mtime stable).
+if [ "$(jq -cS . "$CJ")" = "$(jq -cnS --argjson n "$new" '$n')" ]; then
+  echo "  settings.json: already current"; exit 0
+fi
+
+# SAFETY: every original top-level key must survive the rewrite (never nuke
+# enabledPlugins / marketplaces / theme).
+orig_keys="$(jq -cS 'keys' "$CJ")"
+tmp="$(mktemp)"
+printf '%s\n' "$new" > "$tmp"
+if ! jq -e -n --argjson o "$orig_keys" --slurpfile n <(jq -cS 'keys' "$tmp") \
+     '($o - $n[0]) | length == 0' >/dev/null; then
+  echo "  settings.json: ABORT — merge would drop top-level keys"; rm -f "$tmp"; exit 1
+fi
+mv "$tmp" "$CJ"
+echo "  settings.json: permission posture updated"

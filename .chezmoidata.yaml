@@ -31,3 +31,26 @@ shlinkApiUrl: "https://u.stu.mp"
 # files read it from the agent's env ({{ env "VAULT_ADDR" }}) since chezmoi does not
 # template them.
 vaultAddr: "https://vault.stump.rocks"
+
+# Claude Code permission posture, merged into ~/.claude/settings.json by
+# .chezmoiscripts/run_onchange_after_48-claude-settings-merge.sh. These are the
+# SHARED DEFAULTS = interactive/attended (Claude asks before acting) — the right
+# posture for a personal laptop. An UNATTENDED box (e.g. an autonomous agent that
+# runs scheduled tasks) overrides them per-machine in its chezmoi config's
+# [data.claude] table (~/.config/chezmoi/chezmoi.toml), which takes precedence over
+# this file — no fork of the shared repo required. Override just the keys you need.
+claude:
+  # Startup permission mode. One of: default | acceptEdits | plan | auto |
+  # bypassPermissions | dontAsk. "auto" runs a safety classifier (allows safe
+  # actions, soft-denies destructive ones unless intent is clear, hard-denies
+  # security boundaries) — what an unattended box wants so runs don't stall on
+  # prompts. "default" keeps a laptop attended.
+  permissionMode: "default"
+  # Skip the one-time "accept Auto mode" opt-in dialog. Only meaningful when a box
+  # sets permissionMode "auto"; harmless otherwise.
+  skipAutoPermissionPrompt: false
+  # Skip the multi-agent workflow usage warning (the prompt Auto mode shows before
+  # running a Workflow). Unattended boxes set this true so a workflow doesn't hang.
+  skipWorkflowUsageWarning: false
+  # Skip the "bypass permissions" acceptance dialog. Independent of permissionMode.
+  skipDangerousModePermissionPrompt: false
