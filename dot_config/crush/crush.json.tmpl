@@ -1,0 +1,139 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "litellm": {
+      "type": "litellm",
+      "name": "LiteLLM (StumpCloud)",
+      "base_url": "https://litellm.stump.rocks/v1",
+      "api_key": "$LITELLM_API_KEY",
+      "discover_models": true
+    }
+  },
+  "models": {
+    "large": {
+      "provider": "litellm",
+      "model": "claude-opus-4-6"
+    },
+    "small": {
+      "provider": "litellm",
+      "model": "claude-haiku-4-5-20251001"
+    }
+  },
+  "lsp": {
+    "go": {
+      "command": "gopls",
+      "enabled": true
+    },
+    "python": {
+      "command": "pyright",
+      "args": ["--stdio"],
+      "enabled": true
+    },
+    "ansible": {
+      "command": "ansible-language-server",
+      "args": ["--stdio"],
+      "enabled": true
+    },
+    "yaml": {
+      "command": "yaml-language-server",
+      "args": ["--stdio"],
+      "enabled": true
+    },
+    "markdown": {
+      "command": "marksman",
+      "enabled": true
+    },
+    "terraform": {
+      "command": "terraform-ls",
+      "args": ["serve"],
+      "enabled": true
+    },
+    "json": {
+      "command": "vscode-json-language-server",
+      "args": ["--stdio"],
+      "enabled": true
+    }
+  },
+  "mcp": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "{{ .chezmoi.homeDir }}/src"
+      ],
+      "timeout": 60,
+      "disabled": false
+    },
+    "aws-knowledge": {
+      "type": "http",
+      "url": "https://knowledge-mcp.global.api.aws",
+      "timeout": 120,
+      "disabled": false
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "timeout": 60,
+      "disabled": false
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "timeout": 60,
+      "disabled": false,
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$(echo $GITHUB_API_TOKEN)"
+      }
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "timeout": 60
+    }
+  },
+  "options": {
+    "context_paths": [
+      "**/*.md",
+      "**/ADR-*.md",
+      "**/adr/*.md",
+      "**/*.yaml",
+      "**/*.yml",
+      "**/playbook*.yml",
+      "**/inventory/**",
+      "**/*.go",
+      "**/*.py",
+      "**/README.md",
+      "**/CHANGELOG.md",
+      "**/openapi.yaml",
+      "**/openapi.json",
+      "**/*.tf",
+      "**/main.tf"
+    ],
+    "disabled_tools": []
+  },
+  "permissions": {
+    "allowed_tools": [
+      "view",
+      "ls",
+      "grep",
+      "edit",
+      "bash",
+      "mcp_filesystem_read_file",
+      "mcp_filesystem_write_file",
+      "mcp_filesystem_list_directory",
+      "mcp_github_search_repositories",
+      "mcp_github_search_code",
+      "mcp_github_create_or_update_file",
+      "mcp_github_get_file_contents",
+      "mcp_aws-knowledge_search",
+      "mcp_aws-knowledge_get_documentation",
+      "mcp_memory_create_entities",
+      "mcp_memory_create_relations"
+    ]
+  }
+}
