@@ -25,6 +25,12 @@ githubUser: "joestump"
 # from OpenBao (secret/users/<you>/shlink → SHLINK_API_KEY), NOT here.
 shlinkApiUrl: "https://u.stu.mp"
 
+# LiteLLM gateway (OpenAI-compatible) base URL. Single source of truth for the
+# OPENAI_BASE_URL export in env.zsh and the crush `litellm` provider base_url. The
+# API KEY is the secret half and comes from OpenBao (secret/users/<you>/llm →
+# LITELLM_API_KEY), NOT here.
+litellmUrl: "https://litellm.stump.rocks/v1"
+
 # OpenBao / Vault server address. Single source of truth for the agent config
 # (agent.hcl), the systemd units + launchd plists that run it, and the czu updater.
 # Referenced as {{ .vaultAddr }} in those *.tmpl files; the Consul-Template *.ctmpl
