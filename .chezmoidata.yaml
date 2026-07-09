@@ -31,6 +31,13 @@ shlinkApiUrl: "https://u.stu.mp"
 # LITELLM_API_KEY), NOT here.
 litellmUrl: "https://litellm.stump.rocks/v1"
 
+# crush fork — Joe's agent-account fork of Charm's Crush, built from source by
+# run_after_install-crush (the fork keeps the upstream module path + ships no
+# release binaries, so it can't be `go install`-ed). Lives on joestump-agent (NOT
+# {{ .githubUser }}) because that account maintains it. Single source of truth for
+# both the .chezmoiexternal.toml clone URL and the build script's remote guard.
+crushRepo: "https://github.com/joestump-agent/crush.git"
+
 # OpenBao / Vault server address. Single source of truth for the agent config
 # (agent.hcl), the systemd units + launchd plists that run it, and the czu updater.
 # Referenced as {{ .vaultAddr }} in those *.tmpl files; the Consul-Template *.ctmpl

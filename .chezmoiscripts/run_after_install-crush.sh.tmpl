@@ -2,7 +2,7 @@
 # Build Joe's crush fork → ~/.local/bin/crush.
 #
 # The source is cloned by the chezmoi external at ~/.local/share/crush-src
-# (github.com/joestump/crush). The fork keeps the upstream module path and ships
+# ({{ .crushRepo }}). The fork keeps the upstream module path and ships
 # no release binaries, so there's nothing to `go install` or download — we build
 # from that clone. The result lands in ~/.local/bin, which sorts ahead of
 # /opt/homebrew/bin on PATH (see env.zsh), so it transparently shadows any
@@ -34,6 +34,23 @@ STATE="$HOME/.config/dotfiles/.crush-build-state"
 
 # The external clones the source; if it isn't there yet, there's nothing to build.
 [ -d "$SRC/.git" ] || { echo "crush source not cloned yet ($SRC); skipping build"; exit 0; }
+
+# Keep the managed clone pointed at the configured fork. chezmoi's git-repo
+# external clones a fresh machine from {{ .crushRepo }} correctly, but it will NOT
+# re-point an EXISTING clone when .crushRepo changes (it just `git pull`s the old
+# remote) — so reconcile the remote here. Safe on the managed clone: nothing is
+# developed in it (ff-only pull), and the reset just tracks the new default branch.
+WANT="{{ .crushRepo }}"
+if [ "$(git -C "$SRC" remote get-url origin 2>/dev/null)" != "$WANT" ]; then
+  echo "==> repointing crush clone → $WANT"
+  git -C "$SRC" remote set-url origin "$WANT"
+  if git -C "$SRC" fetch --quiet --prune origin; then
+    DEF="$(git -C "$SRC" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+    git -C "$SRC" reset --hard "$DEF" >/dev/null 2>&1 || git -C "$SRC" reset --hard origin/main >/dev/null 2>&1 || true
+  else
+    warn "fetch after repoint failed — clone may still track the old fork"
+  fi
+fi
 
 # Building needs the Go toolchain (Brewfile installs it on macOS; on a headless
 # Linux node without `go` this is a graceful no-op — add golang there if you want

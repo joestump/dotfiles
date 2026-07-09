@@ -50,8 +50,8 @@ chezmoi apply
 
 ## crush — Joe's fork, built from source
 
-[Crush](https://github.com/joestump/crush) is Joe's fork of Charm's Crush (a
-terminal AI coding agent). The fork adds a first-class **`litellm` provider type**
+[Crush](https://github.com/joestump-agent/crush) is Joe's agent-account fork of
+Charm's Crush (a terminal AI coding agent). The fork adds a first-class **`litellm` provider type**
 that auto-discovers every model from the LiteLLM gateway's `/v1/models` endpoint
 and enriches them via `/model/info` — so `~/.config/crush/crush.json` (managed;
 source `dot_config/crush/crush.json.tmpl`) needs no hand-maintained model list and
