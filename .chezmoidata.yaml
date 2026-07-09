@@ -31,6 +31,14 @@ shlinkApiUrl: "https://u.stu.mp"
 # LITELLM_API_KEY), NOT here.
 litellmUrl: "https://litellm.stump.rocks/v1"
 
+# Gitea base URL. Non-secret; used as GITEA_HOST for the crush `gitea` MCP. The
+# token half comes from OpenBao (secret/users/<you>/… → GITEA_TOKEN), NOT here.
+giteaUrl: "https://gitea.stump.rocks"
+
+# Outline (wiki) base URL. Non-secret; the crush `outline` MCP appends `/mcp`. The
+# token half comes from OpenBao (secret/users/<you>/… → OUTLINE_API_TOKEN), NOT here.
+outlineUrl: "https://outline.stump.rocks"
+
 # crush fork — Joe's agent-account fork of Charm's Crush, built from source by
 # run_after_install-crush (the fork keeps the upstream module path + ships no
 # release binaries, so it can't be `go install`-ed). Lives on joestump-agent (NOT

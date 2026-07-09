@@ -71,7 +71,7 @@
       "command": "go",
       "args": ["run", "gitea.com/gitea/gitea-mcp@latest", "-t", "stdio"],
       "env": {
-        "GITEA_HOST": "https://gitea.stump.rocks",
+        "GITEA_HOST": "{{ .giteaUrl }}",
         "GITEA_ACCESS_TOKEN": "$GITEA_TOKEN"
       },
       "timeout": 120,
@@ -88,7 +88,7 @@
     },
     "outline": {
       "type": "http",
-      "url": "https://outline.stump.rocks/mcp",
+      "url": "{{ .outlineUrl }}/mcp",
       "headers": {
         "Authorization": "Bearer $OUTLINE_API_TOKEN"
       },
