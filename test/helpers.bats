@@ -23,7 +23,9 @@ setup() { setup_stub_path; }
   # to the real `systemctl` and shows the live unit instead of "not loaded").
   [[ "$OSTYPE" == darwin* ]] || skip "launchctl path is macOS-only"
   make_stub launchctl 'echo "LAUNCHCTL $*"'
-  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-agent.zsh"; vault-agent status'
+  # Force the macOS branch so the launchctl stub is exercised regardless of the
+  # host OS (on Linux CI the systemctl branch would hit a missing user dbus).
+  run zsh -c 'OSTYPE="darwin24"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-agent.zsh"; vault-agent status'
   [ "$status" -eq 0 ]
   # stub output has no matching label, so the helper reports "not loaded"
   [[ "$output" == *"not loaded"* ]]
@@ -49,6 +51,44 @@ setup() { setup_stub_path; }
   run zsh -c 'export SSH_CONNECTION="1 2 3 4"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-oidc-login.zsh"; vault-oidc-login' </dev/null
   [[ "$output" == *"ssh -L 8250:localhost:8250"* ]]
   [[ "$output" == *"VAULT login -method=oidc"* ]]
+}
+
+@test "flush-dns: refuses on non-macOS" {
+  make_stub sudo 'exit 0'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  run zsh -c 'OSTYPE="linux-gnu"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"macOS only"* ]]
+}
+
+@test "flush-dns: no host arg just flushes" {
+  make_stub sudo '"$@"'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  run zsh -c 'OSTYPE="darwin24"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"flushed"* ]]
+}
+
+@test "flush-dns: host responds after flush -> success, notes it was down before" {
+  make_stub sudo '"$@"'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  make_stub ping '[ -f "$BATS_TEST_TMPDIR/ping-marker" ] && exit 0; touch "$BATS_TEST_TMPDIR/ping-marker"; exit 1'
+  run zsh -c 'OSTYPE="darwin24"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns example.com'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"example.com responds"* ]]
+  [[ "$output" == *"was unreachable before the flush"* ]]
+}
+
+@test "flush-dns: host still unreachable after flush -> failure" {
+  make_stub sudo '"$@"'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  make_stub ping 'exit 1'
+  run zsh -c 'OSTYPE="darwin24"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns example.com'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"still isn't responding"* ]]
+}
+
+@test "flush-dns: sudo failure is reported and stops before any ping check" {
+  make_stub sudo 'exit 1'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
+  run zsh -c 'OSTYPE="darwin24"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns example.com'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"couldn't flush"* ]]
 }
 
 @test "00-secrets.zsh: sources rendered secrets-*.env files" {
