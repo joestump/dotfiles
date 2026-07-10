@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
-# Tests for custom/vault-token.zsh (export VAULT_TOKEN from the Vault Agent's
-# AppRole token) and the agent.hcl.tmpl sink that mirrors that token to
-# ~/.vault-token. Together they make bare `vault` commands ride the durable
-# machine identity instead of a stale interactive OIDC token (dotfiles#1).
+# Tests for custom/vault-token.zsh and agent.hcl.tmpl under the ADR-0038 /
+# SPEC-0022 Vault identity model: the personal AppRole token is QUARANTINED —
+# exported only as $VAULT_PERSONAL_TOKEN, never as $VAULT_TOKEN, and the agent no
+# longer mirrors it to ~/.vault-token. That keeps it from shadowing the operator's
+# admin OIDC identity (which lives in ~/.vault-token via `vault-oidc-login`).
 load test_helper
 
 setup() { setup_stub_path; }
@@ -14,29 +15,36 @@ _fakehome() {
   printf '%s' "$h"
 }
 
-# ----- custom/vault-token.zsh: the VAULT_TOKEN export guard -----
+# ----- custom/vault-token.zsh: exports VAULT_PERSONAL_TOKEN, never VAULT_TOKEN -----
 
-@test "vault-token: exports VAULT_TOKEN from agent-token when unset" {
+@test "vault-token: exports VAULT_PERSONAL_TOKEN from agent-token" {
   local h; h="$(_fakehome)"
   printf 's.testtoken123' > "$h/.config/vault/agent-token"
-  run zsh -c 'export HOME="'"$h"'"; unset VAULT_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "tok=$VAULT_TOKEN"'
+  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "tok=$VAULT_PERSONAL_TOKEN"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"tok=s.testtoken123"* ]]
 }
 
-@test "vault-token: a preset VAULT_TOKEN is preserved (deliberate override wins)" {
+@test "vault-token: NEVER exports VAULT_TOKEN (must not shadow admin OIDC)" {
+  local h; h="$(_fakehome)"
+  printf 's.testtoken123' > "$h/.config/vault/agent-token"
+  # ${VAULT_TOKEN+SET} is 'SET' only if the var exists — asserts genuinely UNSET.
+  run zsh -c 'export HOME="'"$h"'"; unset VAULT_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_TOKEN+SET}]"'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"state=[]"* ]]
+}
+
+@test "vault-token: leaves a preset VAULT_TOKEN (OIDC admin) untouched" {
   local h; h="$(_fakehome)"
   printf 's.fromfile' > "$h/.config/vault/agent-token"
-  run zsh -c 'export HOME="'"$h"'"; export VAULT_TOKEN=s.preset; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "tok=$VAULT_TOKEN"'
+  run zsh -c 'export HOME="'"$h"'"; export VAULT_TOKEN=s.oidcadmin; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "tok=$VAULT_TOKEN"'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"tok=s.preset"* ]]
+  [[ "$output" == *"tok=s.oidcadmin"* ]]
 }
 
 @test "vault-token: no-op (no error) when agent-token is missing" {
   local h; h="$(_fakehome)"   # dir exists, agent-token does not
-  # ${VAULT_TOKEN+SET} is 'SET' only if the var exists — asserts genuinely UNSET,
-  # not merely empty, so removing the -s guard (which would export "") is caught.
-  run zsh -c 'export HOME="'"$h"'"; unset VAULT_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_TOKEN+SET}]"'
+  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_PERSONAL_TOKEN+SET}]"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"state=[]"* ]]
 }
@@ -44,7 +52,7 @@ _fakehome() {
 @test "vault-token: no-op when agent-token is empty (0 bytes)" {
   local h; h="$(_fakehome)"
   : > "$h/.config/vault/agent-token"
-  run zsh -c 'export HOME="'"$h"'"; unset VAULT_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_TOKEN+SET}]"'
+  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_PERSONAL_TOKEN+SET}]"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"state=[]"* ]]
 }
@@ -52,29 +60,30 @@ _fakehome() {
 @test "vault-token: strips a trailing newline from the token file" {
   local h; h="$(_fakehome)"
   printf 's.trailing\n' > "$h/.config/vault/agent-token"
-  run zsh -c 'export HOME="'"$h"'"; unset VAULT_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "len=${#VAULT_TOKEN} tok=[$VAULT_TOKEN]"'
+  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "len=${#VAULT_PERSONAL_TOKEN} tok=[$VAULT_PERSONAL_TOKEN]"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"tok=[s.trailing]"* ]]
   [[ "$output" == *"len=10"* ]]
 }
 
-@test "vault-token: VAULT_TOKEN is exported so child processes inherit it" {
+@test "vault-token: VAULT_PERSONAL_TOKEN is exported so child processes inherit it" {
   local h; h="$(_fakehome)"
   printf 's.exported' > "$h/.config/vault/agent-token"
-  # `env` is a forked child — it only sees VAULT_TOKEN if it was *exported*.
-  run zsh -c 'export HOME="'"$h"'"; unset VAULT_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; env | grep "^VAULT_TOKEN="'
+  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; env | grep "^VAULT_PERSONAL_TOKEN="'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"VAULT_TOKEN=s.exported"* ]]
+  [[ "$output" == *"VAULT_PERSONAL_TOKEN=s.exported"* ]]
 }
 
-# ----- agent.hcl.tmpl: the ~/.vault-token sink is on the AppRole path only -----
+# ----- agent.hcl.tmpl: neither branch mirrors the token to ~/.vault-token -----
 
-@test "agent.hcl: the AppRole branch mirrors the token to ~/.vault-token" {
+@test "agent.hcl: the AppRole branch does NOT mirror the token to ~/.vault-token" {
+  # ADR-0038: the personal token is quarantined to ~/.config/vault/agent-token so
+  # it can't shadow the operator's OIDC login in ~/.vault-token.
   local tmpl="$REPO_ROOT/dot_config/vault/agent.hcl.tmpl"
   awk '/\{\{ if stat/{f=1;next} /\{\{ else/{f=0} f' "$tmpl" > "$BATS_TEST_TMPDIR/approle.hcl"
   [ -s "$BATS_TEST_TMPDIR/approle.hcl" ]
   run grep -E '^[[:space:]]+path = .*/\.vault-token"' "$BATS_TEST_TMPDIR/approle.hcl"
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
 }
 
 @test "agent.hcl: the legacy token_file branch has NO ~/.vault-token sink" {
@@ -97,14 +106,12 @@ _fakehome() {
   [ "$status" -eq 0 ]
 }
 
-@test "agent.hcl: renders with the ~/.vault-token sink on this AppRole host" {
-  # Real render — only meaningful where chezmoi is present and AppRole is wired
-  # (the CI bats job has neither, so it skips; the lint job renders separately).
+@test "agent.hcl: renders WITHOUT a ~/.vault-token sink on this AppRole host" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   [ -f "$HOME/.config/vault/approle/secret-id" ] || skip "no AppRole secret-id on this host"
   run chezmoi execute-template --source "$REPO_ROOT" < "$REPO_ROOT/dot_config/vault/agent.hcl.tmpl"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/rendered.hcl"
   run grep -E '^[[:space:]]+path = .*/\.vault-token"' "$BATS_TEST_TMPDIR/rendered.hcl"
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
 }
