@@ -41,11 +41,33 @@ script (not listed in the manifest). Tools without a clean apt package (e.g. `yq
 
 `~/.config/dotfiles/go-tools.txt` (managed) lists `go install` targets, one module
 path per line. Installed by `run_onchange_after_10-install-packages.sh` when `go` is
-present (uncomment `brew "go"` in the Brewfile to get the toolchain).
+present (`brew "go"` is in the Brewfile, so the toolchain is there on macOS).
 
 ```sh
 chezmoi edit ~/.config/dotfiles/go-tools.txt   # add: github.com/x/y@latest
 chezmoi apply
+```
+
+## crush — Joe's fork, built from source
+
+[Crush](https://github.com/joestump-agent/crush) is Joe's agent-account fork of
+Charm's Crush (a terminal AI coding agent). The fork adds a first-class **`litellm` provider type**
+that auto-discovers every model from the LiteLLM gateway's `/v1/models` endpoint
+and enriches them via `/model/info` — so `~/.config/crush/crush.json` (managed;
+source `dot_config/crush/crush.json.tmpl`) needs no hand-maintained model list and
+no plaintext key: it points at `https://litellm.stump.rocks/v1` with
+`api_key: "$LITELLM_API_KEY"` (rendered from OpenBao by the Vault Agent) and
+`discover_models: true`.
+
+It can't be `go install`-ed (the fork keeps the upstream module path and ships no
+release binaries), so chezmoi clones the source via a git-repo external to
+`~/.local/share/crush-src` and `run_after_install-crush.sh` builds it to
+`~/.local/bin/crush` — which shadows any Homebrew `crush` (that dir sorts ahead on
+PATH). The build reruns only when the clone's HEAD moves.
+
+```sh
+chezmoi apply --refresh-externals   # pull the latest fork commit + rebuild
+crush                               # ~/.local/bin/crush (the fork)
 ```
 
 ## vault — installed separately, OS-aware
@@ -65,6 +87,7 @@ canonical install is HashiCorp's apt repo. So a dedicated idempotent step in
 | before | `run_once_before_10-install-prereqs.sh` | **macOS:** install Homebrew · **Linux:** apt essentials (zsh/git/curl…) — no Homebrew · then Oh My Zsh |
 | *(files)* | chezmoi apply | writes `~/.Brewfile`, `apt-packages.txt`, `go-tools.txt`, etc. |
 | after | `run_onchange_after_10-install-packages.sh` | **macOS:** `brew bundle` · **Linux:** `apt-get install` (+ gh/vault apt repos) · then Go tools |
+| after | `run_after_install-crush.sh` | build Joe's crush fork (`~/.local/share/crush-src` → `~/.local/bin/crush`) when its HEAD moves |
 | after | `run_once_after_20-configure-git-hooks.sh` | wire the gitleaks hook |
 
 ## Adding another ecosystem (npm, pipx, cargo…)
