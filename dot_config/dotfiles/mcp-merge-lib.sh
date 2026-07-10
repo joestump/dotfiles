@@ -2,11 +2,20 @@
 # Shared helpers for the Claude MCP merge scripts. NO secrets here — only logic.
 # Sourced by .chezmoiscripts/run_onchange_after_claude-*-mcp-merge.sh.
 
-# mcp_secret <openbao-subpath> <field> <live-fallback>
-#   OpenBao is authoritative; fall back to the live value if OpenBao is empty/unreachable.
+# mcp_secret <legacy-subpath> <env-var> <live-fallback>
+#   Reads the per-user secret the Vault Agent injects into the shell env
+#   (secret/users/$USER/* → ~/.config/vault/secrets-static.env) — the SAME pattern the
+#   outline token uses in the code merge script. $2 is the env-var / KV field name; $1
+#   (the old OpenBao subpath) is kept only for caller compatibility and is unused.
+#   Falls back to the live value so a transient miss never blanks a working token.
+#
+#   Was: `vault kv get -field=$2 secret/personal/$1` — that queried the pre-per-user
+#   SHARED path AND needed a live vault token at merge time; when none was present it
+#   returned empty and blanked the outline/github/karakeep Bearers (dotfiles OMG,
+#   2026-07-05). The env-injection path is per-user and needs no vault call.
 mcp_secret() {
   local v
-  v="$(vault kv get -field="$2" "secret/personal/$1" 2>/dev/null || true)"
+  v="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${!2:-}" )"
   [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$3"
 }
 
