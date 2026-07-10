@@ -18,10 +18,21 @@ vault-oidc-login() {
     print -u2 "leave it open, then continue here.\n"
     print -n "Press Enter once the tunnel is up (Ctrl-C to abort)... "; read -r
   fi
+  # ADR-0038 / SPEC-0022: the personal Vault Agent is quarantined to
+  # ~/.config/vault/agent-token and no longer sinks to ~/.vault-token, so an OIDC
+  # login here STICKS with no agent juggling — ~/.vault-token is the human's alone.
+  # On token_file hosts (no AppRole secret-id) the agent AUTHENTICATES from
+  # ~/.vault-token, so restart it there to adopt the fresh token.
   if vault login -method=oidc; then
-    # All-in-one: kick the agent so secrets populate immediately (and it re-reads
-    # the fresh token). restart if it's already up, else start it.
-    print -u2 "✅ logged in — (re)starting the Vault Agent to render secrets…"
-    vault-agent restart 2>/dev/null || vault-agent start
+    export VAULT_TOKEN="$(cat "$HOME/.vault-token" 2>/dev/null)"   # use it in this shell too
+    if [[ -f "$HOME/.config/vault/approle/secret-id" ]]; then
+      print -u2 "✅ OIDC admin session active — token in ~/.vault-token and \$VAULT_TOKEN."
+      print -u2 "   (Personal secrets keep rendering via the AppRole agent, untouched.)"
+    else
+      print -u2 "✅ logged in — restarting the Vault Agent (token_file mode) to adopt the token…"
+      vault-agent restart 2>/dev/null || vault-agent start
+    fi
+  else
+    return 1
   fi
 }
