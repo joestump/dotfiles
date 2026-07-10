@@ -122,7 +122,6 @@ plugins=(
   urltools
   fzf
   zoxide
-  eza
   sudo
   alias-finder
   copypath
@@ -133,6 +132,11 @@ plugins=(
   zsh-syntax-highlighting
   history-substring-search
 )
+
+# eza: a Brewfile/macOS tool. Enable its OMZ plugin only when the binary is
+# actually present, so Linux hosts without eza don't print
+# "eza not found. Please install eza..." on every interactive shell.
+(( $+commands[eza] )) && plugins+=(eza)
 
 # alias-finder: whenever a typed command has a shorter alias, say so. All the
 # alias-heavy plugins above (git, docker, kubectl, brew...) make this the
