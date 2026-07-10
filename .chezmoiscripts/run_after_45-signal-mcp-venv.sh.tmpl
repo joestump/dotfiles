@@ -10,14 +10,25 @@ set -euo pipefail
 repo="$HOME/src/signal-mcp"
 # uv installs to ~/.local/bin; chezmoi may run from a shell that hasn't sourced it.
 export PATH="$HOME/.local/bin:$PATH"
-command -v uv >/dev/null 2>&1 || { echo "uv absent; skipping signal-mcp venv warm"; exit 0; }
-[ -d "$repo" ] || { echo "no $repo yet (external not cloned?); skipping venv warm"; exit 0; }
+
+# Clean progress via the shared UI lib (spinner/ticks on a TTY, quiet lines
+# otherwise); fallback keeps the script working if the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  have() { command -v "$1" >/dev/null 2>&1; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  warn() { echo "  WARN: $*" >&2; }
+}
+
+heading "💬 Signal MCP"
+have uv        || { item dim "uv absent — skipping venv warm"; exit 0; }
+[ -d "$repo" ] || { item dim "no local checkout yet — skipping venv warm"; exit 0; }
 
 if [ -d "$repo/.venv" ]; then
-  echo "signal-mcp venv already warm"
-else
-  echo "==> warming signal-mcp uv venv ($repo)"
-  uv sync --directory "$repo" || echo "WARN: uv sync failed; first Claude launch may cold-start"
+  item ok "venv already warm"
+elif ! step "warming uv venv" -- uv sync --directory "$repo"; then
+  warn "uv sync failed; first Claude launch may cold-start"
 fi
 {{- else }}
 :  # macOS: signal-mcp is a dev checkout — leave its venv alone.

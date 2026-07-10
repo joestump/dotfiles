@@ -5,10 +5,19 @@
 # lib  hash: {{ include "dot_config/dotfiles/mcp-merge-lib.sh" | sha256sum }}
 set -euo pipefail
 
+# Shared UI lib (ticked items on a TTY, quiet lines otherwise) — sourced BEFORE
+# mcp-merge-lib so its status lines render as items. Fallback keeps us working if
+# the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  warn() { echo "  WARN: $*" >&2; }
+}
 . "$HOME/.config/dotfiles/mcp-merge-lib.sh"
+
 DC="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-[ -f "$DC" ] || { echo "no Claude Desktop config; skipping"; exit 0; }
-echo "==> Claude Desktop mcpServers merge"
+heading "🔗 Claude Desktop MCP"
+[ -f "$DC" ] || { item dim "no Claude Desktop config — skipping"; exit 0; }
 
 GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.gitea.env.GITEA_ACCESS_TOKEN // ""'        "$DC")")"
 # github is the REMOTE hosted GitHub MCP, reached via the npx mcp-remote bridge with
