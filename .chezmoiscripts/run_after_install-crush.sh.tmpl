@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Build Joe's crush fork → ~/.local/bin/crush.
+#
+# The source is cloned by the chezmoi external at ~/.local/share/crush-src
+# ({{ .crushRepo }}). The fork keeps the upstream module path and ships
+# no release binaries, so there's nothing to `go install` or download — we build
+# from that clone. The result lands in ~/.local/bin, which sorts ahead of
+# /opt/homebrew/bin on PATH (see env.zsh), so it transparently shadows any
+# Homebrew `crush` without a `brew uninstall`.
+#
+# Rerun model (mirrors install-claude-plugins): runs on EVERY apply but is cheap
+# when nothing changed — it fingerprints the clone by git HEAD and only rebuilds
+# when HEAD moves (or the binary is missing). run_onchange wouldn't work here: the
+# fork updating upstream doesn't change this script, so an onchange gate would
+# never re-fire. For an immediate pull + rebuild: `chezmoi apply --refresh-externals`.
+set -euo pipefail
+
+# ~/.local/bin may not be on PATH in the shell that invoked chezmoi (a login shell
+# opened before env.zsh added it). Add it so `command -v crush`/go resolve.
+export PATH="$HOME/.local/bin:$PATH"
+
+SRC="$HOME/.local/share/crush-src"
+BIN="$HOME/.local/bin/crush"
+STATE="$HOME/.config/dotfiles/.crush-build-state"
+
+# Clean progress via the shared UI lib (spinner on a TTY, quiet otherwise);
+# fallback keeps the script working if the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
+# The external clones the source; if it isn't there yet, there's nothing to build.
+[ -d "$SRC/.git" ] || { echo "crush source not cloned yet ($SRC); skipping build"; exit 0; }
+
+# Keep the managed clone pointed at the configured fork. chezmoi's git-repo
+# external clones a fresh machine from {{ .crushRepo }} correctly, but it will NOT
+# re-point an EXISTING clone when .crushRepo changes (it just `git pull`s the old
+# remote) — so reconcile the remote here. Safe on the managed clone: nothing is
+# developed in it (ff-only pull), and the reset just tracks the new default branch.
+WANT="{{ .crushRepo }}"
+if [ "$(git -C "$SRC" remote get-url origin 2>/dev/null)" != "$WANT" ]; then
+  echo "==> repointing crush clone → $WANT"
+  git -C "$SRC" remote set-url origin "$WANT"
+  if git -C "$SRC" fetch --quiet --prune origin; then
+    DEF="$(git -C "$SRC" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+    git -C "$SRC" reset --hard "$DEF" >/dev/null 2>&1 || git -C "$SRC" reset --hard origin/main >/dev/null 2>&1 || true
+  else
+    warn "fetch after repoint failed — clone may still track the old fork"
+  fi
+fi
+
+# Building needs the Go toolchain (Brewfile installs it on macOS; on a headless
+# Linux node without `go` this is a graceful no-op — add golang there if you want
+# crush). GOTOOLCHAIN=auto lets an older Go fetch the exact version go.mod pins.
+command -v go >/dev/null 2>&1 || { echo "go toolchain absent; skipping crush build"; exit 0; }
+
+heading "🤖 crush (joestump fork)"
+
+head="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
+if [ -x "$BIN" ] && [ -n "$head" ] && [ "$head" = "$(cat "$STATE" 2>/dev/null || true)" ]; then
+  item ok "crush ${head:0:7} (up to date)"
+  exit 0
+fi
+
+# Version stamp matches the fork's Taskfile build (-X internal/version.Version).
+ver="$(git -C "$SRC" describe --tags --always --dirty 2>/dev/null || echo dev)"
+mkdir -p "$(dirname "$BIN")" "$(dirname "$STATE")"
+
+# First build downloads the go.mod-pinned toolchain (~150MB) and compiles a large
+# tree — it can take a few minutes. No watchdog: a Go build doesn't hang, and
+# killing it mid-toolchain-fetch would only corrupt the cache.
+say "building crush ${ver} (first build fetches the Go toolchain; may take a few minutes)…"
+if ( cd "$SRC" && CGO_ENABLED=0 GOTOOLCHAIN=auto \
+       go build -ldflags "-X github.com/charmbracelet/crush/internal/version.Version=${ver}" -o "$BIN" . ); then
+  printf '%s' "$head" >"$STATE"
+  item ok "crush ${ver} → $BIN"
+else
+  warn "crush build failed — 'cd $SRC && go build .' by hand to see why"
+fi

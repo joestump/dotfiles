@@ -1,0 +1,263 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "litellm": {
+      "type": "litellm",
+      "name": "LiteLLM (StumpCloud)",
+      "base_url": "{{ .litellmUrl }}",
+      "api_key": "$LITELLM_API_KEY",
+      "discover_models": true
+    }
+  },
+  "models": {
+    "large": {
+      "provider": "litellm",
+      "model": "Qwen3-Coder:480b"
+    },
+    "small": {
+      "provider": "litellm",
+      "model": "gpt-oss:120b"
+    }
+  },
+  "lsp": {
+    "go": {
+      "command": "gopls",
+      "enabled": true
+    },
+    "python": {
+      "command": "pyright",
+      "args": ["--stdio"],
+      "enabled": true
+    },
+    "ansible": {
+      "command": "ansible-language-server",
+      "args": ["--stdio"],
+      "enabled": true
+    },
+    "yaml": {
+      "command": "yaml-language-server",
+      "args": ["--stdio"],
+      "enabled": true
+    },
+    "markdown": {
+      "command": "marksman",
+      "enabled": true
+    },
+    "terraform": {
+      "command": "terraform-ls",
+      "args": ["serve"],
+      "enabled": true
+    },
+    "json": {
+      "command": "vscode-json-language-server",
+      "args": ["--stdio"],
+      "enabled": true
+    }
+  },
+  "mcp": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "{{ .chezmoi.homeDir }}/src"
+      ],
+      "timeout": 60,
+      "disabled": false
+    },
+    "gitea": {
+      "type": "stdio",
+      "command": "go",
+      "args": ["run", "gitea.com/gitea/gitea-mcp@latest", "-t", "stdio"],
+      "env": {
+        "GITEA_HOST": "{{ .giteaUrl }}",
+        "GITEA_ACCESS_TOKEN": "$GITEA_TOKEN"
+      },
+      "timeout": 120,
+      "disabled": false
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer $GITHUB_PERSONAL_ACCESS_TOKEN"
+      },
+      "timeout": 120,
+      "disabled": false
+    },
+    "outline": {
+      "type": "http",
+      "url": "{{ .outlineUrl }}/mcp",
+      "headers": {
+        "Authorization": "Bearer $OUTLINE_API_TOKEN"
+      },
+      "timeout": 120,
+      "disabled": false
+    },
+    "signal": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "{{ .chezmoi.homeDir }}/src/signal-mcp",
+        "server",
+        "--user-id",
+        "{{ .signalNumber }}",
+        "--transport",
+        "stdio"
+      ],
+      "timeout": 60,
+      "disabled": false
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"],
+      "timeout": 120,
+      "disabled": false
+    },
+    "aws-knowledge": {
+      "type": "http",
+      "url": "https://knowledge-mcp.global.api.aws",
+      "timeout": 120,
+      "disabled": false
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "timeout": 60,
+      "disabled": false
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "timeout": 60,
+      "disabled": false
+    }
+  },
+  "options": {
+    "context_paths": [
+      "AGENTS.md",
+      "CRUSH.md",
+      "CLAUDE.md",
+      "**/ADR-*.md",
+      "**/adr/*.md",
+      "**/openapi.yaml",
+      "**/openapi.json"
+    ],
+    "disabled_tools": []
+  },
+  "permissions": {
+    "allowed_tools": [
+      "view",
+      "ls",
+      "grep",
+      "glob",
+      "sourcegraph",
+      "fetch",
+      "download",
+      "edit",
+      "multiedit",
+      "write",
+      "bash",
+      "lsp_diagnostics",
+      "lsp_references",
+      "todos",
+      "list_mcp_resources",
+      "read_mcp_resource",
+      "mcp_filesystem_read_file",
+      "mcp_filesystem_read_text_file",
+      "mcp_filesystem_read_multiple_files",
+      "mcp_filesystem_list_directory",
+      "mcp_filesystem_directory_tree",
+      "mcp_filesystem_search_files",
+      "mcp_filesystem_get_file_info",
+      "mcp_filesystem_list_allowed_directories",
+      "mcp_memory_read_graph",
+      "mcp_memory_search_nodes",
+      "mcp_memory_open_nodes",
+      "mcp_aws-knowledge_search",
+      "mcp_aws-knowledge_get_documentation",
+      "mcp_aws-knowledge_read_documentation",
+      "mcp_aws-knowledge_recommend",
+      "mcp_gitea_get_me",
+      "mcp_gitea_get_file_contents",
+      "mcp_gitea_get_dir_contents",
+      "mcp_gitea_get_repository_tree",
+      "mcp_gitea_list_branches",
+      "mcp_gitea_list_tags",
+      "mcp_gitea_list_commits",
+      "mcp_gitea_get_commit",
+      "mcp_gitea_list_releases",
+      "mcp_gitea_get_release",
+      "mcp_gitea_get_latest_release",
+      "mcp_gitea_get_tag",
+      "mcp_gitea_list_issues",
+      "mcp_gitea_issue_read",
+      "mcp_gitea_search_issues",
+      "mcp_gitea_list_pull_requests",
+      "mcp_gitea_pull_request_read",
+      "mcp_gitea_list_my_repos",
+      "mcp_gitea_list_org_repos",
+      "mcp_gitea_search_repos",
+      "mcp_gitea_search_users",
+      "mcp_gitea_get_user_orgs",
+      "mcp_gitea_label_read",
+      "mcp_gitea_milestone_read",
+      "mcp_gitea_notification_read",
+      "mcp_gitea_actions_run_read",
+      "mcp_gitea_actions_config_read",
+      "mcp_gitea_wiki_read",
+      "mcp_gitea_package_read",
+      "mcp_gitea_timetracking_read",
+      "mcp_github_get_me",
+      "mcp_github_get_file_contents",
+      "mcp_github_search_code",
+      "mcp_github_search_repositories",
+      "mcp_github_search_issues",
+      "mcp_github_search_pull_requests",
+      "mcp_github_search_users",
+      "mcp_github_search_commits",
+      "mcp_github_list_branches",
+      "mcp_github_list_commits",
+      "mcp_github_list_issues",
+      "mcp_github_list_pull_requests",
+      "mcp_github_list_releases",
+      "mcp_github_list_tags",
+      "mcp_github_list_repository_collaborators",
+      "mcp_github_issue_read",
+      "mcp_github_pull_request_read",
+      "mcp_github_get_commit",
+      "mcp_github_get_tag",
+      "mcp_github_get_label",
+      "mcp_github_get_latest_release",
+      "mcp_github_get_release_by_tag",
+      "mcp_outline_list_documents",
+      "mcp_outline_list_collections",
+      "mcp_outline_list_collection_documents",
+      "mcp_outline_fetch",
+      "mcp_outline_list_comments",
+      "mcp_outline_list_users",
+      "mcp_karakeep_search-bookmarks",
+      "mcp_karakeep_get-bookmark",
+      "mcp_karakeep_get-bookmark-content",
+      "mcp_karakeep_get-lists",
+      "mcp_karakeep_get-list",
+      "mcp_karakeep_get-tags",
+      "mcp_karakeep_get-tag",
+      "mcp_karakeep_get-tag-bookmarks",
+      "mcp_chrome-devtools_list_pages",
+      "mcp_chrome-devtools_list_console_messages",
+      "mcp_chrome-devtools_list_network_requests",
+      "mcp_chrome-devtools_get_network_request",
+      "mcp_chrome-devtools_take_snapshot",
+      "mcp_chrome-devtools_take_screenshot",
+      "mcp_chrome-devtools_performance_analyze_insight",
+      "mcp_signal_receive_message"
+    ]
+  }
+}
