@@ -51,8 +51,10 @@ Equivalent to SSHing in yourself and running the one-liner — just fewer steps.
 
 `run_once_before_10-install-prereqs.sh` (before any file is written; idempotent):
 
-- on **Ubuntu**, `apt-get install` Homebrew's prerequisites (build-essential, etc.),
-- installs **Homebrew** if missing (macOS + Linux),
+- installs a package manager: **Homebrew** on macOS; on **Linux** it uses **apt only**
+  (no Homebrew) for `zsh git curl ca-certificates gnupg`,
+- on **Linux**, installs **Node 22** (NodeSource) so `qmd` has a modern runtime — a
+  box with no node is detected gracefully and never aborts the bootstrap,
 - installs **Oh My Zsh** if `~/.oh-my-zsh` is absent, using
   `RUNZSH=no KEEP_ZSHRC=yes` so it **never** overwrites the chezmoi-managed `~/.zshrc`.
 
