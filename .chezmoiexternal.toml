@@ -75,6 +75,14 @@
 # Cloned locally because `claude plugin marketplace add` can't HTTP-fetch a
 # private Gitea repo (404). chezmoi keeps it synced (refreshPeriod); the plugin
 # install script adds it as a local-path marketplace.
+#
+# GUARDED: only declare this external on a node that actually has Gitea
+# credentials — a rendered OpenBao secrets file (a provisioned node) OR a stored
+# git credential. A git-repo external that can't authenticate aborts the ENTIRE
+# `chezmoi apply` (exit 128), and because this target sorts early, nothing
+# downstream applies. On a credential-less node we skip it instead so the rest of
+# the apply still lands. Provisioned nodes are unaffected.
+{{- if or (stat (joinPath .chezmoi.homeDir ".config/vault/secrets-static.env")) (stat (joinPath .chezmoi.homeDir ".git-credentials")) }}
 [".config/claude-marketplaces/claude-personal"]
     type = "git-repo"
     url = "https://gitea.stump.rocks/{{ .githubUser }}/claude-personal.git"
@@ -84,6 +92,7 @@
     refreshPeriod = "24h"
 [".config/claude-marketplaces/claude-personal".pull]
     args = ["--ff-only", "--quiet"]
+{{- end }}
 
 # ---------- vim-plug (single-file plugin manager for classic vim) ----------
 # The `plug.vim` runtime file; declared in ~/.vimrc via `call plug#begin()`. A
@@ -92,6 +101,25 @@
     type = "file"
     url = "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
     refreshPeriod = "168h"
+
+# ---------- crush (Joe's agent-account fork) — build source ----------
+# Joe's fork of Charm's Crush ({{ .crushRepo }}) carries the `litellm` provider
+# type with /v1/models auto-discovery + /model/info enrichment, plus the
+# experimental MCP "channels" feature. It keeps the upstream module path
+# (github.com/charmbracelet/crush) and ships NO release binaries, so `go install`
+# by the fork path can't work — chezmoi clones the source HERE and
+# `run_after_install-crush.sh` builds it to ~/.local/bin/crush (which shadows any
+# Homebrew `crush` since ~/.local/bin sorts ahead on PATH). Tracks the default
+# branch (main); ff-only pull keeps this managed clone clean — do NOT hack in this
+# dir, use a separate checkout for development. Note: chezmoi won't re-point an
+# EXISTING clone if .crushRepo changes, so the build script reconciles the remote.
+# For an immediate pull + rebuild: `chezmoi apply --refresh-externals`.
+[".local/share/crush-src"]
+    type = "git-repo"
+    url = "{{ .crushRepo }}"
+    refreshPeriod = "168h"
+[".local/share/crush-src".pull]
+    args = ["--ff-only", "--quiet"]
 
 {{ if ne .chezmoi.os "darwin" -}}
 # ---------- Signal MCP server (Linux only) ----------

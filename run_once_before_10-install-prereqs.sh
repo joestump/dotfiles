@@ -6,6 +6,16 @@
 # Idempotent: every step checks first.
 set -euo pipefail
 
+# Print the installed Node major version, or nothing if node is absent. The
+# `command -v` guard matters: without it, a nodeless box runs `node -v`, which
+# exits 127, and under `set -euo pipefail` that 127 propagates through the pipe
+# and aborts the WHOLE script here — before Oh My Zsh and the dotfiles are ever
+# written, leaving the box with no ~/.zshrc. The guard returns cleanly instead.
+detect_node_major() {
+  command -v node >/dev/null 2>&1 || return 0
+  node -v | sed 's/^v//; s/\..*//'
+}
+
 OS="$(uname -s)"
 echo "==> dotfiles bootstrap: prerequisites ($OS)"
 
@@ -31,7 +41,7 @@ elif [ "$OS" = "Linux" ] && command -v apt-get >/dev/null 2>&1; then
   # NON-FATAL: Node is only needed by qmd (which skips cleanly without it). A
   # transient NodeSource/apt hiccup must NOT abort the whole bootstrap and leave the
   # box with no ~/.zshrc — so warn-and-continue rather than die under `set -e`.
-  node_major="$(node -v 2>/dev/null | sed 's/^v//; s/\..*//')"
+  node_major="$(detect_node_major)"
   if [ -z "$node_major" ] || [ "$node_major" -lt 22 ]; then
     echo "Installing Node 22 (NodeSource); have: $(node -v 2>/dev/null || echo none)"
     if curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -; then
