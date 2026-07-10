@@ -127,7 +127,16 @@ install_linux() {
     done < "$list"
   fi
   heading "📦 apt"
-  sudo -v 2>/dev/null || true   # prime sudo so a spinner never hides a password prompt
+  # Prime sudo so a spinner never hides a password prompt — but probe with a
+  # NON-INTERACTIVE command first. `sudo -v` is the wrong probe on NOPASSWD hosts:
+  # validation obeys `verifypw` (default `all` — EVERY matching sudoers entry must
+  # be NOPASSWD), so mere membership in group `sudo` (%sudo ALL=(ALL:ALL) ALL, a
+  # password rule) makes `sudo -v` demand a password even though every actual
+  # `sudo <cmd>` is passwordless (last-match wins). On cloud-init boxes the account
+  # password is LOCKED, so that prompt is unanswerable and czu hard-blocks.
+  # `sudo -n true` succeeds on NOPASSWD hosts (no prompt ever); only when it fails
+  # (real password-sudo hosts, e.g. macOS) do we fall back to interactive priming.
+  sudo -n true 2>/dev/null || sudo -v || true
   spin "apt-get update" -- sudo apt-get update -y || warn "apt update failed"
   if [ "${#pkgs[@]}" -gt 0 ]; then
     # A transient apt/network blip during bootstrap must not silently leave packages
