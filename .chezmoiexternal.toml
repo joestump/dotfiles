@@ -93,6 +93,25 @@
     url = "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
     refreshPeriod = "168h"
 
+# ---------- crush (Joe's agent-account fork) — build source ----------
+# Joe's fork of Charm's Crush ({{ .crushRepo }}) carries the `litellm` provider
+# type with /v1/models auto-discovery + /model/info enrichment, plus the
+# experimental MCP "channels" feature. It keeps the upstream module path
+# (github.com/charmbracelet/crush) and ships NO release binaries, so `go install`
+# by the fork path can't work — chezmoi clones the source HERE and
+# `run_after_install-crush.sh` builds it to ~/.local/bin/crush (which shadows any
+# Homebrew `crush` since ~/.local/bin sorts ahead on PATH). Tracks the default
+# branch (main); ff-only pull keeps this managed clone clean — do NOT hack in this
+# dir, use a separate checkout for development. Note: chezmoi won't re-point an
+# EXISTING clone if .crushRepo changes, so the build script reconciles the remote.
+# For an immediate pull + rebuild: `chezmoi apply --refresh-externals`.
+[".local/share/crush-src"]
+    type = "git-repo"
+    url = "{{ .crushRepo }}"
+    refreshPeriod = "168h"
+[".local/share/crush-src".pull]
+    args = ["--ff-only", "--quiet"]
+
 {{ if ne .chezmoi.os "darwin" -}}
 # ---------- Signal MCP server (Linux only) ----------
 # The Signal MCP (a JSON-RPC client for the signal-cli daemon) is launched with
