@@ -20,6 +20,12 @@ GitHub marketplaces add by `owner/repo`. The **private Gitea** one
 (`claude-personal`) can't be HTTP-fetched, so a chezmoi **external** clones it
 locally (refreshed every **24h**) and it's added as a **local-path** marketplace.
 
+That external is **credential-guarded**: it's only declared on a node that has
+Gitea credentials (a rendered OpenBao secrets file, or a stored git credential).
+A git-repo external that can't authenticate aborts the whole `chezmoi apply`, so a
+credential-less node skips the private marketplace instead of bricking its apply —
+it reappears automatically once the node is provisioned.
+
 ## Propagation
 
 Local-path marketplaces (`claude-personal`) **auto-reinstall** when the clone's git

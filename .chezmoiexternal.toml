@@ -75,6 +75,14 @@
 # Cloned locally because `claude plugin marketplace add` can't HTTP-fetch a
 # private Gitea repo (404). chezmoi keeps it synced (refreshPeriod); the plugin
 # install script adds it as a local-path marketplace.
+#
+# GUARDED: only declare this external on a node that actually has Gitea
+# credentials — a rendered OpenBao secrets file (a provisioned node) OR a stored
+# git credential. A git-repo external that can't authenticate aborts the ENTIRE
+# `chezmoi apply` (exit 128), and because this target sorts early, nothing
+# downstream applies. On a credential-less node we skip it instead so the rest of
+# the apply still lands. Provisioned nodes are unaffected.
+{{- if or (stat (joinPath .chezmoi.homeDir ".config/vault/secrets-static.env")) (stat (joinPath .chezmoi.homeDir ".git-credentials")) }}
 [".config/claude-marketplaces/claude-personal"]
     type = "git-repo"
     url = "https://gitea.stump.rocks/{{ .githubUser }}/claude-personal.git"
@@ -84,6 +92,7 @@
     refreshPeriod = "24h"
 [".config/claude-marketplaces/claude-personal".pull]
     args = ["--ff-only", "--quiet"]
+{{- end }}
 
 # ---------- vim-plug (single-file plugin manager for classic vim) ----------
 # The `plug.vim` runtime file; declared in ~/.vimrc via `call plug#begin()`. A
