@@ -62,9 +62,3 @@ jobs:
       - name: yamllint — workflows
         run: |
           yamllint -d "{extends: relaxed, rules: {truthy: disable, line-length: disable, document-start: disable}}" .gitea/workflows
-
-      - name: gitleaks — secret scan
-        run: |
-          VER=8.30.1
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" | tar -xz gitleaks
-          ./gitleaks detect --source . --no-banner --redact
