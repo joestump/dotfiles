@@ -12,6 +12,14 @@ OS="$(uname -s)"
 # `chezmoi apply` re-runs this script (run_onchange keys on its rendered content).
 SIGNAL_CLI_VER="0.14.5"
 
+# On macOS, setsid isn't available. Implement a basic fallback using perl
+# (pre-installed on macOS) to create a new session and exec.
+if ! command -v setsid >/dev/null 2>&1; then
+  setsid() {
+    perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' -- "$@"
+  }
+fi
+
 # Clean progress via the shared UI lib (spinner on a TTY, quiet "→ … ok" otherwise);
 # fallback keeps the script working if the lib hasn't been applied yet.
 . "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {

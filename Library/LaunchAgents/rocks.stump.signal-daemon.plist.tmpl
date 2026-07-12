@@ -8,7 +8,7 @@
     <array>
         <!-- No -d: signal-cli uses its default data dir ($XDG_DATA_HOME/signal-cli,
              i.e. ~/.local/share/signal-cli) — the same place `signal-cli link` writes. -->
-        <string>{{ lookPath "signal-cli" }}</string>
+        <string>{{ lookPath "signal-cli" | default "/opt/homebrew/bin/signal-cli" }}</string>
         <string>-a</string>
         <string>{{ .signalNumber }}</string>
         <string>daemon</string>

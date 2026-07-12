@@ -47,8 +47,8 @@ jobs:
         uses: https://gitea.stump.rocks/stumpcloud/gitea-aibot-action@main
         env:
           # --- harness selection (env var, as requested) ----------------------
-          AIBOT_HARNESS: ${{ vars.AIBOT_HARNESS || 'claude' }}        # claude | opencode
-          AIBOT_MODEL:   ${{ vars.AIBOT_MODEL   || 'claude-haiku-4-5' }}
+          AIBOT_HARNESS: ${{ vars.AIBOT_HARNESS || 'opencode' }}        # claude | opencode
+          AIBOT_MODEL:   ${{ vars.AIBOT_MODEL   || 'qwen2.5-coder:14b-instruct' }}
 
           # --- LiteLLM endpoint (Anthropic-compatible gateway) --------------
           AIBOT_LITELLM_BASE_URL: ${{ secrets.AIBOT_LITELLM_BASE_URL }}  # e.g. https://litellm.stump.rocks

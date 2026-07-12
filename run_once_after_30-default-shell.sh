@@ -16,7 +16,9 @@ esac
 [ "$current" = "$zsh_bin" ] && { echo "login shell already $zsh_bin"; exit 0; }
 
 echo "==> setting login shell to $zsh_bin (was: ${current:-unknown})"
-grep -qxF "$zsh_bin" /etc/shells 2>/dev/null || echo "$zsh_bin" | sudo tee -a /etc/shells >/dev/null
-sudo chsh -s "$zsh_bin" "$USER" 2>/dev/null \
-  || chsh -s "$zsh_bin" 2>/dev/null \
-  || echo "WARN: couldn't change login shell automatically — run: chsh -s $zsh_bin"
+if ! grep -qxF "$zsh_bin" /etc/shells 2>/dev/null; then
+  echo "$zsh_bin" | sudo tee -a /etc/shells >/dev/null 2>&1 || echo "WARN: could not add $zsh_bin to /etc/shells" >&2
+fi
+{ sudo chsh -s "$zsh_bin" "$USER" 2>/dev/null \
+  || chsh -s "$zsh_bin" 2>/dev/null; } \
+  || echo "WARN: couldn't change login shell automatically — run: chsh -s $zsh_bin" >&2

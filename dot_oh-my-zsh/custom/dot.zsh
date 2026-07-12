@@ -30,7 +30,7 @@ theme() {
 
 # _skills_freshness — read ~/.config/dotfiles/claude-plugins.tsv, compare each
 # local-path marketplace's current git HEAD against its installed sentinel (written
-# by run_after_install-claude-plugins.sh.tmpl), and print "<fresh>/<total>". Remote
+# by run_after_31-install-claude-plugins.sh.tmpl), and print "<fresh>/<total>". Remote
 # marketplaces (GitHub) can't be freshness-checked without a network fetch, so they
 # count as fresh here — the install script handles them with `claude plugin update`.
 _skills_freshness() {

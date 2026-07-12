@@ -32,8 +32,8 @@ case "$(uname -s)" in
       exit 0
     fi
     # Reload so updated args take effect; tolerate 'not loaded' on first run.
-    launchctl unload "$plist" 2>/dev/null || true
-    if launchctl load -w "$plist" 2>/dev/null; then
+    launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
       :   # quiet on success
     else
       echo "WARN: couldn't load signal-daemon; start it later with 'signal-daemon start'."

@@ -6,7 +6,7 @@
     <string>rocks.stump.vault-agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{{ lookPath "vault" }}</string>
+        <string>{{ lookPath "vault" | default "/opt/homebrew/bin/vault" }}</string>
         <string>agent</string>
         <string>-config={{ .chezmoi.homeDir }}/.config/vault/agent.hcl</string>
     </array>
