@@ -1,0 +1,35 @@
+---
+# Secret scan via the shared stumpcloud/gitleaks-action: a verbose git-history
+# scan, an HTML report published to Garage, and a PR comment on findings. Reads
+# .gitleaks.toml from the repo. Replaces the inline `gitleaks detect` step that
+# used to run in ci.yml (working-tree only) with the full-history action.
+name: Secret scan (gitleaks)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the whole commit range is scanned, not just the tip.
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: https://gitea.stump.rocks/stumpcloud/gitleaks-action@v1
+        with:
+          pages-access-key-id: ${{ secrets.PAGES_ACCESS_KEY_ID }}
+          pages-secret-access-key: ${{ secrets.PAGES_SECRET_ACCESS_KEY }}
+          gitea-token: ${{ secrets.GITEA_TOKEN }}
