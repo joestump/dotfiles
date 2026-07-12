@@ -1,36 +1,52 @@
 {
   "$schema": "https://charm.land/crush.json",
+{{- /* Providers render only when their secret is present in the env at apply
+       time (Vault Agent renders them into the shell that runs `czu`). No provider
+       is hardcoded and no default model is pinned — Crush picks from whatever
+       providers materialized. Leading-comma separator ($sep) keeps the JSON valid
+       when any subset (including none) is enabled. */ -}}
   "providers": {
-    "openai": {
+{{- $sep := "" }}
+{{- if env "OPENAI_DIRECT_API_KEY" }}
+    {{ $sep }}"openai": {
       "type": "openai",
       "name": "OpenAI",
-      "api_key": "$OPENAI_API_KEY",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "$OPENAI_DIRECT_API_KEY",
       "discover_models": true
-    },
-    "litellm": {
+    }
+{{- $sep = "," }}
+{{- end }}
+{{- if env "LITELLM_API_KEY" }}
+    {{ $sep }}"litellm": {
       "type": "litellm",
       "name": "LiteLLM (StumpCloud)",
       "base_url": "{{ .litellmUrl }}",
       "api_key": "$LITELLM_API_KEY",
       "discover_models": true
-    },
-    "zai": {
+    }
+{{- $sep = "," }}
+{{- end }}
+{{- if env "GEMINI_API_KEY" }}
+    {{ $sep }}"gemini": {
+      "type": "openai-compat",
+      "name": "Google Gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "api_key": "$GEMINI_API_KEY",
+      "discover_models": true
+    }
+{{- $sep = "," }}
+{{- end }}
+{{- if env "ZAI_API_TOKEN" }}
+    {{ $sep }}"zai": {
       "type": "openai-compat",
       "name": "Z.ai (GLM Coding Plan)",
       "base_url": "$ZAI_BASE_URL",
       "api_key": "$ZAI_API_TOKEN",
       "discover_models": true
     }
-  },
-  "models": {
-    "large": {
-      "provider": "litellm",
-      "model": "Qwen3-Coder:480b"
-    },
-    "small": {
-      "provider": "litellm",
-      "model": "gpt-oss:120b"
-    }
+{{- $sep = "," }}
+{{- end }}
   },
   "lsp": {
     "go": {
@@ -153,6 +169,9 @@
     }
   },
   "options": {
+    "disable_default_providers": true,
+    "disable_provider_auto_update": true,
+    "disable_metrics": true,
     "context_paths": [
       "AGENTS.md",
       "CRUSH.md",
