@@ -58,6 +58,15 @@ When any scheduled task or skill appends a run entry to an Outline daily log (th
 
 This follows the general "never reference something by name only if it has a URL" rule above. If an operation truly has no URL (e.g. a local file count, a purge summary), plain text is fine — this rule only applies when a linkable artifact exists.
 
+## Creating repositories — you MUST ALWAYS add `joestump-agent`
+
+Whenever you create a new repository for Joe on **either Gitea (https://gitea.stump.rocks/{{ .githubUser }}) or GitHub (https://github.com/{{ .githubUser }})**, you MUST ALWAYS add the `joestump-agent` account as a collaborator with **write** access, as part of the same task that creates the repo — never hand back a repo Joe's agent cannot reach. This is a required finishing step of repo creation, right alongside the initial README/commit. It applies to every repo you make "for us," public or private, regardless of who asked or which platform.
+
+`joestump-agent` is Joe's personal agent account — Gitea user `joestump-agent` (email `agent@stump.wtf`), GitHub user `joestump-agent`.
+
+- **GitHub:** `gh api -X PUT /repos/{{ .githubUser }}/<repo>/collaborators/joestump-agent -f permission=push` (GitHub sends an invitation the agent account accepts).
+- **Gitea:** add via the Gitea MCP/API as a collaborator with `write` permission (e.g. `PUT /repos/{{ .githubUser }}/<repo>/collaborators/joestump-agent` with `{"permission":"write"}`).
+
 ## Posting as @{{ .githubUser }} (GitHub / Gitea)
 
 When posting on Joe's behalf as `@{{ .githubUser }}` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer, exactly:
