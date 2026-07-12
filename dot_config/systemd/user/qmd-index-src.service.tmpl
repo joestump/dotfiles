@@ -1,0 +1,11 @@
+# Scheduled qmd re-index of ~/src — systemd USER oneshot (no sudo). Fired by
+# qmd-index-src.timer (daily). macOS uses the launchd equivalent
+# (rocks.stump.qmd-index-src.plist). Managed by chezmoi.
+[Unit]
+Description=Re-index ~/src into qmd (one collection per repo)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/zsh %h/.config/dotfiles/qmd-index-src.zsh
+StandardOutput=append:%h/.cache/qmd-index-src.log
+StandardError=append:%h/.cache/qmd-index-src.log

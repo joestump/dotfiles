@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Index ~/src into qmd (one collection per top-level repo) on apply.
+# Delegates to the single source of truth so an on-apply index behaves exactly
+# like `dot` → "Re-index ~/src (qmd)". Re-runs whenever that runner changes
+# (hash embedded below) — i.e. on first install and whenever the logic is edited.
+#
+# runner hash: {{ include "dot_config/dotfiles/executable_qmd-index-src.zsh" | sha256sum }}
+set -euo pipefail
+
+runner="$HOME/.config/dotfiles/qmd-index-src.zsh"
+[ -x "$runner" ] || { echo "qmd-index-src runner not present yet; skipping (will retry next apply)."; exit 0; }
+
+# The runner soft-fails on its own (no ~/src, no qmd) and never exits non-zero,
+# so a missing dev tree or uninstalled qmd won't abort the apply.
+"$runner" || echo "WARN: qmd-index-src runner returned non-zero (continuing apply)."
