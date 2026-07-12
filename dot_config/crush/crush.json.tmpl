@@ -43,7 +43,19 @@
       "name": "Z.ai (GLM Coding Plan)",
       "base_url": "$ZAI_BASE_URL",
       "api_key": "$ZAI_API_TOKEN",
-      "discover_models": true
+      "discover_models": true,
+      "models": [
+{{- range $index, $model := .crush.zaiModels }}
+        {{ if $index }},{{ end }}{
+          "id": {{ $model.id | quote }},
+          "name": {{ $model.name | quote }},
+          "cost_per_1m_in": {{ $model.costPer1MIn }},
+          "cost_per_1m_out": {{ $model.costPer1MOut }},
+          "cost_per_1m_in_cached": {{ $model.costPer1MInCached }},
+          "cost_per_1m_out_cached": {{ $model.costPer1MOutCached }}
+        }
+{{- end }}
+      ]
     }
 {{- $sep = "," }}
 {{- end }}
