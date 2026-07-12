@@ -1,6 +1,12 @@
 {
   "$schema": "https://charm.land/crush.json",
   "providers": {
+    "openai": {
+      "type": "openai",
+      "name": "OpenAI",
+      "api_key": "$OPENAI_API_KEY",
+      "discover_models": true
+    },
     "litellm": {
       "type": "litellm",
       "name": "LiteLLM (StumpCloud)",
