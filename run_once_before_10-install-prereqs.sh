@@ -37,7 +37,7 @@ elif [ "$OS" = "Linux" ] && command -v apt-get >/dev/null 2>&1; then
   sudo apt-get install -y zsh git curl ca-certificates gnupg
 
   # ---- Node 22 (qmd needs >= 22; Ubuntu ships an older nodejs) ----
-  # Runs here in the BEFORE phase so Node is present before run_onchange_install-qmd.
+  # Runs here in the BEFORE phase so Node is present before run_onchange_after_16-install-qmd.
   # NON-FATAL: Node is only needed by qmd (which skips cleanly without it). A
   # transient NodeSource/apt hiccup must NOT abort the whole bootstrap and leave the
   # box with no ~/.zshrc — so warn-and-continue rather than die under `set -e`.

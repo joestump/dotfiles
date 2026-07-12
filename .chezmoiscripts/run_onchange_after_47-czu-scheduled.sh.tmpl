@@ -12,9 +12,12 @@ set -euo pipefail
 if [ "$(uname -s)" = "Darwin" ]; then
   plist="$HOME/Library/LaunchAgents/rocks.stump.czu.plist"
   if [ -f "$plist" ]; then
-    launchctl unload "$plist" 2>/dev/null || true
-    launchctl load -w "$plist" 2>/dev/null \
-      || echo "WARN: could not load the scheduled-czu plist"
+    launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
+      :   # quiet on success
+    else
+      echo "WARN: could not load the scheduled-czu plist"
+    fi
   fi
   exit 0
 fi
