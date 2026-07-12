@@ -1,0 +1,13 @@
+# Timer for the scheduled qmd re-index of ~/src — systemd USER (no sudo). Runs
+# ~10min after login (staggered behind czu's 5min), then daily. Catches new
+# markdown that landed in ~/src without a chezmoi apply. Managed by chezmoi.
+[Unit]
+Description=Re-index ~/src into qmd daily
+
+[Timer]
+OnStartupSec=10min
+OnUnitActiveSec=1d
+Persistent=true
+
+[Install]
+WantedBy=timers.target

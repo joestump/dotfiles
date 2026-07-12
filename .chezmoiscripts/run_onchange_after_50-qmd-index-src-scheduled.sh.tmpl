@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Enable the scheduled qmd re-index of ~/src (daily).
+#   Linux: systemd --user timer.   macOS: launchd LaunchAgent (StartInterval).
+# Complements the apply-time hook (49) — that seeds/refreshes on `chezmoi apply`,
+# this keeps the index current between applies as new markdown lands in ~/src.
+# Re-runs whenever the runner or its units change (hashes embedded below).
+#
+# runner hash:  {{ include "dot_config/dotfiles/executable_qmd-index-src.zsh" | sha256sum }}
+# service hash: {{ include "dot_config/systemd/user/qmd-index-src.service.tmpl" | sha256sum }}
+# timer hash:   {{ include "dot_config/systemd/user/qmd-index-src.timer.tmpl" | sha256sum }}
+# plist hash:   {{ include "Library/LaunchAgents/rocks.stump.qmd-index-src.plist.tmpl" | sha256sum }}
+set -euo pipefail
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  plist="$HOME/Library/LaunchAgents/rocks.stump.qmd-index-src.plist"
+  if [ -f "$plist" ]; then
+    launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
+      :   # quiet on success
+    else
+      echo "WARN: could not load the scheduled qmd-index-src plist"
+    fi
+  fi
+  exit 0
+fi
+
+command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping scheduled qmd-index-src"; exit 0; }
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if ! systemctl --user daemon-reload 2>/dev/null; then
+  echo "WARN: no user systemd bus right now — enable later with: systemctl --user enable --now qmd-index-src.timer"
+  exit 0
+fi
+if systemctl --user enable --now qmd-index-src.timer 2>/dev/null; then
+  :   # quiet on success
+else
+  echo "WARN: couldn't enable qmd-index-src.timer yet."
+fi

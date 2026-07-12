@@ -51,6 +51,32 @@ Details (daemon control, troubleshooting): [Signal](claude/signal).
 Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
 `$''` is a heart.
 
+## Search `~/src` with qmd
+
+If `~/src` exists, apply indexes each **top-level repo** into its own
+[qmd](https://github.com/tobil/qmd) collection (named after the directory) for
+local hybrid markdown search — so agents can `qmd query -c <repo>` per project.
+The logic lives in one place, `~/.config/dotfiles/qmd-index-src.zsh`, and is driven
+three ways:
+
+```bash
+dot           # → "🔎 Re-index ~/src (qmd)"  (re-run any time)
+status        # → the 🔎 qmd row: collection count, doc total, embed state
+chezmoi apply # runs the same indexer (a run_onchange_after_ hook)
+```
+
+It also re-indexes **on its own, daily** (launchd on macOS, a systemd --user
+timer on Linux — the same mechanism as scheduled `czu`), so markdown that lands
+in `~/src` without a `chezmoi apply` still gets picked up. The scheduled run logs
+to `~/.cache/qmd-index-src.log` and, being idempotent, is safe to overlap with a
+manual re-index.
+
+Dirs with **no markdown** are skipped (no empty collections), and re-indexing is
+idempotent — existing collections are refreshed incrementally, not recreated. Only
+the BM25 (keyword) index is built automatically; the ~2GB embedding models are
+**opt-in** (exactly like the qmd install), so semantic search needs a manual
+`qmd embed` — that's the "embed pending" note the `status` panel shows.
+
 ## Update everything
 
 > 💡 **One step: `czu`** — brings this machine fully current in a single command: it

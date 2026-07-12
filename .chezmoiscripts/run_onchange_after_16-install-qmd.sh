@@ -9,9 +9,15 @@ command -v qmd >/dev/null 2>&1 && { echo "qmd present"; exit 0; }
 # Soft-fail: if a prereq is missing, SKIP qmd (exit 0) so the rest of the apply
 # still runs. It re-installs on the next apply once the prereq is satisfied — a
 # missing optional tool must never abort the whole bootstrap.
-NODE_MAJOR="$(node -v 2>/dev/null | sed 's/^v//; s/\..*//')"
-{ [ -n "$NODE_MAJOR" ] && [ "$NODE_MAJOR" -ge 22 ]; } || {
-  echo "WARN: skipping qmd — needs Node >= 22 (found: $(node -v 2>/dev/null || echo none)). Will retry on the next apply once Node is present."; exit 0; }
+if ! command -v node >/dev/null 2>&1; then
+  echo "WARN: skipping qmd — Node is absent. Will retry on the next apply once Node is present."
+  exit 0
+fi
+NODE_MAJOR="$(node -v | sed 's/^v//; s/\..*//')"
+if [ -z "$NODE_MAJOR" ] || [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "WARN: skipping qmd — needs Node >= 22 (found: $(node -v 2>/dev/null || echo none)). Will retry on the next apply once Node is present."
+  exit 0
+fi
 
 # sqlite with loadable-extension support (qmd's vec extension needs it). Invoke
 # the platform package manager; do not manage its lifecycle.

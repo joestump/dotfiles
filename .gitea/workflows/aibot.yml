@@ -1,0 +1,65 @@
+# Drop this into a target repo as .gitea/workflows/aibot.yml
+#
+# Fires only on author self-reference (see the `if:` pre-filter — it keeps the
+# container from spinning up for every comment; entrypoint.sh re-checks
+# authoritatively). Secrets/vars drive harness + model + endpoints.
+name: aibot
+
+on:
+  issue_comment:
+    types: [created]            # PR conversation comments → review / merge
+  pull_request_review_comment:
+    types: [created]            # author's inline review comments → address
+  pull_request_review:
+    types: [submitted]          # formal Approve → merge
+
+permissions:
+  contents: write               # push commits in `address` mode; merge in `merge` mode
+  pull-requests: write          # post reviews / comments
+  issues: write                 # comment on issues
+
+jobs:
+  aibot:
+    runs-on: ubuntu-latest
+    # Cheap gate: only proceed when the actor is the PR's own author.
+    if: >
+      (github.event_name == 'issue_comment'
+        && github.event.issue.pull_request != null
+        && github.event.comment.user.login == github.event.issue.user.login)
+      ||
+      (github.event_name == 'pull_request_review_comment'
+        && github.event.sender.login == github.event.pull_request.user.login)
+      ||
+      (github.event_name == 'pull_request_review'
+        && github.event.sender.login == github.event.pull_request.user.login)
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          # PR branch so `address` mode can commit + push back to it.
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref }}
+          fetch-depth: 0
+
+      - name: AI bot
+        # Full URL is required on Gitea: a bare `owner/repo` resolves against
+        # github.com (404), not your local instance. (Or set the instance's
+        # [actions] DEFAULT_ACTIONS_URL = self to allow the bare form.)
+        uses: https://gitea.stump.rocks/stumpcloud/gitea-aibot-action@main
+        env:
+          # --- harness selection (env var, as requested) ----------------------
+          AIBOT_HARNESS: ${{ vars.AIBOT_HARNESS || 'opencode' }}        # claude | opencode
+          AIBOT_MODEL: ${{ vars.AIBOT_MODEL   || 'qwen2.5-coder:14b-instruct' }}
+
+          # --- LiteLLM endpoint (Anthropic-compatible gateway) --------------
+          AIBOT_LITELLM_BASE_URL: ${{ secrets.AIBOT_LITELLM_BASE_URL }}  # e.g. https://litellm.stump.rocks
+          AIBOT_LITELLM_API_KEY: ${{ secrets.AIBOT_LITELLM_API_KEY }}
+
+          # --- Gitea (auto token is enough for same-repo comment + push) ------
+          AIBOT_GITEA_HOST: ${{ github.server_url }}
+          AIBOT_GITEA_TOKEN: ${{ github.token }}
+          AIBOT_BOT_LOGIN: ${{ vars.AIBOT_BOT_LOGIN }}                # loop guard (the token's user)
+
+      # Want the bot to reach Outline or any other MCP server? Don't configure it
+      # here — declare it in THIS repo's own .mcp.json (Claude Code) / opencode.json
+      # (OpenCode). The bot loads and trusts the repo's MCP servers automatically;
+      # only gitea-mcp is bundled. See the action README.

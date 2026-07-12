@@ -61,7 +61,7 @@ no plaintext key: it points at `https://litellm.stump.rocks/v1` with
 
 It can't be `go install`-ed (the fork keeps the upstream module path and ships no
 release binaries), so chezmoi clones the source via a git-repo external to
-`~/.local/share/crush-src` and `run_after_install-crush.sh` builds it to
+`~/.local/share/crush-src` and `run_after_30-install-crush.sh.tmpl` builds it to
 `~/.local/bin/crush` — which shadows any Homebrew `crush` (that dir sorts ahead on
 PATH). The build reruns only when the clone's HEAD moves.
 

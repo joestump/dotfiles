@@ -36,7 +36,7 @@ brew "qrencode"                # terminal QR for `signal-link` (link a new Signa
 brew "uv"                      # Python runner — launches the Signal MCP (uv run --directory ~/src/signal-mcp)
 brew "gum"                     # charm TUI toolkit — powers the `dot`/`theme`/`status` helpers
 brew "eza"                     # modern ls — backend for the eza OMZ plugin (ls/ll/la aliases)
-brew "go"                      # Go toolchain — builds the crush fork (run_after_install-crush) and enables go-tools.txt (GOTOOLCHAIN=auto fetches newer toolchains as go.mod demands)
+brew "go"                      # Go toolchain — builds the crush fork (run_after_30-install-crush) and enables go-tools.txt (GOTOOLCHAIN=auto fetches newer toolchains as go.mod demands)
 # (vault — the OpenBao client — is installed OS-aware; see the note above.)
 
 # ---- Optional: uncomment what you want; this is your "don't think about it"

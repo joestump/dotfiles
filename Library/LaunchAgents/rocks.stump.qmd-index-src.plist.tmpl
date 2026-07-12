@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>rocks.stump.qmd-index-src</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>{{ .chezmoi.homeDir }}/.config/dotfiles/qmd-index-src.zsh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <!-- The chezmoi apply hook already seeds the index on install/change, so we
+         don't RunAtLoad here (would re-run on every launchctl reload); the daily
+         StartInterval keeps it fresh. The runner is idempotent regardless. -->
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StartInterval</key>
+    <integer>86400</integer>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.cache/qmd-index-src.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.cache/qmd-index-src.log</string>
+</dict>
+</plist>
