@@ -48,16 +48,16 @@ jobs:
         env:
           # --- harness selection (env var, as requested) ----------------------
           AIBOT_HARNESS: ${{ vars.AIBOT_HARNESS || 'opencode' }}        # claude | opencode
-          AIBOT_MODEL:   ${{ vars.AIBOT_MODEL   || 'qwen2.5-coder:14b-instruct' }}
+          AIBOT_MODEL: ${{ vars.AIBOT_MODEL   || 'qwen2.5-coder:14b-instruct' }}
 
           # --- LiteLLM endpoint (Anthropic-compatible gateway) --------------
           AIBOT_LITELLM_BASE_URL: ${{ secrets.AIBOT_LITELLM_BASE_URL }}  # e.g. https://litellm.stump.rocks
-          AIBOT_LITELLM_API_KEY:  ${{ secrets.AIBOT_LITELLM_API_KEY }}
+          AIBOT_LITELLM_API_KEY: ${{ secrets.AIBOT_LITELLM_API_KEY }}
 
           # --- Gitea (auto token is enough for same-repo comment + push) ------
-          AIBOT_GITEA_HOST:  ${{ github.server_url }}
+          AIBOT_GITEA_HOST: ${{ github.server_url }}
           AIBOT_GITEA_TOKEN: ${{ github.token }}
-          AIBOT_BOT_LOGIN:   ${{ vars.AIBOT_BOT_LOGIN }}                # loop guard (the token's user)
+          AIBOT_BOT_LOGIN: ${{ vars.AIBOT_BOT_LOGIN }}                # loop guard (the token's user)
 
       # Want the bot to reach Outline or any other MCP server? Don't configure it
       # here — declare it in THIS repo's own .mcp.json (Claude Code) / opencode.json
