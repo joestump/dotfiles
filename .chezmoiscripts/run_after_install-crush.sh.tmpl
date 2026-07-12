@@ -44,12 +44,16 @@ WANT="{{ .crushRepo }}"
 if [ "$(git -C "$SRC" remote get-url origin 2>/dev/null)" != "$WANT" ]; then
   echo "==> repointing crush clone → $WANT"
   git -C "$SRC" remote set-url origin "$WANT"
-  if git -C "$SRC" fetch --quiet --prune origin; then
-    DEF="$(git -C "$SRC" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
-    git -C "$SRC" reset --hard "$DEF" >/dev/null 2>&1 || git -C "$SRC" reset --hard origin/main >/dev/null 2>&1 || true
-  else
-    warn "fetch after repoint failed — clone may still track the old fork"
-  fi
+fi
+
+# Always fetch and sync to origin's default branch on every apply so we have the
+# absolute latest commits without waiting for chezmoi's external refresh period.
+# Safe because nothing is developed in this clone.
+if git -C "$SRC" fetch --quiet --prune origin; then
+  DEF="$(git -C "$SRC" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+  git -C "$SRC" reset --hard "$DEF" >/dev/null 2>&1 || git -C "$SRC" reset --hard origin/main >/dev/null 2>&1 || true
+else
+  warn "fetch failed — building from current local state"
 fi
 
 # Building needs the Go toolchain (Brewfile installs it on macOS; on a headless

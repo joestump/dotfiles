@@ -44,7 +44,7 @@ _fakehome() {
 
 @test "vault-token: no-op (no error) when agent-token is missing" {
   local h; h="$(_fakehome)"   # dir exists, agent-token does not
-  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_PERSONAL_TOKEN+SET}]"'
+  run zsh -c 'export HOME="'"$h"'"; unset VAULT_PERSONAL_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_PERSONAL_TOKEN+SET}]"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"state=[]"* ]]
 }
@@ -52,7 +52,7 @@ _fakehome() {
 @test "vault-token: no-op when agent-token is empty (0 bytes)" {
   local h; h="$(_fakehome)"
   : > "$h/.config/vault/agent-token"
-  run zsh -c 'export HOME="'"$h"'"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_PERSONAL_TOKEN+SET}]"'
+  run zsh -c 'export HOME="'"$h"'"; unset VAULT_PERSONAL_TOKEN; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-token.zsh"; echo "state=[${VAULT_PERSONAL_TOKEN+SET}]"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"state=[]"* ]]
 }
