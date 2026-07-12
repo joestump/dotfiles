@@ -31,6 +31,98 @@ shlinkApiUrl: "https://u.stu.mp"
 # LITELLM_API_KEY), NOT here.
 litellmUrl: "https://litellm.stump.rocks/v1"
 
+# Z.ai model metadata for Crush. Prices are USD per 1M tokens and override the
+# corresponding models returned by Z.ai discovery; newly discovered models remain
+# available without pricing until they are added here. Cached output is not listed
+# by Z.ai, so it uses the regular output rate. Cached input storage is currently
+# free and is not a token price represented by Crush.
+crush:
+  zaiModels:
+    - id: "glm-5.2"
+      name: "GLM-5.2"
+      costPer1MIn: 1.4
+      costPer1MOut: 4.4
+      costPer1MInCached: 0.26
+      costPer1MOutCached: 4.4
+    - id: "glm-5.1"
+      name: "GLM-5.1"
+      costPer1MIn: 1.4
+      costPer1MOut: 4.4
+      costPer1MInCached: 0.26
+      costPer1MOutCached: 4.4
+    - id: "glm-5"
+      name: "GLM-5"
+      costPer1MIn: 1.0
+      costPer1MOut: 3.2
+      costPer1MInCached: 0.2
+      costPer1MOutCached: 3.2
+    - id: "glm-5-turbo"
+      name: "GLM-5-Turbo"
+      costPer1MIn: 1.2
+      costPer1MOut: 4.0
+      costPer1MInCached: 0.24
+      costPer1MOutCached: 4.0
+    - id: "glm-4.7"
+      name: "GLM-4.7"
+      costPer1MIn: 0.6
+      costPer1MOut: 2.2
+      costPer1MInCached: 0.11
+      costPer1MOutCached: 2.2
+    - id: "glm-4.7-flashx"
+      name: "GLM-4.7-FlashX"
+      costPer1MIn: 0.07
+      costPer1MOut: 0.4
+      costPer1MInCached: 0.01
+      costPer1MOutCached: 0.4
+    - id: "glm-4.6"
+      name: "GLM-4.6"
+      costPer1MIn: 0.6
+      costPer1MOut: 2.2
+      costPer1MInCached: 0.11
+      costPer1MOutCached: 2.2
+    - id: "glm-4.5"
+      name: "GLM-4.5"
+      costPer1MIn: 0.6
+      costPer1MOut: 2.2
+      costPer1MInCached: 0.11
+      costPer1MOutCached: 2.2
+    - id: "glm-4.5-x"
+      name: "GLM-4.5-X"
+      costPer1MIn: 2.2
+      costPer1MOut: 8.9
+      costPer1MInCached: 0.45
+      costPer1MOutCached: 8.9
+    - id: "glm-4.5-air"
+      name: "GLM-4.5-Air"
+      costPer1MIn: 0.2
+      costPer1MOut: 1.1
+      costPer1MInCached: 0.03
+      costPer1MOutCached: 1.1
+    - id: "glm-4.5-airx"
+      name: "GLM-4.5-AirX"
+      costPer1MIn: 1.1
+      costPer1MOut: 4.5
+      costPer1MInCached: 0.22
+      costPer1MOutCached: 4.5
+    - id: "glm-4-32b-0414-128k"
+      name: "GLM-4-32B-0414-128K"
+      costPer1MIn: 0.1
+      costPer1MOut: 0.1
+      costPer1MInCached: 0.1
+      costPer1MOutCached: 0.1
+    - id: "glm-4.7-flash"
+      name: "GLM-4.7-Flash"
+      costPer1MIn: 0.0
+      costPer1MOut: 0.0
+      costPer1MInCached: 0.0
+      costPer1MOutCached: 0.0
+    - id: "glm-4.5-flash"
+      name: "GLM-4.5-Flash"
+      costPer1MIn: 0.0
+      costPer1MOut: 0.0
+      costPer1MInCached: 0.0
+      costPer1MOutCached: 0.0
+
 # Gitea base URL. Non-secret; used as GITEA_HOST for the crush `gitea` MCP. The
 # token half comes from OpenBao (secret/users/<you>/… → GITEA_TOKEN), NOT here.
 giteaUrl: "https://gitea.stump.rocks"
