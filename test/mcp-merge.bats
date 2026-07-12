@@ -25,7 +25,7 @@ _home_with() {
 
 @test "mcp_secret falls back to the live value when the var is absent" {
   local h; h="$(_home_with 'export SOMETHING_ELSE="x"')"
-  run bash -c 'export HOME="'"$h"'"; . "'"$LIB"'"; mcp_secret karakeep KARAKEEP_API_KEY "live_fallback"'
+  run bash -c 'export HOME="'"$h"'"; unset KARAKEEP_API_KEY; . "'"$LIB"'"; mcp_secret karakeep KARAKEEP_API_KEY "live_fallback"'
   [ "$status" -eq 0 ]
   [ "$output" = "live_fallback" ]
 }
