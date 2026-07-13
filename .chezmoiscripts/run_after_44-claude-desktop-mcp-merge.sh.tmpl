@@ -34,8 +34,8 @@ OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "
 # Claude Desktop only exists on macOS/Windows, so in practice this is the macOS branch,
 # but resolve per-OS for correctness. The daemon (tcp 127.0.0.1:7583) is launchd-run.
 {{- if eq .chezmoi.os "darwin" }}
-SIG_UV="/opt/homebrew/bin/uv"
-SIG_PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+SIG_UV="{{ (lookPath "uv") | default "/opt/homebrew/bin/uv" }}"
+SIG_PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 {{- else }}
 SIG_UV="{{ .chezmoi.homeDir }}/.local/bin/uv"
 SIG_PATH="{{ .chezmoi.homeDir }}/.local/bin:/usr/bin:/bin:/usr/local/bin"
