@@ -192,7 +192,11 @@ ensure_claude() {
       # Run in a new session so the whole installer tree (curl | bash → claude install)
       # shares one process group we can signal; a watchdog TERM/KILLs that group if the
       # install runs long, instead of us orphaning a hung child like the old code could.
-      setsid bash -c 'curl -fsSL https://claude.ai/install.sh | bash' </dev/null &
+      if [ "$OS" = "Darwin" ]; then
+        bash -c 'curl -fsSL https://claude.ai/install.sh | bash' </dev/null &
+      else
+        setsid bash -c 'curl -fsSL https://claude.ai/install.sh | bash' </dev/null &
+      fi
       local ci_pgid=$! ci_rc=0
       { sleep 180; kill -TERM -"$ci_pgid" 2>/dev/null; sleep 5; kill -KILL -"$ci_pgid" 2>/dev/null; } &
       local ci_wd=$!

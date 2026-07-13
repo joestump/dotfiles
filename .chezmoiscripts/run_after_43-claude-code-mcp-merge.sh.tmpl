@@ -51,14 +51,16 @@ SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
 desired="$(mcp_base | jq \
   --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
-    .karakeep.env.KARAKEEP_API_KEY             = $kk
+    (if $kk != "" then .karakeep.env.KARAKEEP_API_KEY = $kk else . end)
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
   # github: REMOTE hosted MCP — native http + PAT Bearer (no Docker / local runtime).
-  | .github = {type:"http", url:"https://api.githubcopilot.com/mcp/",
-               headers:{"Authorization": ("Bearer " + $gh)}}
+  # Only set when the token resolved non-empty so a fresh machine does not get a
+  # broken "Bearer " entry baked in (dotfiles#15). A later apply fills it in.
+  | (if $gh != "" then .github = {type:"http", url:"https://api.githubcopilot.com/mcp/",
+               headers:{"Authorization": ("Bearer " + $gh)}} else . end)
   # outline: native http + a STATIC Bearer token (no OAuth/refresh tokens), baked.
-  | .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
-                headers:{"Authorization": ("Bearer " + $ot)}}
+  | (if $ot != "" then .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
+                headers:{"Authorization": ("Bearer " + $ot)}} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {type:"stdio", command:$uv,
                args:["run","--directory",$sigdir,"server","--user-id","{{ .signalNumber }}","--transport","stdio"],

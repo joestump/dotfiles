@@ -47,13 +47,14 @@ SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
 desired="$(mcp_base | jq \
   --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
-    .gitea.env.GITEA_ACCESS_TOKEN              = $gt
-  | .karakeep.env.KARAKEEP_API_KEY             = $kk
+    (if $gt != "" then .gitea.env.GITEA_ACCESS_TOKEN = $gt else . end)
+  | (if $kk != "" then .karakeep.env.KARAKEEP_API_KEY = $kk else . end)
   # github: REMOTE hosted MCP via the mcp-remote stdio bridge + PAT Bearer (no Docker).
-  | .github = {command:"npx", args:["-y","mcp-remote","https://api.githubcopilot.com/mcp/",
-                                     "--header", ("Authorization:Bearer " + $gh)]}
-  | .outline = {command:"npx", args:["-y","mcp-remote","https://outline.stump.rocks/mcp",
-                                      "--header", ("Authorization:Bearer " + $ot)]}
+  # Only set when the token resolved non-empty (dotfiles#15).
+  | (if $gh != "" then .github = {command:"npx", args:["-y","mcp-remote","https://api.githubcopilot.com/mcp/",
+                                     "--header", ("Authorization:Bearer " + $gh)]} else . end)
+  | (if $ot != "" then .outline = {command:"npx", args:["-y","mcp-remote","https://outline.stump.rocks/mcp",
+                                      "--header", ("Authorization:Bearer " + $ot)]} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {command:$uv,
                args:["run","--directory",$sigdir,"server","--user-id","{{ .signalNumber }}","--transport","stdio"],

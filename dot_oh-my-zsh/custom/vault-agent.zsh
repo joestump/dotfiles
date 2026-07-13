@@ -7,10 +7,13 @@ vault-agent() {
   if [[ "$OSTYPE" == darwin* ]]; then
     local plist="$HOME/Library/LaunchAgents/rocks.stump.vault-agent.plist"
     case "$1" in
-      start|load)  launchctl load -w "$plist" && echo "vault-agent loaded" ;;
-      stop|unload) launchctl unload -w "$plist" && echo "vault-agent unloaded" ;;
-      restart)     launchctl unload "$plist" 2>/dev/null; launchctl load -w "$plist" && echo "vault-agent restarted" ;;
-      status)      launchctl list | grep -E 'rocks\.stump\.vault-agent' || echo "vault-agent: not loaded" ;;
+      start|load)  launchctl bootstrap "gui/$(id -u)" "$plist" && echo "vault-agent loaded" ;;
+      stop|unload) launchctl bootout "gui/$(id -u)" "$plist" && echo "vault-agent unloaded" ;;
+      restart)
+        launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+        launchctl bootstrap "gui/$(id -u)" "$plist" && echo "vault-agent restarted"
+        ;;
+      status)      launchctl list rocks.stump.vault-agent >/dev/null 2>&1 && echo "rocks.stump.vault-agent" || echo "vault-agent: not loaded" ;;
       log)         tail -f "$HOME/.config/vault/agent.log" ;;
       env)         cat "$HOME"/.config/vault/secrets-*.env 2>/dev/null || echo "no rendered secrets yet" ;;
       *) print -u2 "usage: vault-agent {start|stop|restart|status|log|env}"; return 2 ;;

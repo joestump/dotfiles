@@ -66,7 +66,7 @@ status() {
   _have gum || { print -u2 "status: needs gum"; return 1 }
   local host="${HOST%%.*}" va sd df disk pend skills sk_color
   if [[ "$OSTYPE" == darwin* ]]; then
-    launchctl list 2>/dev/null | grep -q 'rocks\.stump\.vault-agent' && va=up || va=down
+    launchctl list rocks.stump.vault-agent >/dev/null 2>&1 && va=up || va=down
   else
     systemctl --user is-active --quiet vault-agent 2>/dev/null && va=up || va=down
   fi

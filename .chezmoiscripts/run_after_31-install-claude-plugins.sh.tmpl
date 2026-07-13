@@ -40,7 +40,7 @@ installed="$(claude plugin list 2>/dev/null || true)"
 }
 
 heading "🔌 Claude plugins"
-while read -r src plugin _rest; do
+while read -r src plugin _rest <&3 || [ -n "${src:-}" ]; do
   case "$src" in ''|\#*) continue ;; esac
   [ -n "${plugin:-}" ] || continue
   src="${src/#\~/$HOME}"                              # expand a leading ~
@@ -52,14 +52,17 @@ while read -r src plugin _rest; do
   head=""
   [ -d "$src/.git" ] && head="$(git -C "$src" rev-parse HEAD 2>/dev/null || true)"
 
-  if ! grep -qF "$plugin" <<<"$installed"; then
-    claude plugin marketplace add "$src" >/dev/null 2>&1 || claude plugin marketplace update "$mp" >/dev/null 2>&1 || true
-    if step "$plugin" -- claude plugin install "$plugin"; then printf '%s' "$head" >"$sentinel"; else warn "install $plugin failed"; fi
+  # Exact-name match: `claude plugin list` prints one plugin per line; a bare
+  # grep -F would substring-match (e.g. qmd@qmd inside my-qmd@qmd). Anchor with
+  # -x so the WHOLE line must equal the plugin name (dotfiles#19).
+  if ! grep -qxF "$plugin" <<<"$installed"; then
+    claude plugin marketplace add "$src" </dev/null >/dev/null 2>&1 || claude plugin marketplace update "$mp" </dev/null >/dev/null 2>&1 || true
+    if step "$plugin" -- claude plugin install "$plugin" </dev/null; then printf '%s' "$head" >"$sentinel"; else warn "install $plugin failed"; fi
   elif [ -n "$head" ] && [ "$head" != "$(cat "$sentinel" 2>/dev/null || true)" ]; then
-    claude plugin marketplace update "$mp" >/dev/null 2>&1 || true
-    claude plugin uninstall "$plugin" >/dev/null 2>&1 || true
-    if step "$plugin → ${head:0:7}" -- claude plugin install "$plugin"; then printf '%s' "$head" >"$sentinel"; else warn "refresh $plugin failed"; fi
+    claude plugin marketplace update "$mp" </dev/null >/dev/null 2>&1 || true
+    claude plugin uninstall "$plugin" </dev/null >/dev/null 2>&1 || true
+    if step "$plugin → ${head:0:7}" -- claude plugin install "$plugin" </dev/null; then printf '%s' "$head" >"$sentinel"; else warn "refresh $plugin failed"; fi
   else
     item ok "$plugin"
   fi
-done < "$LIST"
+done 3< "$LIST"
