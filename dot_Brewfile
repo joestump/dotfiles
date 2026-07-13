@@ -2,16 +2,17 @@
 # Installed with `brew bundle --global` (run automatically by the chezmoi
 # bootstrap, and any time: `brew bundle --global`).
 #
-# Cross-platform: works on macOS and on Ubuntu/Linux via Homebrew. `cask` lines
-# are macOS-only and guarded with `if OS.mac?`.
+# macOS-only for Homebrew tooling. Linux nodes use apt (see
+# dot_config/dotfiles/apt-packages.txt). `cask` lines are macOS-only and
+# guarded with `if OS.mac?`.
 #
 # ADD NEW TOOLING HERE — drop a `brew "name"` line, run `chezmoi apply` (or
 # `brew bundle --global`), and never remember the install command again.
 
 # NOTE: `vault` (the OpenBao-compatible client) is intentionally NOT here. It
 # lives in hashicorp/tap (macOS) or HashiCorp's apt repo (Ubuntu) and is
-# installed by an OS-aware step in run_once_after_10-install-packages.sh. Keeping
-# it out of the Brewfile avoids tap-trust friction so `brew bundle check` is clean.
+# installed by an OS-aware step in run_onchange_after_10-install-packages.sh.tmpl.
+# Keeping it out of the Brewfile avoids tap-trust friction so `brew bundle check` is clean.
 
 # ---- Required: tooling this dotfiles setup depends on ----
 brew "chezmoi"
