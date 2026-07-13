@@ -15,6 +15,7 @@
 [".oh-my-zsh/custom/plugins/zsh-autosuggestions"]
     type = "git-repo"
     url = "https://github.com/zsh-users/zsh-autosuggestions.git"
+    revision = "v0.7.1"
     refreshPeriod = "168h"
 [".oh-my-zsh/custom/plugins/zsh-autosuggestions".pull]
     args = ["--ff-only", "--quiet"]
@@ -22,6 +23,7 @@
 [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
     type = "git-repo"
     url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+    revision = "0.8.0"
     refreshPeriod = "168h"
 [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting".pull]
     args = ["--ff-only", "--quiet"]
@@ -29,6 +31,7 @@
 [".oh-my-zsh/custom/plugins/zsh-ai"]
     type = "git-repo"
     url = "https://github.com/matheusml/zsh-ai.git"
+    revision = "v0.9.3"
     refreshPeriod = "168h"
 [".oh-my-zsh/custom/plugins/zsh-ai".pull]
     args = ["--ff-only", "--quiet"]
@@ -46,6 +49,7 @@
 [".oh-my-zsh/custom/themes/spaceship-prompt"]
     type = "git-repo"
     url = "https://github.com/spaceship-prompt/spaceship-prompt.git"
+    revision = "v4.22.5"
     refreshPeriod = "168h"
 [".oh-my-zsh/custom/themes/spaceship-prompt".pull]
     args = ["--ff-only", "--quiet"]
@@ -53,6 +57,7 @@
 [".oh-my-zsh/custom/themes/powerlevel10k"]
     type = "git-repo"
     url = "https://github.com/romkatv/powerlevel10k.git"
+    revision = "v1.9.1"
     refreshPeriod = "168h"
 [".oh-my-zsh/custom/themes/powerlevel10k".pull]
     args = ["--ff-only", "--quiet"]
@@ -60,6 +65,7 @@
 [".oh-my-zsh/custom/themes/quantum-zsh"]
     type = "git-repo"
     url = "https://github.com/calebephrem/quantum-zsh.git"
+    revision = "7b567d5603a0aaf7ff9117cc2dcc537ed591c163"
     refreshPeriod = "168h"
 [".oh-my-zsh/custom/themes/quantum-zsh".pull]
     args = ["--ff-only", "--quiet"]

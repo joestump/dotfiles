@@ -33,10 +33,10 @@ echo "==> enabling aws secrets engine (idempotent)"
 vault secrets enable -path=aws aws 2>/dev/null || echo "    (already enabled)"
 
 echo "==> configuring root credential + region"
-vault write aws/config/root \
-  access_key="$AWS_VAULT_ROOT_ACCESS_KEY" \
-  secret_key="$AWS_VAULT_ROOT_SECRET_KEY" \
-  region="$REGION"
+# Feed over stdin JSON to avoid exposing secrets in argv (dotfiles#11).
+vault write aws/config/root - <<EOF
+{"access_key":"$AWS_VAULT_ROOT_ACCESS_KEY","secret_key":"$AWS_VAULT_ROOT_SECRET_KEY","region":"$REGION"}
+EOF
 
 echo "==> lease TTLs for issued creds (1h default, 24h max)"
 vault write aws/config/lease lease=1h lease_max=24h 2>/dev/null || true
