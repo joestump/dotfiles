@@ -24,17 +24,22 @@ non-secret config, and secrets.
 
 ## What chezmoi manages — and what it must not
 
-chezmoi manages **only**:
+chezmoi manages:
 
-- `~/.zshrc` → source `dot_zshrc` (seeded verbatim from the OMZ-generated file; unchanged)
+- `~/.zshrc` → source `dot_zshrc` (seeded verbatim from the OMZ-generated file)
 - `~/.oh-my-zsh/custom/*.zsh` → source `dot_oh-my-zsh/custom/*.zsh`
+- `~/.Brewfile` → source `dot_Brewfile` (declarative tooling)
+- `~/.config/{vault,dotfiles,ghostty,git,chezmoi,crush}/` → config trees
+- `~/.claude/CLAUDE.md` → Claude Code project instructions
+- `Library/LaunchAgents/` → macOS launchd plists (vault-agent, signal, czu)
+- `.chezmoiscripts/` → install + service-setup scripts
 
 Everything else under `~/.oh-my-zsh/` is owned by OMZ's own self-update and is
 excluded by `.chezmoiignore`:
 
 ```
-.oh-my-zsh/**
-!.oh-my-zsh/custom/**
+.oh-my-zsh/*
+!.oh-my-zsh/custom/
 .oh-my-zsh/custom/example.zsh
 ```
 
@@ -127,20 +132,21 @@ CLIENT: use the HashiCorp **`vault`** CLI (API-compatible with the OpenBao 2.5.0
 server). The Homebrew `bao` is the unrelated BLAKE3 hashing tool — NOT OpenBao;
 an earlier draft wrongly wired `[vault] command = "bao"` and was removed.
 
-Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
+Design (Joe's choice: Vault Agent + OMZ loader + AppRole auto-auth):
 
 - **Vault Agent** under launchd (`rocks.stump.vault-agent`) auto-auths via
-  `token_file` (`~/.vault-token`, seeded by an interactive `vault login -method=oidc`),
-  renews the token, and renders env files on a schedule. Validated: config parses
-  and the agent authenticates against the live server.
+  **AppRole** (role_id + secret_id, provisioned by `czapprole`/`czinit`), giving
+  the agent a self-renewing periodic token that never hits a max-TTL. The legacy
+  `token_file` auth (~/.vault-token from an interactive OIDC login) is kept as a
+  fallback only. The agent renews and renders env files on a schedule.
 - **Per-user KV layout.** Each identity's secrets live under
   `secret/users/<os-login>/<category>` (e.g. `secret/users/joestump/gitea`,
   `secret/users/joestump-agent/gitea`), so hosts sharing one OpenBao never cross
   identities. The render is scoped by `$USER`, which the Vault Agent service
   exports (`vault-agent.service.tmpl` / the launchd plist).
 - **Templates** (Consul-Template `*.ctmpl`, kept separate from chezmoi templating):
-  `secrets-static.env` ← KV `secret/users/$USER/*`; `secrets-aws.env` ← dynamic
-  `aws/creds/personal-cli`. `exit_on_retry_failure=false` so a not-yet-configured
+  `secrets-static.env` ← KV `secret/users/$USER/*`; `secrets-aws.env` ← static KV
+  `secret/users/$USER/aws`. `exit_on_retry_failure=false` so a not-yet-configured
   engine doesn't crash the agent.
 - **SSH keys use the same auto-discovery as env vars.** `ssh-keys.ctmpl` ranges
   over every field of `secret/users/$USER/ssh` and `writeToFile`s each to
@@ -154,8 +160,9 @@ Design (Joe's choice: Vault Agent + OMZ loader + dynamic AWS):
   (0600) are never committed.
 
 Static secrets stay in KV (`secret/users/<you>/{llm,gitea,pocketid,garage}`); **AWS
-moves to dynamic, short-lived credentials** (auto-rotated by the agent), retiring
-the static AWS keys entirely.
+credentials** are also static KV (`secret/users/<you>/aws`), rendered by the agent
+into `secrets-aws.env`. (An earlier design planned dynamic `aws/creds/` creds, but
+the static KV approach is what shipped.)
 
 Remaining (Joe-owned): `vault login` → `scripts/load-static-secrets.sh` →
 `scripts/openbao-aws-setup.sh` (server-side, admin + AWS root cred) →

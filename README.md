@@ -7,8 +7,13 @@ one macOS hub (required — parts of the stack have no Linux desktop apps), any
 number of Linux spokes. Full docs, including install:
 <https://joestump.pages.stump.rocks/dotfiles/>
 
-chezmoi manages **only** `~/.zshrc` and `~/.oh-my-zsh/custom/`. Oh My Zsh
-self-updates the rest of its tree and is never touched by chezmoi.
+chezmoi manages `~/.zshrc`, `~/.oh-my-zsh/custom/`, and several config trees
+(`~/.Brewfile`, `~/.config/{vault,ghostty,dotfiles,chezmoi}`, `~/.config/git/`,
+`Library/LaunchAgents/`, and install scripts under `.chezmoiscripts/`). OMZ
+self-updates the rest of its tree, guarded by `.chezmoiignore`.
+
+Full docs at the **[published website](https://joestump.pages.stump.rocks/dotfiles/)**
+(`website/docs/` is the canonical source).
 
 ## Docs
 
@@ -46,20 +51,28 @@ blocks accidental secret commits.
 dot_zshrc                          → ~/.zshrc  (theme + plugins; seeded from OMZ)
 dot_oh-my-zsh/custom/*.zsh         → ~/.oh-my-zsh/custom/  (helpers + secrets loader)
 dot_Brewfile                       → ~/.Brewfile  (declarative tooling; brew bundle)
-dot_config/dotfiles/go-tools.txt   → Go tools to `go install`
+dot_config/dotfiles/               → manifests (apt-packages, go-tools, MCP defs, UI libs)
 dot_config/vault/                  → Vault Agent config + Consul-Templates
+dot_config/git/                    → git config + Gitea credential helper
+dot_config/chezmoi/                → chezmoi config (autoCommit/autoPush)
+dot_config/crush/                  → Crush (AI coding assistant) config
+dot_claude/                        → Claude Code project instructions
+Library/LaunchAgents/              → macOS launchd plists (vault-agent, signal, czu)
+.chezmoiscripts/                   → install + service-setup scripts (run on apply)
+.chezmoidata.yaml                  → non-secret template data (URLs, signal number)
 .chezmoiexternal.toml              → clones themes + external plugins on apply
-run_once_before_*.sh               → bootstrap: Homebrew + Oh My Zsh (+ apt prereqs on Linux)
-run_once_after_*.sh                → brew bundle + Go tools + vault; wire the gitleaks hook
-.chezmoiignore                     → keep chezmoi to .zshrc + custom/ (+ a few managed files)
+run_onchange_after_10-*.tmpl       → package install (Brewfile/apt + Go tools + Claude)
+run_once_before_10-*.sh            → bootstrap: Homebrew + Oh My Zsh (+ apt prereqs)
+.chezmoiignore                     → keep chezmoi out of OMZ's self-managed tree
 .githooks/  .gitleaks.toml         → secret-leak prevention
+website/                           → Docusaurus site (published via Gitea Pages)
 examples/  docs/  scripts/  test/  → repo-only (not applied to $HOME)
 ```
 
 ### Themes (swap via `ZSH_THEME` in `~/.zshrc`)
 
 `spaceship-prompt/spaceship` (default) · `powerlevel10k/powerlevel10k` ·
-`quantum-zsh/quantum`. Installed as externals — see
+`quantum-zsh/quantum` · `comfyline_prompt/comfyline`. Installed as externals — see
 [docs/usage.md](docs/usage.md#swap-the-prompt-theme).
 
 ## Add a helper (quick reference)
@@ -73,7 +86,7 @@ chezmoi cd && git add -A && git commit -m "Add my-helper" && git push && exit
 ## Tests
 
 BATS tests cover the shell logic (SSH-aware vault auth, the OMZ helper dispatch,
-secret loading). They run in Gitea Actions on every push (`.gitea/workflows/test.yml`).
+secret loading). They run in Gitea Actions on every push (`.gitea/workflows/ci.yml`).
 
 ```sh
 brew install bats-core

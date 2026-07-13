@@ -1,7 +1,7 @@
 # Go tools to install with `go install`. One module path per line; `@version`
 # optional (defaults to @latest if omitted). Lines starting with # are ignored.
 #
-# Installed automatically by run_once_after_10-install-packages.sh into
+# Installed automatically by run_onchange_after_10-install-packages.sh.tmpl into
 # `$(go env GOBIN)` (or $GOPATH/bin) whenever you `chezmoi apply`. Add a line
 # here and it shows up everywhere — no remembering `go install ...`.
 #

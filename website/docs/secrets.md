@@ -17,7 +17,7 @@ shell sources the result.
 ```mermaid
 flowchart TD
     bao["OpenBao<br/>KV: secret/users/<you>/*"]
-    agent["Vault Agent (launchd: rocks.stump.vault-agent)<br/>token_file auth (~/.vault-token) · renews the token · renders every ~5 min"]
+    agent["Vault Agent (launchd: rocks.stump.vault-agent)<br/>AppRole auth (role_id + secret_id) · self-renewing periodic token · renders every ~5 min"]
     files["~/.config/vault/secrets-*.env (0600)<br/>~/.ssh/id_rsa + id_rsa.pub"]
     shell["~/.oh-my-zsh/custom/00-secrets.zsh"]
     bao --> agent --> files -->|source| shell
@@ -48,7 +48,7 @@ That's it — no template edits. The agent discovers it.
 | See what it rendered | `vault-agent env` |
 | Tail its log | `vault-agent log` |
 | Force a re-render | `vault-agent restart` |
-| Re-auth (token hit max TTL) | `vault login -method=oidc` |
+| Re-auth (agent down) | `czapprole --local` (re-provisions AppRole) or `vault login -method=oidc` (fallback) |
 
 ## Over SSH (utility nodes)
 
