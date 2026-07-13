@@ -1,20 +1,23 @@
 # Crush agent rules
 
-## Git workflow
+## GitHub workflow
 
-- **One branch per work item.** Never reuse a merged branch. If a PR was squash-merged, create a new branch for follow-up work.
-- **Use git worktrees** when switching between parallel work items instead of stashing or branching in-place.
-- **Always open a PR.** Pushed code without a PR is unfinished work. If you finish implementation, push AND open the PR in the same turn.
-- **Never force-push to a branch that has an open PR** unless you are rebasing onto the latest main.
-- **Rebase, don't merge main into your feature branch.** Keep history linear.
+1. **Branch from latest main.** Run `git checkout main && git pull` before branching. Never reuse a merged branch.
+2. **Branch naming.** Use `feat/<short-description>`, `bug/<short-description>`, or `toil/<short-description>`.
+3. **Use git worktrees** when switching between parallel work items instead of stashing or branching in-place.
+4. **Rebase, don't merge main into your branch.** Keep history linear.
+5. **Commit with semantic prefixes** (`feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `sec:`).
+6. **Always open a PR.** Pushed code without a PR is unfinished work. Push AND open the PR in the same turn.
+7. **Label the PR.** Apply `feature`, `bug`, or `toil` label matching the branch type when creating the PR via `gh`.
+8. **Never force-push to a branch with an open PR** unless rebasing onto latest main.
+9. **Watch CI after pushing.** Run `gh pr checks` to verify CI status. Do not walk away after push — confirm CI is green.
+10. **CI must be green before merge.** If CI fails, fix immediately in the same branch.
 
 ## Code quality
 
 - **Every PR must include tests** for new or changed behavior. A PR with zero test files is incomplete.
 - **Run `gofumpt -w .` before committing.**
 - **Run `go test ./...` and `go vet ./...` before pushing.** Do not push broken builds.
-- **CI must be green before a PR can merge.** Do not request review or merge until all checks pass.
-- **If CI fails, fix it immediately** in the same branch — do not open a new PR for the same work item.
 
 ## Communication
 
