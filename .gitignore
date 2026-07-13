@@ -7,6 +7,9 @@
 !examples/*.example
 .direnv/
 
+# Claude Code local settings (machine-specific overrides; not portable)
+.claude/settings.local.json
+
 # chezmoi local state / OS cruft
 .DS_Store
 chezmoistate.boltdb

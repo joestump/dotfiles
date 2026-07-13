@@ -20,9 +20,11 @@
     </array>
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- signal-cli is a JVM app; launchd's PATH is minimal, so point it at java + brew. -->
+        <!-- signal-cli is a JVM app; launchd's PATH is minimal, so point it at java + brew.
+             Include BOTH brew prefixes so it works on Apple Silicon (/opt/homebrew) and
+             Intel (/usr/local) Macs (dotfiles#25). -->
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
