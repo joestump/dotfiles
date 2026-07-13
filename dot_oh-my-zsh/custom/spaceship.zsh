@@ -47,7 +47,7 @@ SPACESHIP_VAULT_COLOR_BAD="${SPACESHIP_VAULT_COLOR_BAD=red}"          # named â†
 spaceship_vault() {
   local ok=1
   if [[ "$OSTYPE" == darwin* ]]; then
-    launchctl list 2>/dev/null | grep -q 'rocks\.stump\.vault-agent' || ok=0
+    launchctl list rocks.stump.vault-agent >/dev/null 2>&1 || ok=0
   else
     systemctl --user is-active --quiet vault-agent 2>/dev/null || ok=0
   fi

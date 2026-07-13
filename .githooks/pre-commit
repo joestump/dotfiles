@@ -6,5 +6,7 @@ if command -v gitleaks >/dev/null 2>&1; then
   # gitleaks >= 8.19: `gitleaks git --staged` is the pre-commit scan.
   gitleaks git --staged --redact --no-banner .
 else
-  echo "gitleaks not installed; skipping secret scan. Install with: brew install gitleaks" >&2
+  echo "CRITICAL: gitleaks not installed. Commit blocked." >&2
+  echo "Install with: brew install gitleaks" >&2
+  exit 1
 fi

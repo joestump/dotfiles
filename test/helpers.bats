@@ -22,12 +22,14 @@ setup() { setup_stub_path; }
   # Gate to macOS so this doesn't fail on a Linux host (where `status` shells out
   # to the real `systemctl` and shows the live unit instead of "not loaded").
   [[ "$OSTYPE" == darwin* ]] || skip "launchctl path is macOS-only"
-  make_stub launchctl 'echo "LAUNCHCTL $*"'
+  # Stub launchctl to exit 1 = "label not found" (the direct-query form
+  # `launchctl list <label>` returns non-zero when the job isn't loaded).
+  make_stub launchctl 'exit 1'
   # Force the macOS branch so the launchctl stub is exercised regardless of the
   # host OS (on Linux CI the systemctl branch would hit a missing user dbus).
   run zsh -c 'OSTYPE="darwin24"; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-agent.zsh"; vault-agent status'
   [ "$status" -eq 0 ]
-  # stub output has no matching label, so the helper reports "not loaded"
+  # stub exits 1 (not loaded), so the helper reports "not loaded"
   [[ "$output" == *"not loaded"* ]]
 }
 

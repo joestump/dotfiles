@@ -25,7 +25,7 @@ jobs:
 
       - name: ShellCheck — plain scripts
         run: |
-          git ls-files 'scripts/*.sh' 'run_*.sh' 'dot_config/dotfiles/*.sh' '.githooks/pre-commit' \
+          git ls-files 'scripts/*.sh' 'run_*.sh' 'dot_config/dotfiles/*.sh' '.githooks/pre-commit' '.chezmoiscripts/*.sh' \
             | xargs -r shellcheck -x -e SC1091
 
       - name: ShellCheck — rendered chezmoi *.sh.tmpl
