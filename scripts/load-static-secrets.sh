@@ -26,17 +26,17 @@ req() {
 req OPENAI_API_KEY LITELLM_API_KEY GEMINI_API_KEY \
     GITEA_TOKEN POCKETID_API_KEY GARAGE_ACCESS_KEY GARAGE_SECRET_KEY
 
-vault kv put secret/personal/llm \
-  OPENAI_API_KEY="$OPENAI_API_KEY" \
-  LITELLM_API_KEY="$LITELLM_API_KEY" \
-  GEMINI_API_KEY="$GEMINI_API_KEY"
+# Feed values over stdin JSON to avoid exposing secrets in argv (dotfiles#11).
+vault kv put secret/personal/llm - <<EOF
+{"OPENAI_API_KEY":"$OPENAI_API_KEY","LITELLM_API_KEY":"$LITELLM_API_KEY","GEMINI_API_KEY":"$GEMINI_API_KEY"}
+EOF
 
-vault kv put secret/personal/gitea    GITEA_TOKEN="$GITEA_TOKEN"
-vault kv put secret/personal/pocketid POCKETID_API_KEY="$POCKETID_API_KEY"
+vault kv put secret/personal/gitea    - <<<"{\"GITEA_TOKEN\":\"$GITEA_TOKEN\"}"
+vault kv put secret/personal/pocketid - <<<"{\"POCKETID_API_KEY\":\"$POCKETID_API_KEY\"}"
 
-vault kv put secret/personal/garage \
-  GARAGE_ACCESS_KEY="$GARAGE_ACCESS_KEY" \
-  GARAGE_SECRET_KEY="$GARAGE_SECRET_KEY"
+vault kv put secret/personal/garage - <<EOF
+{"GARAGE_ACCESS_KEY":"$GARAGE_ACCESS_KEY","GARAGE_SECRET_KEY":"$GARAGE_SECRET_KEY"}
+EOF
 
 echo "✅ Static secrets loaded into OpenBao KV (secret/personal/*)."
 echo "   The Vault Agent will render them to ~/.config/vault/secrets-static.env."

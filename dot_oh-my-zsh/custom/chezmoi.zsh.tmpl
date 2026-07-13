@@ -38,7 +38,7 @@ czinit() {
   [[ -z $tok ]] && { print -u2 "czinit: no GITEA_TOKEN locally — run 'vault-oidc-login' first."; return 1 }
 
   print -u2 "→ seeding Gitea credentials on ${host} …"
-  ssh "$host" 'umask 077; cat > ~/.git-credentials && git config --global credential.helper store' \
+  ssh "$host" 'umask 077; cat > ~/.git-credentials && git config --global credential."https://gitea.stump.rocks".helper store' \
     <<< "https://{{ .githubUser }}:${tok}@gitea.stump.rocks" \
     || { print -u2 "czinit: could not seed credentials on ${host}"; return 1 }
 
@@ -62,6 +62,13 @@ czinit() {
   else
     print -u2 "→ final step — run: czapprole ${host}"
   fi
+
+  # Clean up bootstrap credentials: the node now has the host-scoped credential
+  # helper from dot_config/git/config.tmpl (credential-gitea.sh reads the live
+  # OpenBao token), so the seeded ~/.git-credentials and the temporary store
+  # helper are no longer needed (dotfiles#13).
+  ssh "$host" 'rm -f ~/.git-credentials; git config --global --unset credential."https://gitea.stump.rocks".helper 2>/dev/null; true' \
+    || print -u2 "czinit: credential cleanup failed on ${host} (non-fatal)."
 
   print -u2 "\n✓ ${host} bootstrapped — dotfiles applied and Vault Agent provisioned (self-renewing)."
 }
