@@ -1,0 +1,28 @@
+{{- /* Chezmoi template that generates a Consul Template for Vault Agent. */ -}}
+# ~/.netrc - managed by Vault Agent (source: ~/.config/vault/netrc.ctmpl)
+# Used by git, go get, curl, etc.
+
+{{ "{{- $githubToken := \"\" -}}" }}
+{{ "{{- $giteaToken := \"\" -}}" }}
+
+{{ "{{- range secrets (printf \"secret/metadata/users/%s/\" (env \"USER\")) -}}" }}
+{{ "{{- $name := . | trimSuffix \"/\" -}}" }}
+{{ "{{- if and (ne $name \"ssh\") (ne $name \"aws\") -}}" }}
+{{ "{{- with secret (printf \"secret/data/users/%s/%s\" (env \"USER\") $name) -}}" }}
+{{ "{{- range $k, $v := .Data.data -}}" }}
+{{ "{{- if eq $k \"GITHUB_PERSONAL_ACCESS_TOKEN\" }}{{ $githubToken = $v }}{{ end -}}" }}
+{{ "{{- if eq $k \"GITHUB_TOKEN\" }}{{ if eq $githubToken \"\" }}{{ $githubToken = $v }}{{ end }}{{ end -}}" }}
+{{ "{{- if eq $k \"GITEA_TOKEN\" }}{{ $giteaToken = $v }}{{ end -}}" }}
+{{ "{{- if eq $k \"GITEA_ACCESS_TOKEN\" }}{{ if eq $giteaToken \"\" }}{{ $giteaToken = $v }}{{ end }}{{ end -}}" }}
+{{ "{{- end -}}" }}
+{{ "{{- end -}}" }}
+{{ "{{- end -}}" }}
+{{ "{{- end -}}" }}
+
+{{ "{{- if $githubToken }}" }}
+machine github.com login {{ .githubUser }} password {{ "{{ $githubToken }}" }}
+{{ "{{- end }}" }}
+
+{{ "{{- if $giteaToken }}" }}
+machine gitea.stump.rocks login {{ .githubUser }} password {{ "{{ $giteaToken }}" }}
+{{ "{{- end }}" }}
