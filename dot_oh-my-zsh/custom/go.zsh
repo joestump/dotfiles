@@ -2,5 +2,7 @@
 # The `go` binary itself already comes from macOS path_helper (/etc/paths.d/go);
 # this only adds the user bin dirs that path_helper does not.
 export GOPATH="${GOPATH:-$HOME/go}"
+export GOPRIVATE="github.com/joestump/*,gitea.stump.rocks/*"
+
 typeset -U path            # keep PATH entries unique (no duplicates on re-source)
 path=("$HOME/.local/bin" "$HOME/bin" "$GOPATH/bin" $path)
