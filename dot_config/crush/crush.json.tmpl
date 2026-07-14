@@ -146,8 +146,9 @@
         "server",
         "--user-id",
         "{{ .signalNumber }}",
-        "--transport",
-        "stdio"
+        "--channel",
+        "--prefix",
+        "cc"
       ],
       "timeout": 60,
       "disabled": false
@@ -177,6 +178,15 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
       "timeout": 60,
+      "disabled": false
+    },
+    "cairn": {
+      "type": "http",
+      "url": "$CAIRN_BASE_URL/mcp",
+      "headers": {
+        "Authorization": "Bearer $CAIRN_API_TOKEN"
+      },
+      "timeout": 120,
       "disabled": false
     }
   },
@@ -306,7 +316,12 @@
       "mcp_aws-knowledge_aws___get_regional_availability",
       "mcp_aws-knowledge_aws___list_regions",
       "mcp_aws-knowledge_aws___retrieve_skill",
-      "mcp_signal_receive_message"
+      "mcp_signal_receive_message",
+      "mcp_signal_send",
+      "mcp_signal_send_message_to_user",
+      "mcp_signal_send_message_to_group",
+      "mcp_signal_send_reaction_to_user",
+      "mcp_signal_send_reaction_to_group"
     ]
   }
 }
