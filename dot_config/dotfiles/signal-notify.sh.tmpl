@@ -7,7 +7,7 @@
 # Tries the warm signal-cli daemon first (JSON-RPC on 127.0.0.1:7583 — fast, no
 # cold JVM start), falls back to a cold signal-cli send, then to syslog as a last
 # resort so the failure is at least discoverable.
-SIGNAL_NUMBER="{{ .signalNumber }}"
+SIGNAL_NUMBER="{{ env "SIGNAL_MCP_USER_ID" | default .signalNumber }}"
 
 _signal_have() { command -v "$1" >/dev/null 2>&1; }
 
