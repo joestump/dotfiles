@@ -1,7 +1,7 @@
 # Crush headless session (Signal channel arbiter) — tmux-managed user service.
-# The agent runs one persistent Crush process attached to the Signal MCP as a
-# channel; it is the SOLE arbiter of messages that land on the agent's Signal
-# account. systemd keeps it alive; tmux gives you a way in to watch/steer:
+# One persistent Crush process attached to the Signal MCP as a channel; it is
+# the SOLE arbiter of messages that land on this machine's Signal account.
+# systemd keeps it alive; tmux gives you a way in to watch/steer:
 #
 #   attach: crush-signal-channel attach     (or: tmux -L crush attach -t signal)
 #   detach: ^b d                            (standard tmux keybind)
@@ -11,9 +11,10 @@
 # Requires the signal-cli daemon (JSON-RPC backend the signal MCP talks to) and
 # vault-agent-rendered env (LLM provider keys — Crush needs at least one).
 #
-# A user service runs while you have a session. On the unattended agent host,
-# keep it running when you are NOT logged in (needs sudo ONCE):
+# A user service runs while you have a session. To keep it running when you're
+# NOT logged in (unattended box, needs sudo ONCE):
 #   sudo loginctl enable-linger {{ .chezmoi.username }}
+# macOS counterpart: Library/LaunchAgents/rocks.stump.crush-signal-channel.plist.tmpl
 [Unit]
 Description=Crush headless (Signal channel arbiter, tmux-managed)
 After=network-online.target vault-agent.service signal-daemon.service

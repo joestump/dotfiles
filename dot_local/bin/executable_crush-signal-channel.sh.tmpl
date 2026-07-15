@@ -1,19 +1,35 @@
 #!/usr/bin/env bash
-# Managed by systemd (crush-signal-channel.service). Runs the agent's dedicated
-# Crush session — the sole arbiter of messages on the agent's Signal channel —
-# inside a detached tmux, so systemd keeps it alive AND you can attach at any
-# time to watch/steer:
+# Runs a dedicated Crush session attached to the Signal MCP as a channel —
+# the sole arbiter of messages that land on this machine's Signal account —
+# inside a detached tmux, so the supervisor keeps it alive AND you can attach
+# at any time to watch/steer:
 #
 #   crush-signal-channel attach       # tmux -L crush attach -t signal
 #   ^b d                              # detach without killing anything
 #
 # Data + cwd live in a dedicated dir so this arbiter never collides with an
 # interactive `crush` or a real project's .crush/ state. Crush is wrapped in a
-# supervisor loop: if the TUI exits (crash, updater, etc.) tmux stays alive and
-# the loop restarts crush in the same pane, so the channel stays responsive.
+# supervisor loop: if the TUI exits (crash, updater, etc.) tmux stays alive
+# and the loop restarts crush in the same pane, so the channel stays
+# responsive.
 #
-# systemd unit: dot_config/systemd/user/crush-signal-channel.service.tmpl
+# Supervisors:
+#   Linux — dot_config/systemd/user/crush-signal-channel.service.tmpl
+#   macOS — Library/LaunchAgents/rocks.stump.crush-signal-channel.plist.tmpl
 set -eu
+
+# Source vault-agent's rendered env (LITELLM_API_KEY / OPENAI_DIRECT_API_KEY /
+# GEMINI_API_KEY / ZAI_API_TOKEN etc.) so Crush's providers block sees at
+# least one provider. systemd's EnvironmentFile= already sets these before
+# ExecStart on Linux; launchd on macOS doesn't inherit shell env, so sourcing
+# here matters — and re-sourcing on Linux is idempotent.
+VAULT_ENV="{{ .chezmoi.homeDir }}/.config/vault/secrets-static.env"
+if [ -r "$VAULT_ENV" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$VAULT_ENV"
+  set +a
+fi
 
 WORKDIR="{{ .chezmoi.homeDir }}/.local/share/crush-signal-channel"
 mkdir -p "$WORKDIR"
@@ -21,9 +37,16 @@ mkdir -p "$WORKDIR"
 TMUX="{{ lookPath "tmux" | default "/usr/bin/tmux" }}"
 CRUSH="{{ lookPath "crush" | default (printf "%s/.local/bin/crush" .chezmoi.homeDir) }}"
 
-# Dedicated tmux socket (`-L crush`) so this session is isolated from anything
-# the user runs under the default socket, and `crush-signal-channel attach`
-# always finds the right session name.
+# Dedicated tmux socket (`-L crush`) so this session is isolated from
+# anything the user runs under the default socket, and `crush-signal-channel
+# attach` always finds the right session name. Idempotent — if the session is
+# already up (launchd re-fire, manual re-run), leave it alone and exit 0
+# rather than erroring with "duplicate session" and causing a restart loop.
+if "$TMUX" -L crush has-session -t signal 2>/dev/null; then
+  echo "[crush-signal-channel] tmux session 'signal' already running"
+  exit 0
+fi
+
 exec "$TMUX" -L crush new-session -d -s signal -c "$WORKDIR" \
   "while true; do \"$CRUSH\" --data-dir '$WORKDIR' --channels server:signal; \
      echo \"[crush exited \$? — restarting in 5s]\"; sleep 5; \
