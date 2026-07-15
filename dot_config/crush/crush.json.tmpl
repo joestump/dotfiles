@@ -146,9 +146,15 @@
         "server",
         "--user-id",
         "{{ .signalNumber }}",
-        "--channel",
+        "--channel"
+{{- range .signal.trustedRecipients }},
+        "--trusted-recipient",
+        "{{ . }}"
+{{- end }}
+{{- with .signal.channelPrefix }},
         "--prefix",
-        "cc"
+        "{{ . }}"
+{{- end }}
       ],
       "timeout": 60,
       "disabled": false
