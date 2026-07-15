@@ -25,7 +25,10 @@ set -eu
 # here matters — and re-sourcing on Linux is idempotent.
 VAULT_ENV="{{ .chezmoi.homeDir }}/.config/vault/secrets-static.env"
 if [ -r "$VAULT_ENV" ]; then
-  set -a; . "$VAULT_ENV"; set +a
+  set -a
+  # shellcheck source=/dev/null
+  . "$VAULT_ENV"
+  set +a
 fi
 
 WORKDIR="{{ .chezmoi.homeDir }}/.local/share/crush-signal-channel"
