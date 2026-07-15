@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Managed by systemd (crush-signal-channel.service). Runs the agent's dedicated
+# Crush session — the sole arbiter of messages on the agent's Signal channel —
+# inside a detached tmux, so systemd keeps it alive AND you can attach at any
+# time to watch/steer:
+#
+#   crush-signal-channel attach       # tmux -L crush attach -t signal
+#   ^b d                              # detach without killing anything
+#
+# Data + cwd live in a dedicated dir so this arbiter never collides with an
+# interactive `crush` or a real project's .crush/ state. Crush is wrapped in a
+# supervisor loop: if the TUI exits (crash, updater, etc.) tmux stays alive and
+# the loop restarts crush in the same pane, so the channel stays responsive.
+#
+# systemd unit: dot_config/systemd/user/crush-signal-channel.service.tmpl
+set -eu
+
+WORKDIR="{{ .chezmoi.homeDir }}/.local/share/crush-signal-channel"
+mkdir -p "$WORKDIR"
+
+TMUX="{{ lookPath "tmux" | default "/usr/bin/tmux" }}"
+CRUSH="{{ lookPath "crush" | default (printf "%s/.local/bin/crush" .chezmoi.homeDir) }}"
+
+# Dedicated tmux socket (`-L crush`) so this session is isolated from anything
+# the user runs under the default socket, and `crush-signal-channel attach`
+# always finds the right session name.
+exec "$TMUX" -L crush new-session -d -s signal -c "$WORKDIR" \
+  "while true; do \"$CRUSH\" --data-dir '$WORKDIR' --channels server:signal; \
+     echo \"[crush exited \$? — restarting in 5s]\"; sleep 5; \
+   done"
