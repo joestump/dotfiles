@@ -7,31 +7,24 @@
 
 # Joe's Signal note-to-self number (E.164). Backs the signal-cli daemon + the Signal
 # MCP (--user-id) + scheduled-task summaries. Quoted so YAML keeps it a string.
+#
+# FALLBACK ONLY — the authoritative value is the SIGNAL_MCP_USER_ID env var
+# (provisioned by OpenBao). Templates use `{{ env "SIGNAL_MCP_USER_ID" | default .signalNumber }}`
+# so an OpenBao-provisioned node picks up the agent's number (+353871760709) while a
+# bare macOS dev box without OpenBao still falls back to Joe's personal number below.
 signalNumber: "+12062257886"
 
 # Signal MCP config. Rendered into the crush `signal` MCP block (see
-# dot_config/crush/crush.json.tmpl). --channel is always on for the agent (this is
-# how incoming messages push into the session); everything else is knobs.
+# dot_config/crush/crush.json.tmpl). The server is always started with
+# `--transport stdio`; everything else is knobs.
 signal:
-  # Outbound allowlist. Recipients (E.164 numbers or Signal group IDs) that the
-  # signal-mcp server is permitted to send to. Rendered as repeated
-  # `--trusted-recipient` flags. When the list is non-empty, signal-mcp rejects
-  # any send targeting a recipient not on it before talking to the daemon. Docs:
-  # https://github.com/joestump/signal-mcp/#restricting-recipients-trusted-recipients
-  #
-  # This file is the declarative source of truth. SIGNAL_MCP_TRUSTED_RECIPIENTS
-  # from OpenBao (secret/users/joestump-agent/signal-mcp) is *also* merged by
-  # signal-mcp at runtime — use it for host-specific additions; keep the shared
-  # baseline here.
-  trustedRecipients:
-    - "+12062257886"      # Joe — note-to-self, agent status pings
-    # add other recipients below (E.164 or Signal group id)
-
-  # Channel-mode prefix filter. When set (non-empty), signal-mcp only forwards
-  # messages whose body starts with this prefix (case-insensitive); the prefix is
-  # stripped before delivery. Empty / unset = every message reaches the agent.
-  # Rendered as `--prefix <val>` on the signal MCP command line.
-  channelPrefix: ""
+  # Outbound allowlist is NOT hardcoded here — it comes from the
+  # SIGNAL_MCP_TRUSTED_RECIPIENTS env var (OpenBao:
+  # secret/users/<you>/signal-mcp), which signal-mcp reads at runtime. Keeping
+  # it in OpenBao avoids re-keying recipients across machines and keeps this
+  # file non-secret. trustedRecipients is kept empty so no --trusted-recipient
+  # flags are rendered; signal-mcp's env-var merge is the sole source.
+  trustedRecipients: []
 
 # Contact email. Not currently referenced anywhere (the repo had no real email — the
 # joestump@host strings are SSH targets), but kept here as the single place to set it

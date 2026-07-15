@@ -144,15 +144,12 @@
         "--directory",
         "{{ .chezmoi.homeDir }}/src/signal-mcp",
         "server",
+        "--transport",
+        "stdio",
         "--user-id",
-        "{{ .signalNumber }}",
-        "--channel"
+        "{{ env "SIGNAL_MCP_USER_ID" | default .signalNumber }}"
 {{- range .signal.trustedRecipients }},
         "--trusted-recipient",
-        "{{ . }}"
-{{- end }}
-{{- with .signal.channelPrefix }},
-        "--prefix",
         "{{ . }}"
 {{- end }}
       ],
