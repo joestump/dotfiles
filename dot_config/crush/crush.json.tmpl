@@ -147,7 +147,8 @@
         "--transport",
         "stdio",
         "--user-id",
-        "{{ env "SIGNAL_MCP_USER_ID" | default .signalNumber }}"
+        "{{ env "SIGNAL_MCP_USER_ID" | default .signalNumber }}",
+        "--channel"
 {{- range .signal.trustedRecipients }},
         "--trusted-recipient",
         "{{ . }}"
