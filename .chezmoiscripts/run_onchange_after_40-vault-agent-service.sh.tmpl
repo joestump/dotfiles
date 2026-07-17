@@ -1,25 +1,60 @@
 #!/usr/bin/env bash
-# Enable the Vault Agent as a systemd USER service on Linux — NO sudo.
-# macOS uses the launchd LaunchAgent instead (handled by the plist + RunAtLoad).
-# Re-runs when the unit file changes (hash embedded below).
+# Bring up the Vault Agent that renders OpenBao secrets — NO sudo.
+#   macOS:  (re)load the launchd LaunchAgent (rocks.stump.vault-agent)
+#   Linux:  enable the systemd --user service, RESTARTING it if already running
+# Re-runs when the unit, the plist, OR agent.hcl changes (hashes below). The
+# agent reads agent.hcl only at startup, so hashing the unit alone let config
+# edits (e.g. #68's secrets-static.systemd.env template block) slip by: nothing
+# re-ran, nothing restarted, and new template blocks silently never rendered
+# until a manual `vault-agent restart`.
 #
-# unit hash: {{ include "dot_config/systemd/user/vault-agent.service.tmpl" | sha256sum }}
+# unit hash:   {{ include "dot_config/systemd/user/vault-agent.service.tmpl" | sha256sum }}
+# plist hash:  {{ include "Library/LaunchAgents/rocks.stump.vault-agent.plist.tmpl" | sha256sum }}
+# config hash: {{ include "dot_config/vault/agent.hcl.tmpl" | sha256sum }}
 set -euo pipefail
 
-[ "$(uname -s)" = "Linux" ] || exit 0
-command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping vault-agent service"; exit 0; }
+case "$(uname -s)" in
+  Darwin)
+    plist="$HOME/Library/LaunchAgents/rocks.stump.vault-agent.plist"
+    if [ ! -f "$plist" ]; then
+      echo "WARN: $plist not found (is Library/ applied?); skipping"
+      exit 0
+    fi
+    # bootout+bootstrap (the `vault-agent restart` recipe) rather than kickstart:
+    # it re-reads BOTH the plist and agent.hcl. Tolerate 'not loaded' on first
+    # run, and soft-fail when there's no GUI session to bootstrap into (SSH).
+    launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
+      :   # quiet on success — czu's 🔐 Secrets section reports the live state
+    else
+      echo "WARN: couldn't (re)load vault-agent; run 'vault-agent start' from a GUI session."
+    fi
+    ;;
+  Linux)
+    command -v systemctl >/dev/null 2>&1 || { echo "no systemd; skipping vault-agent service"; exit 0; }
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    # Needs a per-user systemd instance (present in any login session). Soft-fail if
+    # not — the agent can still be started in-session later with `vault-agent start`.
+    if ! systemctl --user daemon-reload 2>/dev/null; then
+      echo "WARN: no user systemd bus right now — after 'vault login', run: vault-agent start"
+      exit 0
+    fi
 
-# Needs a per-user systemd instance (present in any login session). Soft-fail if
-# not — the agent can still be started in-session later with `vault-agent start`.
-if ! systemctl --user daemon-reload 2>/dev/null; then
-  echo "WARN: no user systemd bus right now — after 'vault login', run: vault-agent start"
-  exit 0
-fi
-
-if systemctl --user enable --now vault-agent 2>/dev/null; then
-  :   # quiet on success — czu's 🔐 Secrets section reports the live state
-else
-  echo "WARN: couldn't enable vault-agent yet; run 'vault-agent start' after 'vault login'."
-fi
+    if systemctl --user is-active --quiet vault-agent 2>/dev/null; then
+      # Agent already running: `enable --now` is a NO-OP for a live process, so
+      # restart it to pick up the change. (enable kept so a hand-started unit
+      # still gets enabled; try-restart never starts a stopped one.)
+      systemctl --user enable vault-agent 2>/dev/null || true
+      if systemctl --user try-restart vault-agent 2>/dev/null; then
+        :   # quiet on success — czu's 🔐 Secrets section reports the live state
+      else
+        echo "WARN: couldn't restart vault-agent — run 'vault-agent restart' to pick up the new config."
+      fi
+    elif systemctl --user enable --now vault-agent 2>/dev/null; then
+      :   # quiet on success
+    else
+      echo "WARN: couldn't enable vault-agent yet; run 'vault-agent start' after 'vault login'."
+    fi
+    ;;
+esac
