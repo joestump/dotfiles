@@ -26,6 +26,10 @@ flowchart TD
 - **Env secrets** — the static template **dynamically** exports *every* field of
   *every* `secret/users/<you>/*` KV secret. Add a new secret → it shows up automatically
   (next render or `vault-agent restart`). `ssh` is skipped (it's files).
+- **systemd services** — the agent also renders `secrets-static.systemd.env`: the same
+  static secrets in systemd `EnvironmentFile` syntax (no `export`, double-quoted), because
+  systemd can't parse the shell-formatted file. User units like
+  `crush-signal-channel.service` load their provider keys from it.
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
   `secret/users/<you>/ssh`.
 
