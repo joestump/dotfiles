@@ -167,7 +167,7 @@ the static KV approach is what shipped.)
 Remaining (Joe-owned): `vault login` → `scripts/load-static-secrets.sh` →
 `scripts/openbao-aws-setup.sh` (server-side, admin + AWS root cred) →
 `vault-agent start` → verify → strip secret lines from `~/.zprofile` → rotate the
-previously-exposed credentials. Runbook: `docs/secrets.md`.
+previously-exposed credentials. Runbook: [Secrets](https://joestump.pages.stump.rocks/dotfiles/docs/secrets).
 
 ## Open / future ideas
 
