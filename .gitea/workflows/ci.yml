@@ -6,8 +6,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats + zsh
-        run: sudo apt-get update && sudo apt-get install -y bats zsh
+      - name: Install bats + zsh + chezmoi
+        # chezmoi lets the render-based suites (chezmoiexternal.bats,
+        # vault-agent-stale.bats) actually run here instead of skipping.
+        run: |
+          sudo apt-get update && sudo apt-get install -y bats zsh
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: BATS suite
         run: bats --print-output-on-failure test/
 
