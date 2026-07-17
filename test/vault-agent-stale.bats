@@ -11,6 +11,12 @@
 # tick. Neither is observable in production until it bites, so pin it here.
 load test_helper
 
+# Every test renders the template, so guard once here instead of per-test as
+# chezmoiexternal.bats does. CI installs chezmoi for the bats job.
+setup() {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+}
+
 DETECTOR="$REPO_ROOT/dot_config/vault/vault-agent-stale.sh.tmpl"
 
 # Render the chezmoi template once into a runnable script. The only directive is
