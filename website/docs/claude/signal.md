@@ -107,7 +107,7 @@ The same `signal-daemon` verbs work on both OSes (launchd under the hood on macO
 trusted-recipients allowlist). On macOS this is **your own working checkout** —
 chezmoi deliberately doesn't manage it. On Linux it's a chezmoi **external** that
 tracks `main` (ff-only pulls, refreshed weekly). The MCP is launched with
-`uv run --directory ~/src/signal-mcp server --user-id <number> --transport stdio`;
+`uv run --directory ~/src/signal-mcp signal-mcp --user-id <number> --transport stdio`;
 the per-OS `uv` path and `PATH` are injected by the
 [MCP merge scripts](./mcp#the-servers).
 
