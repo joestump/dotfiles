@@ -1,7 +1,9 @@
 # dotfiles
 
 Personal dotfiles, managed with [chezmoi](https://www.chezmoi.io/), backed by
-self-hosted Gitea at <https://gitea.stump.rocks/joestump/dotfiles>, and
+self-hosted Gitea at <https://gitea.stump.rocks/joestump/dotfiles> (mirrored to
+[GitHub](https://github.com/joestump/dotfiles), docs mirror at
+<https://joestump.github.io/dotfiles/>), and
 layered on an existing [Oh My Zsh](https://ohmyz.sh/) install. Hub-and-spoke:
 one macOS hub (required — parts of the stack have no Linux desktop apps), any
 number of Linux spokes. Full docs, including install:

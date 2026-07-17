@@ -7,7 +7,10 @@ const config = {
   tagline: 'chezmoi // Oh My Zsh // OpenBao — one command, any machine.',
   favicon: 'img/favicon.svg',
 
-  url: 'https://joestump.pages.stump.rocks',
+  // Published to TWO hosts from one source: Gitea Pages (canonical) and the
+  // GitHub Pages mirror. Only the host differs — the GitHub workflow sets
+  // SITE_URL; the default keeps local `npm start` and the Gitea build canonical.
+  url: process.env.SITE_URL || 'https://joestump.pages.stump.rocks',
   baseUrl: '/dotfiles/',
 
   organizationName: 'joestump',
