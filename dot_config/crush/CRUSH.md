@@ -21,7 +21,7 @@ approval from Joe.** When in doubt, ASK FIRST — never assume permission.
 
 ### General rules
 
-1. **Branch from latest main.** Run `git checkout main && git pull` before
+1. **Branch from latest main.** Run `git checkout main && git pull` before branching. Never reuse a merged branch.
 2. **Branch naming.** Use `feat/<short-description>`, `bug/<short-description>`, or `toil/<short-description>`.
 3. **Use git worktrees** when switching between parallel work items instead of stashing or branching in-place.
 4. **Rebase, don't merge main into your branch.** Keep history linear.
