@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Warm the Signal MCP's uv venv (Linux only) so the FIRST Claude launch doesn't
-# cold-resolve `mcp` + its transitive deps and overrun the MCP init window — the
-# same class of slow-first-start we warm away for gitea-mcp via go-tools.txt.
+# Pull signal-mcp to HEAD and warm its uv venv (Linux only).
 #
-# Runs on every apply (cheap: a directory test once warm). On macOS this is Joe's
-# own dev checkout of signal-mcp, so we never touch its venv.
+# The Signal MCP is launched with `uv run --directory ~/src/signal-mcp`. The
+# chezmoi external refreshes the clone on a 168h period, but `czu` runs more
+# often than that — so we fetch + ff-only pull here on EVERY apply to get the
+# absolute latest. Then we run `uv sync` to keep the venv in sync with whatever
+# pyproject.toml changed.
+#
+# On macOS this is Joe's own dev checkout of signal-mcp, so we never touch it.
 set -euo pipefail
 {{- if ne .chezmoi.os "darwin" }}
 repo="$HOME/src/signal-mcp"
@@ -22,14 +25,27 @@ export PATH="$HOME/.local/bin:$PATH"
 }
 
 heading "💬 Signal MCP"
-have uv        || { item dim "uv absent — skipping venv warm"; exit 0; }
-[ -d "$repo" ] || { item dim "no local checkout yet — skipping venv warm"; exit 0; }
+[ -d "$repo/.git" ] || { item dim "no local checkout yet — skipping"; exit 0; }
 
-if [ -d "$repo/.venv" ]; then
-  item ok "venv already warm"
-elif ! step "warming uv venv" -- uv sync --directory "$repo"; then
-  warn "uv sync failed; first Claude launch may cold-start"
+# Aggressively fetch + ff-only pull on every apply. This clone is managed (nothing
+# is developed here), so this is always safe.
+if git -C "$repo" fetch --quiet --prune origin 2>/dev/null; then
+  if git -C "$repo" merge --ff-only --quiet origin/main 2>/dev/null; then
+    head="$(git -C "$repo" rev-parse --short HEAD)"
+    item ok "signal-mcp at ${head}"
+  else
+    warn "ff-only merge failed (local commits?) — running from current HEAD"
+  fi
+else
+  warn "fetch failed — running from current local state"
+fi
+
+# Keep the venv in sync with pyproject.toml after the pull.
+have uv || { item dim "uv absent — skipping venv sync"; exit 0; }
+
+if ! step "syncing uv venv" -- uv sync --directory "$repo" --quiet; then
+  warn "uv sync failed; first launch may cold-start"
 fi
 {{- else }}
-:  # macOS: signal-mcp is a dev checkout — leave its venv alone.
+:  # macOS: signal-mcp is a dev checkout — leave it alone.
 {{- end }}

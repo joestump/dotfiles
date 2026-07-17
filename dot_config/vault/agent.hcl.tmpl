@@ -91,6 +91,14 @@ template {
   perms       = "0600"
 }
 
+# The same static secrets in systemd EnvironmentFile syntax. Keep this separate
+# from the shell export file so both consumers receive correctly parsed values.
+template {
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.systemd.env.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.systemd.env"
+  perms       = "0600"
+}
+
 # Dynamic, short-lived AWS credentials (auto-rotated on lease expiry). Renders
 # empty when the user has no secret/users/$USER/aws — a harmless empty env file,
 # so no gating is needed.

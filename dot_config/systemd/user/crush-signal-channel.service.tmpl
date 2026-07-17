@@ -29,9 +29,9 @@ Type=forking
 RemainAfterExit=yes
 
 # LLM keys (LITELLM_API_KEY / OPENAI_DIRECT_API_KEY / GEMINI_API_KEY / ZAI_API_TOKEN)
-# reach Crush via vault-agent's rendered env. Without at least one, Crush's
-# providers block is empty and it can't run.
-EnvironmentFile=%h/.config/vault/secrets-static.env
+# reach Crush via vault-agent's systemd-compatible rendered env. Without at
+# least one, Crush's providers block is empty and it can't run.
+EnvironmentFile=%h/.config/vault/secrets-static.systemd.env
 Environment=HOME=%h
 Environment=USER={{ .chezmoi.username }}
 Environment=VAULT_ADDR={{ .vaultAddr }}

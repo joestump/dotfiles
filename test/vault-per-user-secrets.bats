@@ -14,15 +14,38 @@ V="$REPO_ROOT/dot_config/vault"
 @test "no render template references the retired secret/personal/ path" {
   run grep -REn 'secret/(data|metadata)/personal/' \
     "$V/secrets-static.env.ctmpl" \
+    "$V/secrets-static.systemd.env.ctmpl" \
     "$V/secrets-aws.env.ctmpl" \
     "$V/ssh-keys.ctmpl"
   [ "$status" -eq 1 ]  # grep exits 1 = no matches = path fully retired
 }
 
-@test "secrets-static.env.ctmpl ranges over secret/users/\$USER/*" {
-  grep -q 'secret/metadata/users/%s/' "$V/secrets-static.env.ctmpl"
-  grep -q 'secret/data/users/%s/%s' "$V/secrets-static.env.ctmpl"
-  grep -q 'env "USER"' "$V/secrets-static.env.ctmpl"
+@test "static secret templates range over secret/users/\$USER/*" {
+  local template
+  for template in secrets-static.env.ctmpl secrets-static.systemd.env.ctmpl; do
+    grep -q 'secret/metadata/users/%s/' "$V/$template"
+    grep -q 'secret/data/users/%s/%s' "$V/$template"
+    grep -q 'env "USER"' "$V/$template"
+  done
+}
+
+@test "systemd static secrets use EnvironmentFile syntax" {
+  grep -q '^VAULT_ADDR="{{' "$V/secrets-static.systemd.env.ctmpl"
+  grep -q '^{{ \$k }}="{{' "$V/secrets-static.systemd.env.ctmpl"
+  run grep -n '^export ' "$V/secrets-static.systemd.env.ctmpl"
+  [ "$status" -eq 1 ]
+}
+
+@test "Vault Agent renders the systemd static secrets file" {
+  grep -q 'source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.systemd.env.ctmpl"' "$V/agent.hcl.tmpl"
+  grep -q 'destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.systemd.env"' "$V/agent.hcl.tmpl"
+}
+
+@test "Crush Signal service loads the systemd static secrets file" {
+  local svc="$REPO_ROOT/dot_config/systemd/user/crush-signal-channel.service.tmpl"
+  grep -q '^EnvironmentFile=%h/.config/vault/secrets-static.systemd.env$' "$svc"
+  run grep -n '^EnvironmentFile=%h/.config/vault/secrets-static.env$' "$svc"
+  [ "$status" -eq 1 ]
 }
 
 @test "secrets-aws.env.ctmpl reads secret/users/\$USER/aws" {
