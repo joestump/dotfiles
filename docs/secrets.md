@@ -19,9 +19,10 @@ OpenBao server  ──►  Vault Agent (launchd: rocks.stump.vault-agent)  ─�
 ```
 
 - **`~/.config/vault/agent.hcl`** — agent config (from `dot_config/vault/agent.hcl.tmpl`).
-- **`secrets-static.env.ctmpl`** → `secrets-static.env` — static KV secrets.
+- **`secrets-static.env.ctmpl`** → `secrets-static.env` — static KV secrets for shells.
+- **`secrets-static.systemd.env.ctmpl`** → `secrets-static.systemd.env` — the same static secrets in systemd `EnvironmentFile` syntax.
 - **`secrets-aws.env.ctmpl`** → `secrets-aws.env` — dynamic, short-lived AWS creds.
-- **`custom/00-secrets.zsh`** — sources every `~/.config/vault/secrets-*.env` (guarded).
+- **`custom/00-secrets.zsh`** — sources every shell-formatted `~/.config/vault/secrets-*.env` file (guarded).
 - **`custom/vault-agent.zsh`** — `vault-agent {start|stop|restart|status|log|env}` + `czrefresh`.
 - **`custom/vault-approle.zsh`** — `czapprole <host>|--local` — provision the agent's machine identity.
 - **`vault-agent-stale.sh`** — timer-driven detector; Signal-alerts if the agent's auth dies.
