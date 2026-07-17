@@ -6,11 +6,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats + zsh + chezmoi
+      - name: Install bats + zsh + jq + chezmoi
         # chezmoi lets the render-based suites (chezmoiexternal.bats,
-        # vault-agent-stale.bats) actually run here instead of skipping.
+        # vault-agent-stale.bats) actually run here instead of skipping; jq backs
+        # the approle-setup identity-merge path exercised by
+        # vault-approle-blast-radius.bats.
         run: |
-          sudo apt-get update && sudo apt-get install -y bats zsh
+          sudo apt-get update && sudo apt-get install -y bats zsh jq
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: BATS suite
