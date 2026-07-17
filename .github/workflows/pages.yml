@@ -1,0 +1,58 @@
+# Builds the Docusaurus docs (website/) and publishes to GitHub Pages on the
+# joestump/dotfiles MIRROR. Live at: https://joestump.github.io/dotfiles/
+#
+# This repo's canonical home is Gitea (https://gitea.stump.rocks/joestump/dotfiles),
+# which publishes the same site to https://joestump.pages.stump.rocks/dotfiles/ via
+# .gitea/workflows/pages.yml. Gitea Actions only reads .gitea/workflows when that
+# directory exists, so this file runs on GitHub ONLY.
+name: Deploy Docs to GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+      - name: Install dependencies
+        working-directory: website
+        run: npm ci
+      - name: Build
+        working-directory: website
+        run: npm run build
+        env:
+          SITE_URL: https://joestump.github.io
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
