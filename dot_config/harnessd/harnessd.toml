@@ -8,3 +8,13 @@ args = ["--yolo", "--data-dir", "{workdir}", "--channels", "server:signal"]
 workdir = "~/.local/share/crush-signal-channel"   # holds the stumpcloud checkout + CRUSH.md
 env_file = "~/.config/vault/secrets-static.env"
 restart_delay = 5
+
+# A headless Claude Code session joestump drives from his phone via Remote
+# Control (claude.ai / mobile) — NOT wired to Signal. Needs a one-time
+# `claude` login on first boot (persists in ~/.claude).
+[claude-remote-control]
+cmd = "claude"
+args = ["--remote-control", "joestump-agent (tars)", "--dangerously-skip-permissions"]
+workdir = "~/.local/share/claude-remote-control"
+env_file = "~/.config/vault/secrets-static.env"
+restart_delay = 5
