@@ -50,6 +50,9 @@ case "$czu_out" in
 esac
 (( czu_rc == 0 )) \
   || fail "git sync failed ($czu_out) — check for local edits/conflicts in $CZU_SRC"
+# Source the vault-rendered env so env-conditional templates (e.g. crush.json
+# providers) render populated, not empty, when apply runs outside a login shell.
+set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vault/secrets-static.env"; set +a
 chezmoi apply "$@" \
   || fail "chezmoi apply failed — see ~/.cache/chezmoi-apply.log"
 

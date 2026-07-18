@@ -2,7 +2,7 @@
 # plugin: harnessd {list|create|start|stop|restart|status|log|attach} <name>.
 
 # Headless Crush attached to the Signal channel — this machine's Signal arbiter.
-[signal-crush]
+[crush-signal-channel]
 cmd = "crush"
 args = ["--yolo", "--data-dir", "{workdir}", "--channels", "server:signal"]
 workdir = "~/.local/share/crush-signal-channel"   # holds the stumpcloud checkout + CRUSH.md
