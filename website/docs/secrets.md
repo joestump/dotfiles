@@ -25,11 +25,16 @@ flowchart TD
 
 - **Env secrets** — the static template **dynamically** exports *every* field of
   *every* `secret/users/<you>/*` KV secret. Add a new secret → it shows up automatically
-  (next render or `vault-agent restart`). `ssh` is skipped (it's files).
-- **systemd services** — the agent also renders `secrets-static.systemd.env`: the same
-  static secrets in systemd `EnvironmentFile` syntax (no `export`, double-quoted), because
-  systemd can't parse the shell-formatted file. User units like
-  harnessd harnesses (via harness-run sourcing the shell-format env) load their provider keys; some user units also read this systemd-format copy.
+  (next render or `vault-agent restart`). `ssh` is skipped (it's files). This
+  shell-format `secrets-static.env` is what most consumers read: `~/.oh-my-zsh`
+  sources it, and **harnessd harnesses** load it via `env_file` (harness-run
+  sources it in a shell context).
+- **systemd `EnvironmentFile` copy** — the agent *also* renders the same secrets
+  to `secrets-static.systemd.env` in systemd `EnvironmentFile` syntax (no `export`,
+  double-quoted), because systemd's `EnvironmentFile=` parser can't read the shell
+  format. It exists for systemd **user units** that need secrets; nothing consumes
+  it today (the Crush Signal arbiter moved to harnessd), but it's kept ready for
+  the next such unit.
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
   `secret/users/<you>/ssh`.
 
