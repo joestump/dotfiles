@@ -1,0 +1,8 @@
+# Headless Crush attached to the Signal channel — this machine's Signal arbiter.
+# Managed by harnessd (zsh-harnessd): `harnessd {start|stop|restart|status|log|attach} signal-crush`.
+# Signal/Crush specifics live entirely here + in the workdir; harnessd is agnostic.
+cmd=crush
+args=--yolo --data-dir {workdir} --channels server:signal
+workdir=$HOME/.local/share/crush-signal-channel
+env_file=$HOME/.config/vault/secrets-static.env
+restart_delay=5

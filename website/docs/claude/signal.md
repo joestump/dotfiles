@@ -107,9 +107,26 @@ The same `signal-daemon` verbs work on both OSes (launchd under the hood on macO
 trusted-recipients allowlist). On macOS this is **your own working checkout** —
 chezmoi deliberately doesn't manage it. On Linux it's a chezmoi **external** that
 tracks `main` (ff-only pulls, refreshed weekly). The MCP is launched with
-`uv run --directory ~/src/signal-mcp signal-mcp --user-id <number> --transport stdio`;
+`uv run --directory ~/src/signal-mcp signal-mcp --account <account> --operator <operator> --transport stdio`;
 the per-OS `uv` path and `PATH` are injected by the
 [MCP merge scripts](./mcp#the-servers).
 
-> **Note-to-self number:** `+12062257886`. Signal renders **no markdown** — plain
-> text, emoji, and bare `https://` URLs only.
+## Two numbers: account vs operator
+
+signal-mcp separates the number it runs **as** from the number it talks **to**:
+
+- **`--account`** — the Signal number the daemon is logged in as (`signal-cli -a`);
+  messages are sent *from* it. On this agent box that's the agent's own number
+  (**+353871760709**), provisioned as `SIGNAL_MCP_ACCOUNT` in OpenBao
+  (`secret/users/<you>/signal`). On a personal machine with no OpenBao it falls
+  back to `.signalNumber`, so account == operator → Note to Self.
+- **`--operator`** — the human the agent serves: the default recipient of the
+  `send` tool and, in channel mode, the default trusted inbound sender. That's
+  **joestump, +12062257886** (`.signalNumber`).
+
+The outbound allow-list is `SIGNAL_MCP_TRUSTED_RECIPIENTS` (same OpenBao secret) —
+a *gate* on who the agent may message, not an address it sends to. The daemon
+`-a`, the MCP `--account`, and `signal-notify.sh` all resolve `SIGNAL_MCP_ACCOUNT`;
+the MCP `--operator` and scheduled-task summaries use `.signalNumber`.
+
+> Signal renders **no markdown** — plain text, emoji, and bare `https://` URLs only.

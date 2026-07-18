@@ -29,7 +29,7 @@ flowchart TD
 - **systemd services** — the agent also renders `secrets-static.systemd.env`: the same
   static secrets in systemd `EnvironmentFile` syntax (no `export`, double-quoted), because
   systemd can't parse the shell-formatted file. User units like
-  `crush-signal-channel.service` load their provider keys from it.
+  harnessd harnesses (via harness-run sourcing the shell-format env) load their provider keys; some user units also read this systemd-format copy.
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
   `secret/users/<you>/ssh`.
 
