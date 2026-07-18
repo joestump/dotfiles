@@ -111,14 +111,24 @@ template {
 # SSH keys rendered as FILES. Source of truth = OpenBao secret/users/$USER/ssh.
 # ssh-keys.ctmpl auto-discovers EVERY field of that bag and writeToFile()s each to
 # ~/.ssh/<field> (0600, or 0644 for *.pub) — the file-secret analogue of the static
-# env bag. No per-key config, no gating: a user with no ssh bag writes nothing under
-# ~/.ssh (only the manifest below), so it can never clobber a key. The destination
-# is a names-only manifest of what was written.
+# env bag. A user with no ssh bag writes nothing under ~/.ssh (only the manifest
+# below), so it can never clobber a key. The destination is a names-only manifest
+# of what was written.
+#
+# Blast-radius gate (dotfiles#12): untrusted/throwaway boxes should NOT receive the
+# shared private key. Default is on (vaultSshKeys: true in .chezmoidata.yaml); opt
+# a host out in ~/.config/chezmoi/chezmoi.toml:
+#   [data]
+#   vaultSshKeys = false
+{{ if .vaultSshKeys -}}
 template {
   source      = "{{ .chezmoi.homeDir }}/.config/vault/ssh-keys.ctmpl"
   destination = "{{ .chezmoi.homeDir }}/.config/vault/ssh-keys.manifest"
   perms       = "0600"
 }
+{{ else -}}
+# vaultSshKeys=false on this host — SSH keys are NOT rendered here.
+{{ end -}}
 
 # Git/curl .netrc credentials for gitea and github, dynamically rendered from
 # the user's personal secrets (so 'go get' and git HTTPS clones authenticate

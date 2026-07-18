@@ -166,6 +166,12 @@ crushRepo: "https://github.com/joestump-agent/crush.git"
 # template them.
 vaultAddr: "https://vault.stump.rocks"
 
+# Whether the Vault Agent renders the shared SSH private key onto this machine
+# (dotfiles#12 blast-radius control). Default on — trusted machines get the key as
+# always. Opt an untrusted/throwaway box OUT in its ~/.config/chezmoi/chezmoi.toml
+# ([data] vaultSshKeys = false), which takes precedence over this file.
+vaultSshKeys: true
+
 # Claude Code permission posture, merged into ~/.claude/settings.json by
 # .chezmoiscripts/run_onchange_after_48-claude-settings-merge.sh. These are the
 # SHARED DEFAULTS = interactive/attended (Claude asks before acting) — the right

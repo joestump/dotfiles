@@ -54,6 +54,37 @@ That's it — no template edits. The agent discovers it.
 | Force a re-render | `vault-agent restart` |
 | Re-auth (agent down) | `czapprole --local` (re-provisions AppRole) or `vault login -method=oidc` (fallback) |
 
+## Blast radius (per-host AppRoles)
+
+Prefer a **per-host** role over the legacy shared `personal-vault-agent` so one
+compromised or retired box can be cut off without re-provisioning the fleet:
+
+```bash
+# once per host, as admin — creates vault-agent-<host> and merges its login
+# alias into your identity entity (required for the templated policy):
+~/.local/share/chezmoi/scripts/openbao-approle-setup.sh ie01
+
+# optionally pin its creds to the box's network:
+~/.local/share/chezmoi/scripts/openbao-approle-setup.sh --cidr 10.0.0.5/32 ie01
+
+czapprole joestump@ie01.stump.rocks   # auto-selects vault-agent-ie01
+
+# revoke JUST that box later:
+vault delete auth/approle/role/vault-agent-ie01
+```
+
+`czapprole` falls back to the shared role (with a warning) for hosts provisioned
+before per-host roles existed, so nothing breaks mid-migration.
+
+**SSH keys:** an untrusted/throwaway box shouldn't hold the shared private key.
+Opt it out in that box's `~/.config/chezmoi/chezmoi.toml` — the Vault Agent there
+will render env secrets but never `~/.ssh/id_rsa`:
+
+```toml
+[data]
+vaultSshKeys = false
+```
+
 ## Over SSH (utility nodes)
 
 OIDC login opens a `localhost:8250` callback that needs your laptop's browser. The
