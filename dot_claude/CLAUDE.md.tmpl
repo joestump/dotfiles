@@ -58,9 +58,19 @@ When any scheduled task or skill appends a run entry to an Outline daily log (th
 
 This follows the general "never reference something by name only if it has a URL" rule above. If an operation truly has no URL (e.g. a local file count, a purge summary), plain text is fine — this rule only applies when a linkable artifact exists.
 
+## Organizations & collaboration — the `stump.wtf` orgs
+
+`joestump` (Joe) and `joestump-agent` (Joe's agent account — Gitea/GitHub user `joestump-agent`, email `agent@stump.wtf`) **collaborate together** on shared repos. The convention:
+
+- **Origin/truth lives on Gitea in the `stump.wtf` org: https://gitea.stump.rocks/stump.wtf** (free self-hosted CI). That's where you create and push shared repos.
+- Each `stump.wtf` repo **auto-syncs to GitHub at https://github.com/stump-wtf** via a Gitea **push mirror** (interval ~8h + sync-on-commit). GitHub is a downstream mirror for public discoverability — do work against Gitea, not GitHub, for these.
+- New shared work **converges on `stump.wtf`**. Older personal repos still under `gitea.stump.rocks/{{ .githubUser }}` (mirrored to `github.com/{{ .githubUser }}`) are being migrated over time.
+
+When you create a new shared repo, do all of: create it in `gitea.stump.rocks/stump.wtf`, add `joestump-agent` as a **write** collaborator (below), and set up the push mirror to `github.com/stump-wtf/<repo>` (create the GitHub repo first, then `POST /repos/stump.wtf/<repo>/push_mirrors`). Idiomatic naming still applies (e.g. an Oh My Zsh plugin repo uses the community `zsh-<name>` convention).
+
 ## Creating repositories — you MUST ALWAYS add `joestump-agent`
 
-Whenever you create a new repository for Joe on **either Gitea (https://gitea.stump.rocks/{{ .githubUser }}) or GitHub (https://github.com/{{ .githubUser }})**, you MUST ALWAYS add the `joestump-agent` account as a collaborator with **write** access, as part of the same task that creates the repo — never hand back a repo Joe's agent cannot reach. This is a required finishing step of repo creation, right alongside the initial README/commit. It applies to every repo you make "for us," public or private, regardless of who asked or which platform.
+Whenever you create a new repository for Joe — default to the **`stump.wtf` org** (`gitea.stump.rocks/stump.wtf`, mirrored to `github.com/stump-wtf`); older repos may still be under `gitea.stump.rocks/{{ .githubUser }}` / `github.com/{{ .githubUser }}` — you MUST ALWAYS add the `joestump-agent` account as a collaborator with **write** access, as part of the same task that creates the repo — never hand back a repo Joe's agent cannot reach. This is a required finishing step of repo creation, right alongside the initial README/commit. It applies to every repo you make "for us," public or private, regardless of who asked or which platform.
 
 `joestump-agent` is Joe's personal agent account — Gitea user `joestump-agent` (email `agent@stump.wtf`), GitHub user `joestump-agent`.
 
