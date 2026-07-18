@@ -41,11 +41,9 @@ V="$REPO_ROOT/dot_config/vault"
   grep -q 'destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.systemd.env"' "$V/agent.hcl.tmpl"
 }
 
-@test "Crush Signal service loads the systemd static secrets file" {
-  local svc="$REPO_ROOT/dot_config/systemd/user/crush-signal-channel.service.tmpl"
-  grep -q '^EnvironmentFile=%h/.config/vault/secrets-static.systemd.env$' "$svc"
-  run grep -n '^EnvironmentFile=%h/.config/vault/secrets-static.env$' "$svc"
-  [ "$status" -eq 1 ]
+@test "signal-crush harness sources the vault static env" {
+  local harness="$REPO_ROOT/dot_config/harnessd/harnessd.toml"
+  grep -q 'env_file = "~/.config/vault/secrets-static.env"' "$harness"
 }
 
 @test "secrets-aws.env.ctmpl reads secret/users/\$USER/aws" {

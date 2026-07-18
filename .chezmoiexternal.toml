@@ -45,6 +45,13 @@
 [".oh-my-zsh/custom/plugins/shlink".pull]
     args = ["--ff-only", "--quiet"]
 
+[".oh-my-zsh/custom/plugins/zsh-harnessd"]
+    type = "git-repo"
+    url = "https://gitea.stump.rocks/stump.wtf/zsh-harnessd.git"
+    refreshPeriod = "168h"
+[".oh-my-zsh/custom/plugins/zsh-harnessd".pull]
+    args = ["--ff-only", "--quiet"]
+
 # ---------- Themes (install many, swap via ZSH_THEME in ~/.zshrc) ----------
 [".oh-my-zsh/custom/themes/spaceship-prompt"]
     type = "git-repo"
