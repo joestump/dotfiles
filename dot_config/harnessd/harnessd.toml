@@ -1,0 +1,10 @@
+# harnessd config — one [<name>] table per harness. Managed by the zsh-harnessd
+# plugin: harnessd {list|create|start|stop|restart|status|log|attach} <name>.
+
+# Headless Crush attached to the Signal channel — this machine's Signal arbiter.
+[signal-crush]
+cmd = "crush"
+args = ["--yolo", "--data-dir", "{workdir}", "--channels", "server:signal"]
+workdir = "~/.local/share/crush-signal-channel"   # holds the stumpcloud checkout + CRUSH.md
+env_file = "~/.config/vault/secrets-static.env"
+restart_delay = 5

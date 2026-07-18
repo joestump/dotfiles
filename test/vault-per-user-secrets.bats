@@ -42,8 +42,8 @@ V="$REPO_ROOT/dot_config/vault"
 }
 
 @test "signal-crush harness sources the vault static env" {
-  local harness="$REPO_ROOT/dot_config/harnessd/signal-crush.harness"
-  grep -q 'env_file=\$HOME/.config/vault/secrets-static.env' "$harness"
+  local harness="$REPO_ROOT/dot_config/harnessd/harnessd.toml"
+  grep -q 'env_file = "~/.config/vault/secrets-static.env"' "$harness"
 }
 
 @test "secrets-aws.env.ctmpl reads secret/users/\$USER/aws" {
