@@ -9,6 +9,8 @@ following organizations/owners:
 
 | Host    | Owner            | Permission              |
 |---------|------------------|-------------------------|
+| Gitea   | `stump.wtf`      | Full (PRs, issues, forks) — **origin of truth for shared repos** |
+| GitHub  | `stump-wtf`      | Full — downstream mirror of `stump.wtf` |
 | GitHub  | `joestump-agent` | Full (PRs, issues, forks) |
 | GitHub  | `joestump`       | Full (PRs, issues, forks) |
 | Gitea   | `joestump-agent` | Full (PRs, issues, forks) |
@@ -18,6 +20,16 @@ following organizations/owners:
 **You MUST NOT open PRs, issues, or any other contributions against ANY other
 organization or user on GitHub or Gitea without EXPLICIT, prior, per-action
 approval from Joe.** When in doubt, ASK FIRST — never assume permission.
+
+### Organizations — `joestump` + `joestump-agent` collaborate in `stump.wtf`
+
+`joestump` (Joe) and `joestump-agent` (you) work together. **Shared repos of
+origin/truth live on Gitea in the `stump.wtf` org (https://gitea.stump.rocks/stump.wtf)**
+— that's where you branch, push, and open PRs (free self-hosted CI). Each repo
+**auto-syncs to GitHub at https://github.com/stump-wtf** via a Gitea push mirror,
+so GitHub is a read-only downstream — never push work directly to the GitHub
+mirror. New shared work converges on `stump.wtf`; some older repos still live
+under `joestump`.
 
 ### General rules
 
