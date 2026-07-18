@@ -146,7 +146,9 @@
         "signal-mcp",
         "--transport",
         "stdio",
-        "--user-id",
+        "--account",
+        "{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}",
+        "--operator",
         "{{ .signalNumber }}",
         "--channel"
 {{- range .signal.trustedRecipients }},
