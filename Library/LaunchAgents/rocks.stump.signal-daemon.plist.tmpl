@@ -10,7 +10,7 @@
              i.e. ~/.local/share/signal-cli) — the same place `signal-cli link` writes. -->
         <string>{{ lookPath "signal-cli" | default "/opt/homebrew/bin/signal-cli" }}</string>
         <string>-a</string>
-        <string>{{ env "SIGNAL_MCP_USER_ID" | default .signalNumber }}</string>
+        <string>{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}</string>
         <string>daemon</string>
         <string>--tcp</string>
         <string>127.0.0.1:7583</string>
