@@ -12,6 +12,14 @@ Joe's infra (StumpCloud services **and** the dotfiles/MCP/agent tooling — dotf
 2. **Propose the OMG to Joe before filing** (title + severity + one-line root cause is enough), then file it via the stumpcloud-omg skill once he approves.
 3. Precedent: the 2026-07-01 Outline uploads OMG (https://outline.stump.rocks/doc/2026-07-01-outline-uploads-broken-since-aug-2025-volume-owner-mismatch-small-omg-uptvxnEKyZ).
 
+## Issue tracking — one tracker for all of StumpCloud
+
+**`stumpcloud/stumpcloud` (https://gitea.stump.rocks/stumpcloud/stumpcloud) is the single issue tracker for everything StumpCloud** — code-level stories, spec/SDD sprint issues, AND cross-cutting/OMG action items all live here, regardless of which repo the work touches. Do **not** open issues in `stumpcloud/ansible` (or any submodule repo); those repos hold code and PRs, not issues. So:
+
+- `/sdd:plan` / `/sdd:work` file their story issues in `stumpcloud/stumpcloud`, even when the code lands in `stumpcloud/ansible` (or `mirror`, etc.).
+- OMG action items keep going to `stumpcloud/stumpcloud` (label `OMG`, id 53), as before.
+- **Links stay honest:** a story/PR/source-file link still points at the repo the *code* lives in (e.g. `stumpcloud/ansible/...`); only the **issue** is filed in `stumpcloud/stumpcloud`.
+
 ## Scheduled Tasks
 
 - Every scheduled task must send a Signal summary to {{ .signalNumber }} (joestump's personal number — this is the RECIPIENT, not joestump-agent's own +353 daemon account; use the phone number, NOT the email, or the send fails) via mcp__signal__send_message_to_user when the run completes. Mandatory for all new scheduled tasks.
