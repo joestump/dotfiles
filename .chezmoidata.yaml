@@ -31,6 +31,14 @@ shlinkApiUrl: "https://u.stu.mp"
 # LITELLM_API_KEY), NOT here.
 litellmUrl: "https://litellm.stump.rocks/v1"
 
+# Switchboard MCP endpoint for Claude Code. The /mcp/<client> path segment is
+# per-client, minted by switchboard. Referenced by
+# run_after_43-claude-code-mcp-merge to bake ~/.claude.json's
+# .mcpServers.switchboard.url — Claude Code ONLY (deliberately not the Desktop
+# merge). The Bearer token is the secret half and comes from OpenBao
+# (secret/users/<you>/switchboard → SWITCHBOARD_CLAUDE_CODE_API_KEY), NOT here.
+switchboardMcpEndpoint: "https://switchboard.stump.wtf/mcp/joestump-claude-code-f47b11a4"
+
 # Z.ai model metadata for Crush. Prices are USD per 1M tokens and override the
 # corresponding models returned by Z.ai discovery; newly discovered models remain
 # available without pricing until they are added here. Cached output is not listed
