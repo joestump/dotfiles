@@ -1,0 +1,52 @@
+Host github.com
+  Hostname ssh.github.com
+  Port 443
+  User git
+  ServerAliveInterval 600
+  TCPKeepAlive yes
+  IPQoS=throughput
+
+Host claude-*
+  HostName ops01.stump.rocks
+  User joestump
+  RequestTTY yes
+  RemoteCommand ~/.cargo/bin/shpool -d attach --cmd ~/.local/bin/claude\ --dangerously-skip-permissions --dir ~/src %n
+
+# ie02 on dagda (DUB) — reachable only via ProxyJump through the hypervisor
+Host 192.168.100.213
+    HostName 192.168.100.213
+    User joestump
+    ProxyJump root@dagda.stump.rocks
+    IdentityFile ~/.ssh/id_ansible
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new
+
+Host 192.168.100.210
+    HostName 192.168.100.210
+    User joestump
+    ProxyJump root@dagda.stump.rocks
+    IdentityFile ~/.ssh/id_ansible
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new
+
+Host 192.168.100.220
+    HostName 192.168.100.220
+    User joestump
+    ProxyJump root@dagda.stump.rocks
+    IdentityFile ~/.ssh/id_ansible
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new
+
+# BEGIN cloud01-bootstrap (temporary — remove after WG/internal DNS; cloud01.stump.rocks is NXDOMAIN on LAN)
+Host cloud01.stump.rocks
+    HostName 179.237.64.122
+    IPQoS none
+# END cloud01-bootstrap
+
+# Connection multiplexing for StumpCloud/infra hosts: reuse one TCP connection
+# per host so heavy-SSH sessions don't exhaust local ephemeral ports
+# (EADDRNOTAVAIL / "Can't assign requested address"). Excludes github + claude-*.
+Host *.stump.rocks *.stump.wtf 192.168.100.* 179.237.64.122 lir dagda
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%C
+    ControlPersist 10m

@@ -33,7 +33,7 @@ czu_sync_branch() {
   if git -C "$_czu_dir" ls-remote --exit-code --heads origin "$_czu_br" >/dev/null 2>&1; then
     # Best-effort: keep tracking correct so a bare `git pull` works next time.
     git -C "$_czu_dir" branch --set-upstream-to="origin/$_czu_br" "$_czu_br" >/dev/null 2>&1 || true
-    if git -C "$_czu_dir" pull --ff-only origin "$_czu_br" >/dev/null 2>&1; then
+    if git -C "$_czu_dir" pull --ff-only --autostash origin "$_czu_br" >/dev/null 2>&1; then
       echo pulled
       return 0
     fi

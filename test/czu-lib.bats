@@ -85,6 +85,21 @@ advance_origin() {
   [ "$output" = "pulled" ]
 }
 
+@test "fast-forwards while preserving non-conflicting local edits" {
+  printf 'base\n' >"$WORK/local.txt"
+  git -C "$WORK" add local.txt
+  git -C "$WORK" commit --quiet -m "add local file"
+  git -C "$WORK" push --quiet origin main
+  printf 'local edit\n' >"$WORK/local.txt"
+  advance_origin main
+
+  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "pulled" ]
+  [ "$(cat "$WORK/local.txt")" = "local edit" ]
+  [ "$(git -C "$WORK" status --short -- local.txt)" = " M local.txt" ]
+}
+
 @test "fails on a detached HEAD" {
   git -C "$WORK" checkout --quiet --detach
   run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
