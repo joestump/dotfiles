@@ -1,11 +1,12 @@
-# Drop this into a target repo as .gitea/workflows/aibot.yml
-#
-# Fires only on author self-reference (see the `if:` pre-filter — it keeps the
-# container from spinning up for every comment; entrypoint.sh re-checks
-# authoritatively). Secrets/vars drive harness + model + endpoints.
+# AI bot for this repo: automatic code review on every PR push (Crush + Z.ai GLM),
+# plus the on-demand author-self-reference modes (review / address / merge).
+# entrypoint.sh re-checks the trigger authoritatively; the `if:` below is just a
+# cheap pre-filter so the container doesn't spin up for every comment.
 name: aibot
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]   # automatic code review
   issue_comment:
     types: [created]            # PR conversation comments → review / merge
   pull_request_review_comment:
@@ -21,8 +22,12 @@ permissions:
 jobs:
   aibot:
     runs-on: ubuntu-latest
-    # Cheap gate: only proceed when the actor is the PR's own author.
+    # Cheap gate: auto-review on non-draft PR events, else only when the actor is
+    # the PR's own author. (entrypoint.sh loop-guards the bot's own pushes.)
     if: >
+      (github.event_name == 'pull_request'
+        && github.event.pull_request.draft == false)
+      ||
       (github.event_name == 'issue_comment'
         && github.event.issue.pull_request != null
         && github.event.comment.user.login == github.event.issue.user.login)
@@ -46,20 +51,24 @@ jobs:
         # [actions] DEFAULT_ACTIONS_URL = self to allow the bare form.)
         uses: https://gitea.stump.rocks/stumpcloud/gitea-aibot-action@main
         env:
-          # --- harness selection (env var, as requested) ----------------------
-          AIBOT_HARNESS: ${{ vars.AIBOT_HARNESS || 'opencode' }}        # claude | opencode
-          AIBOT_MODEL: ${{ vars.AIBOT_MODEL   || 'qwen2.5-coder:14b-instruct' }}
+          # --- harness selection ----------------------------------------------
+          AIBOT_HARNESS: ${{ vars.AIBOT_HARNESS || 'crush' }}          # claude | opencode | crush
+          AIBOT_MODEL:   ${{ vars.AIBOT_MODEL   || 'zaicoding/glm-4.7' }}
 
-          # --- LiteLLM endpoint (Anthropic-compatible gateway) --------------
-          AIBOT_LITELLM_BASE_URL: ${{ secrets.AIBOT_LITELLM_BASE_URL }}  # e.g. https://litellm.stump.rocks
-          AIBOT_LITELLM_API_KEY: ${{ secrets.AIBOT_LITELLM_API_KEY }}
+          # --- Crush harness: Z.ai (GLM coding plan, OpenAI-compatible) --------
+          AIBOT_ZAI_BASE_URL:  ${{ secrets.AIBOT_ZAI_BASE_URL }}       # e.g. https://api.z.ai/api/coding/paas/v4
+          AIBOT_ZAI_API_TOKEN: ${{ secrets.AIBOT_ZAI_API_TOKEN }}
+
+          # --- claude/opencode harness (optional): LiteLLM gateway ------------
+          AIBOT_LITELLM_BASE_URL: ${{ secrets.AIBOT_LITELLM_BASE_URL }}
+          AIBOT_LITELLM_API_KEY:  ${{ secrets.AIBOT_LITELLM_API_KEY }}
 
           # --- Gitea (auto token is enough for same-repo comment + push) ------
-          AIBOT_GITEA_HOST: ${{ github.server_url }}
+          AIBOT_GITEA_HOST:  ${{ github.server_url }}
           AIBOT_GITEA_TOKEN: ${{ github.token }}
-          AIBOT_BOT_LOGIN: ${{ vars.AIBOT_BOT_LOGIN }}                # loop guard (the token's user)
+          AIBOT_BOT_LOGIN:   ${{ vars.AIBOT_BOT_LOGIN }}               # loop guard (the token's user)
 
       # Want the bot to reach Outline or any other MCP server? Don't configure it
       # here — declare it in THIS repo's own .mcp.json (Claude Code) / opencode.json
-      # (OpenCode). The bot loads and trusts the repo's MCP servers automatically;
-      # only gitea-mcp is bundled. See the action README.
+      # (OpenCode) / crush.json (Crush). The bot loads and trusts the repo's MCP
+      # servers automatically; only gitea-mcp is bundled. See the action README.
