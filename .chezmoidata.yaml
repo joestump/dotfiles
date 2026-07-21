@@ -5,30 +5,26 @@
 # Single source of truth for values that were previously hardcoded in many places.
 # To change one, edit here and `chezmoi apply`.
 
-# Joe's personal Signal number (E.164) = the OPERATOR: the human the agent serves.
-# Backs the Signal MCP `--operator` flag, the signal-notify recipient, and
-# scheduled-task summaries. Quoted so YAML keeps it a string.
+# Joe's personal Signal number (E.164) = the OPERATOR default: the human the
+# agent serves. Backs the signal-notify recipient and scheduled-task summaries.
+# Quoted so YAML keeps it a string.
 #
-# The number the agent runs AS (the signal-cli daemon `-a` and the MCP
-# `--account`) is a SEPARATE value: the SIGNAL_MCP_ACCOUNT env var, provisioned by
-# OpenBao (secret/users/<you>/signal). Templates use
-# `{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}` for the account, so an
-# OpenBao-provisioned node runs as the agent's own number (+353871760709) while a
-# bare macOS dev box without OpenBao falls back to this number (account == operator
-# == Joe → Note to Self).
+# Both identities are overridable by env vars provisioned from OpenBao
+# (secret/users/<you>/signal), with this number as the dev-box fallback:
+#
+#   SIGNAL_MCP_ACCOUNT   signal-cli daemon `-a` and signal-mcp `--account`
+#                        (the number the agent runs AS). OpenBao-provisioned
+#                        nodes serve from the agent's own number (+353871760709).
+#   SIGNAL_MCP_OPERATOR  signal-mcp `--operator` (the human the agent serves).
+#                        Defaults to this number on a bare dev box without
+#                        OpenBao (account == operator == Joe → Note to Self).
+#   SIGNAL_MCP_TRUSTED_RECIPIENTS / SIGNAL_MCP_TRUSTED_SENDERS
+#                        Inbound/outbound allowlists. Read by signal-mcp from
+#                        the env at runtime; never rendered as CLI flags.
+#
+# Templates use `{{ env "SIGNAL_MCP_*" | default .signalNumber }}`, so omitting
+# an env var falls back to this number rather than breaking the apply.
 signalNumber: "+12062257886"
-
-# Signal MCP config. Rendered into the crush `signal` MCP block (see
-# dot_config/crush/crush.json.tmpl). The server is always started with
-# `--transport stdio`; everything else is knobs.
-signal:
-  # Outbound allowlist is NOT hardcoded here — it comes from the
-  # SIGNAL_MCP_TRUSTED_RECIPIENTS env var (OpenBao:
-  # secret/users/<you>/signal), which signal-mcp reads at runtime. Keeping
-  # it in OpenBao avoids re-keying recipients across machines and keeps this
-  # file non-secret. trustedRecipients is kept empty so no --trusted-recipient
-  # flags are rendered; signal-mcp's env-var merge is the sole source.
-  trustedRecipients: []
 
 # Contact email. Not currently referenced anywhere (the repo had no real email — the
 # joestump@host strings are SSH targets), but kept here as the single place to set it
