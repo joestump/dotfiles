@@ -12,6 +12,12 @@ OS="$(uname -s)"
 # `chezmoi apply` re-runs this script (run_onchange keys on its rendered content).
 SIGNAL_CLI_VER="0.14.5"
 
+# Pinned gitleaks version for Linux (macOS gets it from the Brewfile). The repo's
+# .githooks/pre-commit HARD-REQUIRES gitleaks (>= 8.19 for `gitleaks git --staged`),
+# so a fresh Linux node can't commit until this lands. Not in apt — installed from
+# the GitHub release binary below.
+GITLEAKS_VER="8.30.1"
+
 # On macOS, setsid isn't available. Implement a basic fallback using perl
 # (pre-installed on macOS) to create a new session and exec.
 if ! command -v setsid >/dev/null 2>&1; then
@@ -122,6 +128,33 @@ ensure_signal_cli_linux() {
   rm -rf "$tmp"
 }
 
+# gitleaks — secret scanner the pre-commit hook requires. Not in apt; install the
+# prebuilt GitHub release binary (arch-aware) under ~/.local/bin. Idempotent: skips
+# when the pinned version is already on PATH. Mirrors the signal-cli approach so it
+# works on future arm64 nodes too.
+ensure_gitleaks_linux() {
+  local ver="$GITLEAKS_VER"
+  if command -v gitleaks >/dev/null 2>&1 && gitleaks version 2>/dev/null | grep -qx "$ver"; then
+    return 0
+  fi
+  local arch
+  case "$(dpkg --print-architecture 2>/dev/null || uname -m)" in
+    amd64|x86_64) arch="x64" ;;
+    arm64|aarch64) arch="arm64" ;;
+    *) echo "WARN: unsupported arch for gitleaks; install by hand"; return 0 ;;
+  esac
+  echo "==> installing gitleaks $ver (GitHub release binary → ~/.local/bin)"
+  local url="https://github.com/gitleaks/gitleaks/releases/download/v${ver}/gitleaks_${ver}_linux_${arch}.tar.gz"
+  local tmp; tmp="$(mktemp -d)"
+  if curl -fsSL "$url" -o "$tmp/gitleaks.tgz" && tar -xzf "$tmp/gitleaks.tgz" -C "$tmp" gitleaks; then
+    mkdir -p "$HOME/.local/bin"
+    install -m0755 "$tmp/gitleaks" "$HOME/.local/bin/gitleaks"
+  else
+    echo "WARN: could not download gitleaks $ver from $url"
+  fi
+  rm -rf "$tmp"
+}
+
 install_linux() {
   command -v apt-get >/dev/null 2>&1 || { echo "no apt-get; skipping Linux packages"; return 0; }
   local list="$HOME/.config/dotfiles/apt-packages.txt"
@@ -164,6 +197,7 @@ install_linux() {
   ensure_gum_linux
   ensure_uv_linux
   ensure_signal_cli_linux
+  ensure_gitleaks_linux
 }
 
 # Claude Code CLI — install if absent (native installer → ~/.local/bin, versioned
