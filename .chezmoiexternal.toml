@@ -127,6 +127,28 @@
 [".local/share/crush-src".pull]
     args = ["--ff-only", "--quiet"]
 
+# ---------- Crush Agent Skills sources ----------
+# Crush discovers Agent Skills (folders with SKILL.md) from options.skills_paths
+# in crush.json. Clone the skill repos into a Crush-owned, clearly-named dir so
+# they're managed + reproducible on every machine — rather than pointing at Claude
+# Code's opaque plugin-marketplace clones (~/.claude/plugins/marketplaces, keyed by
+# marketplace name, e.g. claude-skills lives under .../joestump). Public repos, so
+# no auth guard needed. ff-only keeps the clones clean; 24h refresh so newly-pushed
+# skills propagate within a day (immediate: `chezmoi apply --refresh-externals`).
+# Pruning of non-portable skills lives in crush.json's disabled_skills.
+[".config/crush/skills-ext/claude-skills"]
+    type = "git-repo"
+    url = "https://github.com/{{ .githubUser }}/claude-skills.git"
+    refreshPeriod = "24h"
+[".config/crush/skills-ext/claude-skills".pull]
+    args = ["--ff-only", "--quiet"]
+[".config/crush/skills-ext/claude-plugin-sdd"]
+    type = "git-repo"
+    url = "https://github.com/{{ .githubUser }}/claude-plugin-sdd.git"
+    refreshPeriod = "24h"
+[".config/crush/skills-ext/claude-plugin-sdd".pull]
+    args = ["--ff-only", "--quiet"]
+
 {{ if ne .chezmoi.os "darwin" -}}
 # ---------- Signal MCP server (Linux only) ----------
 # The Signal MCP (a JSON-RPC client for the signal-cli daemon) is launched with
