@@ -59,6 +59,16 @@
     }
 {{- $sep = "," }}
 {{- end }}
+{{- if env "HYPER_API_KEY" }}
+    {{ $sep }}"hyper": {
+      "type": "openai-compat",
+      "name": "Hyper (charm.land)",
+      "base_url": "https://hyper.charm.land/v1",
+      "api_key": "$HYPER_API_KEY",
+      "discover_models": true
+    }
+{{- $sep = "," }}
+{{- end }}
   },
   "lsp": {
     "go": {
