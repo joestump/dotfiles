@@ -3,7 +3,8 @@
 #
 # settings.json is co-owned: Claude Code itself writes enabledPlugins,
 # extraKnownMarketplaces, theme, etc. So — like the MCP merge into ~/.claude.json —
-# we rewrite ONLY our permission keys with jq and leave every other key untouched.
+# we rewrite ONLY our keys (permission posture + the chezmoi-drift guard hooks) with
+# jq and leave every other key untouched.
 #
 # The values come from .chezmoidata.yaml (shared attended defaults), overridable
 # per-machine via the chezmoi config's [data.claude] table. Because the values are
@@ -27,17 +28,36 @@ echo "==> Claude Code settings merge (permissionMode=${MODE})"
 mkdir -p "$HOME/.claude"
 [ -f "$CJ" ] || echo '{}' > "$CJ"
 
+# Hook posture: dotfiles owns the chezmoi-drift guard. Absolute paths are baked in at
+# render time so hook invocation never depends on shell env expansion at runtime.
+# The scripts themselves ship via dot_claude/hooks/ (applied before this run_onchange).
+HOOKS_DIR="{{ .chezmoi.homeDir }}/.claude/hooks"
+read -r -d '' HOOKS_JSON <<EOF || true
+{
+  "PostToolUse": [
+    { "matcher": "Edit|Write|MultiEdit",
+      "hooks": [ { "type": "command", "command": "${HOOKS_DIR}/chezmoi-edit-guard.sh" } ] }
+  ],
+  "Stop": [
+    { "hooks": [ { "type": "command", "command": "${HOOKS_DIR}/chezmoi-commit-guard.sh" } ] }
+  ]
+}
+EOF
+
 # Rewrite only our keys. .permissions.defaultMode is set while preserving any other
-# .permissions subkeys (allow/deny/ask). All other top-level keys pass through.
+# .permissions subkeys (allow/deny/ask); .hooks is replaced wholesale (dotfiles is the
+# source of truth for it). All other top-level keys pass through.
 new="$(jq \
   --arg mode "$MODE" \
   --argjson skipAuto "$SKIP_AUTO" \
   --argjson skipWorkflow "$SKIP_WORKFLOW" \
-  --argjson skipDangerous "$SKIP_DANGEROUS" '
+  --argjson skipDangerous "$SKIP_DANGEROUS" \
+  --argjson hooks "$HOOKS_JSON" '
     .permissions = ((.permissions // {}) | .defaultMode = $mode)
     | .skipAutoPermissionPrompt = $skipAuto
     | .skipWorkflowUsageWarning = $skipWorkflow
     | .skipDangerousModePermissionPrompt = $skipDangerous
+    | .hooks = $hooks
   ' "$CJ")"
 
 # Idempotent: no write when already current (keeps run_onchange quiet + mtime stable).
