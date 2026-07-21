@@ -149,12 +149,8 @@
         "--account",
         "{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}",
         "--operator",
-        "{{ .signalNumber }}",
+        "{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}",
         "--channel"
-{{- range .signal.trustedRecipients }},
-        "--trusted-recipient",
-        "{{ . }}"
-{{- end }}
       ],
       "timeout": 60,
       "disabled": false

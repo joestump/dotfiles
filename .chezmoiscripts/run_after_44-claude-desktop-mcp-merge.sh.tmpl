@@ -57,7 +57,7 @@ desired="$(mcp_base | jq \
                                       "--header", ("Authorization:Bearer " + $ot)]} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {command:$uv,
-               args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ .signalNumber }}","--transport","stdio"],
+               args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}","--transport","stdio"],
                env:{PATH:$sigpath}}
 ')"
 
