@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Install Ansible for StumpCloud infrastructure management.
+#
+# The stumpcloud/ansible repo (cloned by the chezmoi external at ~/src/ansible)
+# uses Pipenv for dependency management. On Ubuntu 24.04+, PEP 668 blocks
+# `pip install --user`, so we use uv (already available) to create a venv
+# and install pipenv there. This avoids the externally-managed-environment error.
+#
+# Rerun model: runs on EVERY apply but is cheap when already installed.
+set -euo pipefail
+
+# ~/.local/bin may not be on PATH in the shell that invoked chezmoi (a login shell
+# opened before env.zsh added it). Add it so `command -v` works.
+export PATH="$HOME/.local/bin:$PATH"
+
+repo="$HOME/src/ansible"
+venv="$HOME/.local/share/ansible-venv"
+
+# Clean progress via the shared UI lib (spinner on a TTY, quiet otherwise);
+# fallback keeps the script working if the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  have() { command -v "$1" >/dev/null 2>&1; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  say()   { echo "  $*"; }
+  warn() { echo "  WARN: $*" >&2; }
+}
+
+heading "🔧 Ansible (StumpCloud)"
+
+# The external clones the source; if it isn't there yet, there's nothing to set up.
+[ -d "$repo/.git" ] || { item dim "ansible repo not cloned yet ($repo); skipping"; exit 0; }
+
+# Aggressively fetch + ff-only pull on every apply. This clone is managed (nothing
+# is developed here), so this is always safe.
+if git -C "$repo" fetch --quiet --prune origin 2>/dev/null; then
+  DEF="$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+  if git -C "$repo" merge --ff-only --quiet "$DEF" 2>/dev/null; then
+    head="$(git -C "$repo" rev-parse --short HEAD)"
+    item ok "ansible at ${head}"
+  else
+    warn "ff-only merge failed (local commits?) — running from current HEAD"
+  fi
+else
+  warn "fetch failed — running from current local state"
+fi
+
+# Use uv to create a venv and install pipenv (avoids PEP 668 externally-managed-environment).
+have uv || { item dim "uv absent — skipping ansible setup"; exit 0; }
+
+# Create venv if needed.
+if [ ! -d "$venv" ]; then
+  say "creating ansible venv..."
+  uv venv "$venv" --quiet
+  item ok "venv created at $venv"
+fi
+
+# Install pipenv in the venv if needed.
+if [ ! -x "$venv/bin/pipenv" ]; then
+  say "installing pipenv..."
+  uv pip install --python "$venv/bin/python" pipenv --quiet
+  item ok "pipenv installed"
+else
+  item ok "pipenv already installed"
+fi
+
+# Create a wrapper script so `pipenv` is on PATH.
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/pipenv" << 'EOF'
+#!/bin/bash
+exec "$HOME/.local/share/ansible-venv/bin/pipenv" "$@"
+EOF
+chmod +x "$HOME/.local/bin/pipenv"
+
+# Sync the ansible repo's venv. This downloads dependencies defined in Pipfile.lock.
+# Use the wrapper pipenv which points to our isolated venv.
+export PIPENV_IGNORE_VIRTUALENVS=1
+export PIPENV_VENV_IN_PROJECT=1
+
+if ! step "syncing pipenv venv" -- pipenv sync --quiet --dir "$repo" 2>/dev/null; then
+  warn "pipenv sync failed; first run may cold-start"
+fi
+
+item ok "ansible ready at $repo (run: pipenv run ansible-playbook ...)"

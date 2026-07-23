@@ -151,3 +151,16 @@
 ["src/signal-mcp".pull]
     args = ["--ff-only", "--quiet"]
 {{ end -}}
+
+# ---------- StumpCloud Ansible (Infrastructure automation) ----------
+# The StumpCloud infrastructure monorepo (stumpcloud/ansible on Gitea) deploys
+# services across the DUB/PDX/DTW clusters. Cloned here for local development
+# and agent-initiated deployment. The install-ansible script sets up the venv.
+# Tracks the default branch (main); ff-only pull keeps this managed clone clean.
+# For an immediate pull: `chezmoi apply --refresh-externals`.
+["src/ansible"]
+    type = "git-repo"
+    url = "https://gitea.stump.rocks/stumpcloud/ansible.git"
+    refreshPeriod = "24h"
+["src/ansible".pull]
+    args = ["--ff-only", "--quiet"]
