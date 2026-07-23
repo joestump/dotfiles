@@ -16,7 +16,7 @@ export ZSH="$HOME/.oh-my-zsh"
 #   comfyline_prompt/comfyline      (needs a Powerline/Nerd font)
 #   robbyrussell                    (OMZ built-in fallback)
 # The `theme` helper (dot.zsh) can override this per-machine by writing a theme name
-# to ~/.config/dotfiles/zsh-theme — a local file that's NOT chezmoi-managed, so your
+# to ~/.config/dotfiles/zsh-theme — a local file that's NOT chezmoi-managed, so you
 # pick survives `chezmoi apply` and can differ per box. Falls back to spaceship.
 ZSH_THEME="$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/zsh-theme 2>/dev/null || echo spaceship-prompt/spaceship)"
 
@@ -24,12 +24,12 @@ ZSH_THEME="$(cat ${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/zsh-theme 2>/dev/nul
 # each time a shell starts. Add/remove glyphs here (needs a Nerd Font). Must be
 # set before `source $ZSH/oh-my-zsh.sh` below.
 PROMPT_GLYPHS=(
-  $''   # zap
-  $''   # star
-  $''   # heart
-  $''   # paw
-  $''   # rocket
-  $''   # cloud (StumpCloud!)
+  $'󰌷 '  # zap
+  $'󱅅 '  # star
+  $'󱄄 '  # heart
+  $'󰲠 '  # paw
+  $' '  # rocket
+  $'󰃒 '  # cloud (StumpCloud!)
 )
 
 # Set list of themes to pick from when loading at random
@@ -127,7 +127,6 @@ plugins=(
   copypath
   copyfile
   shlink
-  zsh-harnessd
   zsh-ai
   zsh-autosuggestions
   zsh-syntax-highlighting

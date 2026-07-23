@@ -1,4 +1,4 @@
-# Go tools to install with `go install`. One module path per line; `@version`
+# Go tools to install with `go install`. One module path per line; @version
 # optional (defaults to @latest if omitted). Lines starting with # are ignored.
 #
 # Installed automatically by run_onchange_after_10-install-packages.sh.tmpl into
@@ -9,6 +9,12 @@
 # which recompiles (~12s) on a cold cache and overruns Claude's MCP startup
 # window. Installing it here warms the build cache so `go run` starts instantly.
 gitea.com/gitea/gitea-mcp@latest
+
+# The harness daemon — Go + Charmbracelet TUI for supervising, attaching to,
+# and hopping between long-running harnesses (agent CLIs, REPLs, watchers).
+# Successor to the zsh-harnessd plugin. Config at ~/.config/harness/harness.toml;
+# runs as a systemd --user service (harness.service).
+gitea.stump.rocks/stump.wtf/harness@latest
 
 # Examples (uncomment or add your own):
 # github.com/jesseduffield/lazygit@latest

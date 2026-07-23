@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Installs and enables the harness daemon systemd --user service.
+#
+# Governing: ADR-0005 (supervision and lifecycle). The Go-based `harness`
+# binary replaces the old zsh + tmux `harnessd` plugin. The binary is
+# installed via go-tools.txt (gitea.stump.rocks/stump.wtf/harness@latest).
+
+set -euo pipefail
+
+# Only run on Linux (systemd --user). macOS uses launchd (separate plist).
+if [[ "$(uname)" != "Linux" ]]; then
+  echo "harness-daemon-service: skipping on $(uname) (Linux/systemd only)"
+  exit 0
+fi
+
+# Check if the binary exists (go-tools.txt install may not have run yet)
+if ! command -v harness &>/dev/null; then
+  GO_BIN="${GOBIN:-$HOME/go/bin}"
+  if [[ ! -x "$GO_BIN/harness" ]]; then
+    echo "harness-daemon-service: harness binary not found — run 'go install gitea.stump.rocks/stump.wtf/harness@latest'"
+    exit 0
+  fi
+fi
+
+echo "harness-daemon-service: enabling harness.service"
+
+# Stop and disable the old zsh-harnessd if it exists (migration)
+if systemctl --user is-enabled --quiet zsh-harnessd.service 2>/dev/null; then
+  echo "harness-daemon-service: stopping and disabling legacy zsh-harnessd.service"
+  systemctl --user stop zsh-harnessd.service 2>/dev/null || true
+  systemctl --user disable zsh-harnessd.service 2>/dev/null || true
+fi
+
+# Reload systemd to pick up the new unit file
+systemctl --user daemon-reload
+
+# Enable and (re)start the harness daemon
+systemctl --user enable harness.service
+systemctl --user restart harness.service
+
+echo "harness-daemon-service: harness.service is $(systemctl --user is-active harness.service)"

@@ -1,0 +1,51 @@
+# harness.toml — configuration for the Go-based `harness` daemon.
+#
+# This replaces the old zsh + tmux `harnessd` setup. The binary is installed
+# via `go install gitea.stump.rocks/stump.wtf/harness@latest` (see go-tools.txt)
+# and runs as a systemd --user service (harness.service).
+#
+# Config path: $XDG_CONFIG_HOME/harness/harness.toml (falls back to
+# ~/.config/harness/harness.toml). After editing, run `harness doctor` to
+# verify, then the daemon picks it up on reload.
+#
+# Each harness is one supervised process. The new-style [harness.<name>]
+# form is preferred.
+
+# ── Harness 1: Headless Crush attached to the Signal channel ─────────────
+# This machine's Signal arbiter. Reads secrets from the vault-agent-rendered
+# static env file (LITELLM_API_KEY, SIGNAL_*, etc.).
+[harness.crush-signal-channel]
+cmd = "crush"
+args = ["--yolo", "--data-dir", "{workdir}", "--channels", "server:signal"]
+workdir = "~/.local/share/crush-signal-channel"
+env_file = "~/.config/vault/secrets-static.env"
+description = "Headless Crush attached to the Signal channel"
+restart_delay = 5
+enabled = true
+
+# ── Harness 2: Headless Claude Code via Remote Control ───────────────────
+# Joe drives this from his phone via Remote Control (claude.ai / mobile).
+# NOT wired to any chat channel. Needs a one-time `claude` login on first
+# boot (persists in ~/.claude). Disabled by default — start explicitly via
+# `harness start claude-remote-control`.
+[harness.claude-remote-control]
+cmd = "claude"
+args = ["--remote-control", "joestump-agent (tars)", "--dangerously-skip-permissions"]
+workdir = "~/.local/share/claude-remote-control"
+env_file = "~/.config/vault/secrets-static.env"
+description = "Headless Claude Code driven via Remote Control"
+restart_delay = 5
+enabled = false
+
+# ── Profiles (ADR-0006) ──────────────────────────────────────────────────
+# Named groups of harnesses that switch via `harness use-profile <name>`.
+
+[profile.default]
+description = "Everyday set — just the Crush Signal channel"
+harnesses = ["crush-signal-channel"]
+autostart = true
+
+[profile.full]
+description = "All harnesses running"
+harnesses = ["crush-signal-channel", "claude-remote-control"]
+autostart = false

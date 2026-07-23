@@ -42,7 +42,7 @@ V="$REPO_ROOT/dot_config/vault"
 }
 
 @test "signal-crush harness sources the vault static env" {
-  local harness="$REPO_ROOT/dot_config/harnessd/harnessd.toml"
+  local harness="$REPO_ROOT/dot_config/harness/harness.toml"
   grep -q 'env_file = "~/.config/vault/secrets-static.env"' "$harness"
 }
 

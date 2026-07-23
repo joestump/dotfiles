@@ -1,0 +1,16 @@
+[Unit]
+Description=Harness agent supervisor (Go)
+Documentation=https://gitea.stump.rocks/stump.wtf/harness
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{ env "GOBIN" | default (printf "%s/go/bin" .chezmoi.homeDir) }}/harness daemon
+Restart=on-failure
+RestartSec=5
+
+# Environment
+Environment=XDG_CONFIG_HOME=%h/.config
+
+[Install]
+WantedBy=default.target
