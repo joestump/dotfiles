@@ -223,6 +223,22 @@
       "**/openapi.yaml",
       "**/openapi.json"
     ],
+    "skills_paths": [
+      "{{ .chezmoi.homeDir }}/.config/crush/skills",
+      "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-skills",
+      "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-plugin-sdd/skills"
+    ],
+    "disabled_skills": [
+      "refresh-miatrix-token",
+      "self-report",
+      "retirement-plan",
+      "init",
+      "prime",
+      "report-friction",
+      "index",
+      "search",
+      "work"
+    ],
     "disabled_tools": []
   },
   "permissions": {
