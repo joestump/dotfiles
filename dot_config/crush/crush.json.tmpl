@@ -4,7 +4,15 @@
        time (Vault Agent renders them into the shell that runs `czu`). No provider
        is hardcoded and no default model is pinned — Crush picks from whatever
        providers materialized. Leading-comma separator ($sep) keeps the JSON valid
-       when any subset (including none) is enabled. */ -}}
+       when any subset (including none) is enabled.
+
+       Secret origins (all from OpenBao at secret/users/<you>/…):
+         OPENAI_DIRECT_API_KEY  openai
+         LITELLM_API_KEY        litellm (StumpCloud gateway)
+         GEMINI_API_KEY         gemini (Google AI Studio direct)
+         ZAI_API_TOKEN          zai (Z.ai GLM Coding Plan)
+         HYPER_API_KEY          hyper (charm.land)
+       */ -}}
   "providers": {
 {{- $sep := "" }}
 {{- if env "OPENAI_DIRECT_API_KEY" }}
@@ -56,6 +64,16 @@
         }
 {{- end }}
       ]
+    }
+{{- $sep = "," }}
+{{- end }}
+{{- if env "HYPER_API_KEY" }}
+    {{ $sep }}"hyper": {
+      "type": "openai-compat",
+      "name": "Hyper (charm.land)",
+      "base_url": "https://hyper.charm.land/v1",
+      "api_key": "$HYPER_API_KEY",
+      "discover_models": true
     }
 {{- $sep = "," }}
 {{- end }}

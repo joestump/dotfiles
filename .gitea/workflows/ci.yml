@@ -10,9 +10,11 @@ jobs:
         # chezmoi lets the render-based suites (chezmoiexternal.bats,
         # vault-agent-stale.bats) actually run here instead of skipping; jq backs
         # the approle-setup identity-merge path exercised by
-        # vault-approle-blast-radius.bats.
+        # vault-approle-blast-radius.bats; python3 backs the crush-providers
+        # JSON validation in the bats job.
         run: |
-          sudo apt-get update && sudo apt-get install -y bats zsh jq
+          sudo apt-get update && sudo apt-get install -y bats zsh jq python3
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: BATS suite
