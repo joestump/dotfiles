@@ -1,0 +1,48 @@
+# harness.toml — supervised long-running agents. Seeded by chezmoi, then YOURS.
+#
+# Note the `create_` prefix on the chezmoi SOURCE file: chezmoi writes this file
+# once, on a machine that doesn't already have it, and never touches it again.
+# That's deliberate — harness's own TUI rewrites this file wholesale
+# (internal/tui/form.go → os.WriteFile) when you add or edit a harness in the
+# new-harness form, so a normally-managed file would be clobbered on the next
+# `chezmoi apply`. Consequence: editing the chezmoi source changes the seed for
+# FUTURE machines only; to change THIS machine, edit this file or use the TUI.
+#
+# Full field reference: ~/.local/share/harness-src/harness.toml.example and
+# `harness daemon -h`. Fields not used here: restart_delay, tmux_socket, and
+# backend (defaults to "native", which runs the process under the daemon's own
+# PTY per ADR-0003 — that's what a full-screen TUI like crush needs; "tmux" is
+# the compat escape hatch).
+
+# Crush driven from Signal, on Z.ai's GLM-5.2, with permission prompts off.
+#
+# MODEL PINNING. Crush has no --model flag; the model comes from config, and the
+# last config file wins (GlobalConfig → GlobalConfigData → project configs).
+# CRUSH_GLOBAL_DATA, set in the env_file below, repoints GlobalConfigData at
+# ~/.local/share/crush-glm/crush.json, which pins glm-5.2 on the zai provider for
+# THIS harness only. The `crush` you run interactively keeps its own model — the
+# shared ~/.config/crush/crush.json still pins nothing, by design.
+#
+# --yolo auto-accepts every permission prompt. That's the point of an agent you
+# drive from your phone — nobody is at the keyboard to approve a bash call — and
+# it's also exactly why `enabled = false`: the daemon will NOT autostart this on
+# boot. Start it deliberately with `harness start crush-glm`. Flip to true only
+# if you want a permission-free agent live in ~/src from the moment you log in.
+#
+# --channels signal opts the `signal` MCP server into the fork's channel feature,
+# so inbound Signal messages arrive as live events mid-session rather than only
+# when a tool is polled. Opt-in is per-server and CLI-only (there is no config
+# key for it — hence args), and both "signal" and "server:signal" are accepted.
+#
+# The signal MCP is already launched with `--operator {{ .signalNumber }} --channel
+# --prefix cc` (see dot_config/crush/crush.json.tmpl), so the cc prefix is
+# REQUIRED: signal-mcp drops any inbound message that doesn't start with `cc` on
+# a word boundary. "cc deploy" and "cc: deploy" match, "ccdeploy" does not, and
+# the prefix is stripped before the text reaches the agent.
+[harness.crush-glm]
+cmd = "{{ .chezmoi.homeDir }}/.local/bin/crush"
+args = ["--yolo", "--channels", "signal"]
+workdir = "{{ .chezmoi.homeDir }}/src"
+env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-glm.env"
+description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel (cc prefix)"
+enabled = false
