@@ -1,0 +1,21 @@
+# Targets chezmoi should DELETE from the destination on apply.
+#
+# Deleting a file from the source tree only stops chezmoi managing it — the
+# rendered copy stays on every machine that already applied it. This file is how
+# a retired thing actually leaves those machines. Entries are idempotent: a path
+# that isn't there is a no-op, so they're safe to leave in place indefinitely.
+#
+# BE CAREFUL. Anything listed here is removed from $HOME on the next apply, on
+# every machine. Only list files this repo used to own.
+
+# crush-signal-channel — retired 2026-07-24, superseded by the `crush-glm`
+# harness in ~/.config/harness/harness.toml. The tmux + launchd/systemd wrapper
+# around a headless Crush arbitrating the Signal channel is now harness's job
+# (supervision, restart, attach), so the bespoke supervisor is dead weight.
+# NOTE: the data dir ~/.local/share/crush-signal-channel is deliberately NOT
+# listed — it holds that agent's session history and logs. Delete it by hand if
+# and when you want it gone.
+.local/bin/crush-signal-channel.sh
+.oh-my-zsh/custom/crush-signal-channel.zsh
+Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
+.config/systemd/user/crush-signal-channel.service
