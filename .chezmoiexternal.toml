@@ -134,6 +134,23 @@
 [".local/share/crush-src".pull]
     args = ["--ff-only", "--quiet"]
 
+# ---------- harness ("systemctl for your agents") — build source ----------
+# Same model as crush-src above: {{ .harnessRepo }} ships NO release binaries, so
+# chezmoi clones the source HERE and `run_after_32-install-harness.sh` builds it to
+# ~/.local/bin/harness. PUBLIC repo, so no credential guard is needed (unlike
+# claude-personal above) — an anonymous clone works on an unprovisioned node.
+# Tracks the default branch (main); ff-only pull keeps this managed clone clean —
+# do NOT hack in this dir. Joe's dev checkout is ~/src/harness and chezmoi
+# deliberately does not manage it, so the two never fight. Note: chezmoi won't
+# re-point an EXISTING clone if .harnessRepo changes, so the build script
+# reconciles the remote. Immediate pull + rebuild: `chezmoi apply --refresh-externals`.
+[".local/share/harness-src"]
+    type = "git-repo"
+    url = "{{ .harnessRepo }}"
+    refreshPeriod = "168h"
+[".local/share/harness-src".pull]
+    args = ["--ff-only", "--quiet"]
+
 # ---------- Crush Agent Skills sources ----------
 # Crush discovers Agent Skills (folders with SKILL.md) from options.skills_paths
 # in crush.json. Clone the skill repos into a Crush-owned, clearly-named dir so

@@ -172,6 +172,13 @@ outlineUrl: "https://outline.stump.rocks"
 # both the .chezmoiexternal.toml clone URL and the build script's remote guard.
 crushRepo: "https://github.com/joestump-agent/crush.git"
 
+# harness ("systemctl for your agents") — built from source by
+# run_after_32-install-harness, same model as crushRepo above: the repo ships no
+# release binaries, so there is nothing to download. Public repo on the stump.wtf
+# Gitea org, so the external needs no credential guard. Single source of truth for
+# both the .chezmoiexternal.toml clone URL and the build script's remote guard.
+harnessRepo: "https://gitea.stump.rocks/stump.wtf/harness.git"
+
 # OpenBao / Vault server address. Single source of truth for the agent config
 # (agent.hcl), the systemd units + launchd plists that run it, and the czu updater.
 # Referenced as {{ .vaultAddr }} in those *.tmpl files; the Consul-Template *.ctmpl
