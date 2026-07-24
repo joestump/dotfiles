@@ -232,10 +232,20 @@
       "**/openapi.yaml",
       "**/openapi.json"
     ],
+{{- /* The private claude-personal marketplace is deliberately NOT cloned a second
+       time under skills-ext/ like the public repos above it. It is ALREADY cloned
+       (credential-guarded) at .config/claude-marketplaces/claude-personal for the
+       Claude Code plugin installer, and a second clone of the same private repo
+       would mean two sets of Gitea credentials, two refresh timers, and — the real
+       problem — two HEADs, so Crush and Claude Code could serve different versions
+       of the same skill. Pointing both at one clone keeps them identical. Crush
+       tolerates a path that doesn't exist (skills.go ignores os.IsNotExist), so an
+       unprovisioned node without the guarded clone still starts clean. */}}
     "skills_paths": [
       "{{ .chezmoi.homeDir }}/.config/crush/skills",
       "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-skills",
-      "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-plugin-sdd/skills"
+      "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-plugin-sdd/skills",
+      "{{ .chezmoi.homeDir }}/.config/claude-marketplaces/claude-personal/skills"
     ],
     "disabled_skills": [
       "refresh-miatrix-token",

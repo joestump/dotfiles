@@ -2,7 +2,7 @@
 
 This is Joe's chezmoi-managed dotfiles repo (source of truth: `~/src/dotfiles`, remote: https://gitea.stump.rocks/joestump/dotfiles). It is a **production service** — every StumpCloud node, every ephemeral SSH bootstrap, and every Claude Code session on Joe's machines runs on what lands here. Breakage here has OMG scope (see `~/.claude/CLAUDE.md` § "OMGs").
 
-Before you edit anything, load the `/chezmoi` skill (`.claude/skills/chezmoi/SKILL.md`) — it encodes the source-vs-target rules, the run-script prefixes, the ui-lib.sh + gum theme, the externals model, and the Vault Agent secrets flow. Ignoring those conventions will silently break other machines on the next `chezmoi apply`.
+Before you edit anything, load the `/chezmoi` skill — it ships from the private `claude-personal` marketplace (source: `~/Claude/skills/chezmoi/SKILL.md`), so it is available in Claude Code, Claude Desktop and Crush, in any directory, not just this repo — it encodes the source-vs-target rules, the run-script prefixes, the ui-lib.sh + gum theme, the externals model, and the Vault Agent secrets flow. Ignoring those conventions will silently break other machines on the next `chezmoi apply`.
 
 ## Where to look
 
