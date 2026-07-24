@@ -15,7 +15,7 @@ non-secret config, and secrets.
 
 | Concern | Tool | Notes |
 | --- | --- | --- |
-| Dotfile management | chezmoi | source dir `~/.local/share/chezmoi` = the git repo |
+| Dotfile management | chezmoi | source dir `~/src/dotfiles` = the git repo |
 | Backing remote | Gitea | `https://gitea.stump.rocks/joestump/dotfiles` (private), HTTPS + osxkeychain token |
 | Shell framework | Oh My Zsh | pre-installed at `~/.oh-my-zsh`; **never** re-installed or overwritten |
 | Per-project config | direnv | `.envrc` files; non-secret only |

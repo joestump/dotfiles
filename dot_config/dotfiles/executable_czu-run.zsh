@@ -73,7 +73,7 @@ have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "⟳ czu · updating
 heading "📥 Sync"
 . "$HOME/.config/dotfiles/czu-lib.sh" 2>/dev/null \
   || fail "czu-lib.sh missing — run 'chezmoi apply' to reinstall it"
-CZU_SRC="$(chezmoi source-path 2>/dev/null || print -r -- "$HOME/.local/share/chezmoi")"
+CZU_SRC="$(chezmoi source-path 2>/dev/null || print -r -- "$HOME/src/dotfiles")"
 czu_out="$(czu_sync_branch "$CZU_SRC" 2>&1)"; czu_rc=$?
 case "$czu_out" in
   pulled)            item ok  "dotfiles — synced from fork" ;;

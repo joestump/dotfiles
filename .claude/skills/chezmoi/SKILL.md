@@ -2,7 +2,7 @@
 name: chezmoi
 description: >
   Working reference for Joe's chezmoi-managed dotfiles repo at
-  ~/.local/share/chezmoi (source of truth for every StumpCloud node's shell +
+  ~/src/dotfiles (source of truth for every StumpCloud node's shell +
   helpers + secrets flow). Load this whenever the task edits a file in this
   repo — adding a helper, changing a run script, adjusting an external, wiring
   secrets, extending the czu/status/dot commands, or updating the ui-lib style.
@@ -24,7 +24,7 @@ Companion docs (read as needed, not upfront):
 
 ## Source vs. target — the naming convention
 
-chezmoi's source tree lives at `~/.local/share/chezmoi/`. Rendered targets land in `$HOME`. The mapping is done by filename prefix.
+chezmoi's source tree lives at `~/src/dotfiles/`. Rendered targets land in `$HOME`. The mapping is done by filename prefix.
 
 | Source | Target | Notes |
 |---|---|---|

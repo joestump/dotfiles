@@ -1,6 +1,6 @@
 # Working on this repo (Claude, read this first)
 
-This is Joe's chezmoi-managed dotfiles repo (source of truth: `~/.local/share/chezmoi`, remote: https://gitea.stump.rocks/joestump/dotfiles). It is a **production service** — every StumpCloud node, every ephemeral SSH bootstrap, and every Claude Code session on Joe's machines runs on what lands here. Breakage here has OMG scope (see `~/.claude/CLAUDE.md` § "OMGs").
+This is Joe's chezmoi-managed dotfiles repo (source of truth: `~/src/dotfiles`, remote: https://gitea.stump.rocks/joestump/dotfiles). It is a **production service** — every StumpCloud node, every ephemeral SSH bootstrap, and every Claude Code session on Joe's machines runs on what lands here. Breakage here has OMG scope (see `~/.claude/CLAUDE.md` § "OMGs").
 
 Before you edit anything, load the `/chezmoi` skill (`.claude/skills/chezmoi/SKILL.md`) — it encodes the source-vs-target rules, the run-script prefixes, the ui-lib.sh + gum theme, the externals model, and the Vault Agent secrets flow. Ignoring those conventions will silently break other machines on the next `chezmoi apply`.
 
@@ -15,7 +15,7 @@ Before you edit anything, load the `/chezmoi` skill (`.claude/skills/chezmoi/SKI
 
 ## Non-obvious rules
 
-- **Never edit `~/.<file>` directly** if it's chezmoi-managed. Edit the source under `~/.local/share/chezmoi/` (or use `chezmoi edit <target>`), then `chezmoi apply`. The next apply on any other machine will clobber a rendered-file edit.
+- **Never edit `~/.<file>` directly** if it's chezmoi-managed. Edit the source under `~/src/dotfiles/` (or use `chezmoi edit <target>`), then `chezmoi apply`. The next apply on any other machine will clobber a rendered-file edit.
 - **Never re-run the OMZ installer or touch `~/.oh-my-zsh/` outside `custom/`.** OMZ self-updates; we only own `custom/*`. See `.chezmoiignore`.
 - **Secrets never live in the repo.** Vault Agent renders `~/.config/vault/secrets-*.env` from OpenBao on a schedule; `custom/00-secrets.zsh` sources them. If you catch a `.env` file or a hardcoded token about to be committed, stop — the gitleaks pre-commit hook (`.githooks/pre-commit`) will block it anyway.
 - **Match the visible style.** All apply-time output flows through ui-lib.sh (`heading "📦 …"`, `item ok "…"`, `step "title" -- cmd`). New scripts must too — a raw `echo` in the middle of czu output is a bug. Palette: pink 213, mauve 177, sky 117, green 150 (ok), red 210 (bad), yellow 223 (warn), dim 244.
