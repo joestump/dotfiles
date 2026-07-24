@@ -10,6 +10,37 @@
 # broken box doesn't spam every 6h. State lives in ~/.cache/czu-scheduled-state.
 emulate -L zsh
 
+# Load the Vault-Agent-rendered secrets BEFORE anything else, because several
+# templates gate on `env "SOME_API_KEY"` at APPLY time and render a smaller file
+# when the var is absent. Interactively that never bites — your login shell has
+# already sourced this via ~/.oh-my-zsh/custom/00-secrets.zsh. The scheduled run
+# is the problem: launchd's plist carries only PATH + VAULT_ADDR, and the systemd
+# unit sets no EnvironmentFile at all, so a 6-hourly czu was applying with an
+# empty secret environment. Concretely, that rendered crush.json with
+# `"providers": {}` and silently disabled every Crush provider until the next
+# interactive apply — which in turn pushed you to paste an API key into Crush's
+# TUI, persisting a plaintext secret outside OpenBao.
+#
+# Sourcing here (not in the plist/unit) keeps ONE fix for both platforms and
+# preserves this script's contract that a scheduled run behaves exactly like
+# typing `czu`. `set -a` exports what each file defines; the guards make this a
+# no-op on a machine Vault Agent hasn't provisioned yet. It runs before the
+# PATH/VAULT_ADDR exports below so their ${VAR:-default} precedence still holds.
+#
+# BOTH files, in the same order oh-my-zsh loads them (00-secrets.zsh, then
+# env.zsh), because some vars the templates gate on are DERIVED rather than
+# rendered: env.zsh computes OPENAI_DIRECT_API_KEY from the raw OPENAI_API_KEY
+# before shadowing OPENAI_API_KEY with the LiteLLM gateway, and aliases
+# GITEA_ACCESS_TOKEN from GITEA_TOKEN. Sourcing only the secrets file would still
+# have silently dropped Crush's `openai` provider. env.zsh is a pure export file
+# (no compinit/bindkey/prompt), so it is safe outside an interactive shell.
+if [[ -r "$HOME/.config/vault/secrets-static.env" ]]; then
+  set -a
+  . "$HOME/.config/vault/secrets-static.env"
+  [[ -r "$HOME/.oh-my-zsh/custom/env.zsh" ]] && . "$HOME/.oh-my-zsh/custom/env.zsh"
+  set +a
+fi
+
 export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"
 
