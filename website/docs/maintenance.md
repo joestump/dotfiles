@@ -66,7 +66,17 @@ splitting a group apart. Quote your values (`"yes"`, `"443"`): bare `yes` is a Y
 boolean and would render as `true`, which ssh rejects.
 
 Per-machine overrides go in that box's `~/.config/chezmoi/chezmoi.toml` under
-`[data.ssh]`, same as `[data.claude]`.
+`[data.ssh]`, same as `[data.claude]`. **Maps deep-merge, lists replace** — so this
+repoints the bastion on one box while keeping the shared `IdentityFile` /
+`IdentitiesOnly` / `StrictHostKeyChecking`:
+
+```toml
+[data.ssh.jump.options]
+  ProxyJump = "root@other.bastion"
+```
+
+whereas setting `[data.ssh.jump] hosts = [...]` replaces the host list outright
+rather than appending to it.
 
 ## Add a Claude MCP server or plugin
 

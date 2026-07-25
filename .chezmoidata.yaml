@@ -217,7 +217,10 @@ vaultSshKeys: true
 # to some YAML parsers and would render as `true`/`false`, which ssh rejects.
 #
 # Per-machine overrides go in that box's ~/.config/chezmoi/chezmoi.toml under
-# [data.ssh], same as [data.claude] below.
+# [data.ssh], same as [data.claude] below. Maps DEEP-MERGE and lists REPLACE, so
+# `[data.ssh.jump.options] ProxyJump = "root@other.bastion"` repoints the bastion on
+# one box while keeping the shared IdentityFile/IdentitiesOnly/StrictHostKeyChecking,
+# but overriding ssh.jump.hosts swaps the whole list rather than appending to it.
 ssh:
   hosts:
     # GitHub over 443 — port 22 is blocked on plenty of hotel/corp networks.

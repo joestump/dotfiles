@@ -244,6 +244,46 @@ YAML
   [ "$(grep -c 'User jumpuser' <<<"$output")" -eq 3 ]
 }
 
+# ────── per-machine [data.ssh] overrides ──────
+
+# Render the REAL template + real data, but under a $HOME carrying a chezmoi.toml
+# whose [data.ssh] table overrides part of it. Documented in maintenance.md.
+_render_with_override() {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local fh="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$fh/.config/chezmoi"
+  cat > "$fh/.config/chezmoi/chezmoi.toml"
+  HOME="$fh" chezmoi execute-template --source "$REPO_ROOT" < "$SSH_TMPL"
+}
+
+@test "ssh-config: an options override DEEP-MERGES (siblings survive)" {
+  run _render_with_override <<'TOML'
+[data.ssh.jump.options]
+  ProxyJump = "root@other.bastion"
+TOML
+  [ "$status" -eq 0 ]
+  # The overridden key changes...
+  [[ "$output" == *"ProxyJump root@other.bastion"* ]]
+  [[ "$output" != *"ProxyJump root@dagda.stump.rocks"* ]]
+  # ...and its siblings from .chezmoidata.yaml are retained.
+  [[ "$output" == *"IdentityFile ~/.ssh/id_ansible"* ]]
+  [[ "$output" == *"StrictHostKeyChecking accept-new"* ]]
+  [[ "$output" == *"IdentitiesOnly yes"* ]]
+}
+
+@test "ssh-config: a host-list override REPLACES rather than appends" {
+  run _render_with_override <<'TOML'
+[data.ssh.jump]
+  hosts = ["10.9.9.9"]
+TOML
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host 10.9.9.9"* ]]
+  # The shared defaults still apply to the replacement host...
+  [[ "$output" == *"ProxyJump root@dagda.stump.rocks"* ]]
+  # ...but the original addresses are gone, not merged in.
+  [[ "$output" != *"Host 192.168.100.213"* ]]
+}
+
 @test "ssh-config: empty host lists render a valid (multiplex-only) config" {
   run _render_with_data <<'YAML'
 ssh:
