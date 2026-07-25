@@ -168,7 +168,9 @@
         "{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}",
         "--operator",
         "{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}",
-        "--channel"
+        "--channel",
+        "--prefix",
+        "{{ env "SIGNAL_MCP_PREFIX" | default "cc" }}"
       ],
       "timeout": 60,
       "disabled": false
