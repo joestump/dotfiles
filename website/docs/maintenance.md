@@ -30,6 +30,44 @@ chezmoi edit ~/.Brewfile               # (or ~/.config/dotfiles/apt-packages.txt
 chezmoi apply
 ```
 
+## Add an SSH host
+
+`~/.ssh/config` is generated from the `ssh:` block in `.chezmoidata.yaml` — don't
+hand-edit the rendered file, it gets overwritten on the next apply.
+
+A node behind the `dagda` bastion is one line; it inherits the shared `ProxyJump` /
+`IdentityFile` / `StrictHostKeyChecking` set:
+
+```yaml
+ssh:
+  jump:
+    hosts:
+      - "192.168.100.221"    # ← new node, nothing else to write
+```
+
+Anything else is a `{patterns, options}` pair, where `options` is any set of ssh
+keywords (a list value repeats the keyword, e.g. two `IdentityFile` lines):
+
+```yaml
+ssh:
+  hosts:
+    - patterns: ["buildbox", "buildbox.stump.rocks"]
+      options:
+        HostName: "10.0.0.9"
+        User: "joestump"
+```
+
+Then `chezmoi apply && ssh -G <host>` to confirm what ssh actually resolves.
+
+Order is load-bearing: ssh is first-match-wins per keyword, and the template emits
+`ssh.hosts` → `ssh.jump.hosts` → `ssh.multiplex`. So an entry in `ssh.hosts` always
+beats the shared groups below it — that's how you special-case one node without
+splitting a group apart. Quote your values (`"yes"`, `"443"`): bare `yes` is a YAML
+boolean and would render as `true`, which ssh rejects.
+
+Per-machine overrides go in that box's `~/.config/chezmoi/chezmoi.toml` under
+`[data.ssh]`, same as `[data.claude]`.
+
 ## Add a Claude MCP server or plugin
 
 Edit `~/.config/dotfiles/mcp-servers.json` (+ its OpenBao secret) or

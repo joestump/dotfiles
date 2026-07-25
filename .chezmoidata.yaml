@@ -192,6 +192,90 @@ vaultAddr: "https://vault.stump.rocks"
 # ([data] vaultSshKeys = false), which takes precedence over this file.
 vaultSshKeys: true
 
+# SSH client config. Rendered into ~/.ssh/config by private_dot_ssh/private_config.tmpl
+# — the file used to be a static block of hand-maintained Host stanzas, so adding a
+# node meant copy-pasting five lines and getting one of them wrong. Everything here
+# is data; the template does the shaping.
+#
+# ORDER MATTERS. ssh_config is first-match-wins PER KEYWORD, so the most specific
+# blocks must render before the general ones. The template emits, in this order:
+#
+#   1. ssh.hosts          specific blocks, in list order
+#   2. ssh.jump.hosts     bastion'd hosts, expanded from one shared option set
+#   3. ssh.multiplex      the catch-all ControlMaster rule, last
+#
+# Because of first-match-wins, an entry added to ssh.hosts always beats the jump and
+# multiplex rules below it — that is the supported way to special-case one node
+# without breaking the shared groups apart.
+#
+# Every block is {patterns: [...], options: {...}}. `patterns` becomes the `Host a b c`
+# line; `options` becomes the indented keyword lines, emitted in sorted keyword order
+# (deterministic, and ssh does not care about intra-block order). An option value may
+# be a LIST to emit that keyword more than once — e.g. two IdentityFile lines.
+#
+# Values are quoted strings throughout, deliberately: unquoted `yes`/`no` are booleans
+# to some YAML parsers and would render as `true`/`false`, which ssh rejects.
+#
+# Per-machine overrides go in that box's ~/.config/chezmoi/chezmoi.toml under
+# [data.ssh], same as [data.claude] below.
+ssh:
+  hosts:
+    # GitHub over 443 — port 22 is blocked on plenty of hotel/corp networks.
+    - patterns: ["github.com"]
+      options:
+        Hostname: "ssh.github.com"
+        Port: "443"
+        User: "git"
+        ServerAliveInterval: "600"
+        TCPKeepAlive: "yes"
+        IPQoS: "throughput"
+        # github.com routes to ssh.github.com:443, whose host key lives under the
+        # [ssh.github.com]:443 identity. On a fresh box with an empty known_hosts,
+        # strict checking makes the first clone fail ("No ED25519 host key is
+        # known"); accept-new pins on first contact and rejects later changes.
+        StrictHostKeyChecking: "accept-new"
+
+    # cloud01 bootstrap — temporary, remove after WG/internal DNS lands
+    # (cloud01.stump.rocks is NXDOMAIN on the LAN, hence the literal IP).
+    # The bare `cloud01` alias is listed so `ssh cloud01` keeps working.
+    - patterns: ["cloud01", "cloud01.stump.rocks", "179.237.64.122"]
+      options:
+        HostName: "179.237.64.122"
+        User: "joestump"
+        IPQoS: "none"
+
+  # Hosts reachable only via a ProxyJump through the hypervisor. Each address below
+  # becomes its own Host block carrying `options` verbatim, so adding a node is one
+  # line here instead of a six-line copy-paste.
+  jump:
+    options:
+      User: "joestump"
+      ProxyJump: "root@dagda.stump.rocks"
+      IdentityFile: "~/.ssh/id_ansible"
+      IdentitiesOnly: "yes"
+      StrictHostKeyChecking: "accept-new"
+    hosts:
+      - "192.168.100.213"   # ie02 on dagda (DUB)
+      - "192.168.100.210"
+      - "192.168.100.220"
+
+  # Connection multiplexing for StumpCloud/infra hosts: reuse one TCP connection per
+  # host so heavy-SSH sessions don't exhaust local ephemeral ports (EADDRNOTAVAIL /
+  # "Can't assign requested address"). Deliberately excludes github.com — a shared
+  # public endpoint.
+  multiplex:
+    patterns:
+      - "*.stump.rocks"
+      - "*.stump.wtf"
+      - "192.168.100.*"
+      - "179.237.64.122"
+      - "lir"
+      - "dagda"
+    options:
+      ControlMaster: "auto"
+      ControlPath: "~/.ssh/cm-%C"
+      ControlPersist: "10m"
+
 # Claude Code permission posture, merged into ~/.claude/settings.json by
 # .chezmoiscripts/run_onchange_after_48-claude-settings-merge.sh. These are the
 # SHARED DEFAULTS = interactive/attended (Claude asks before acting) — the right

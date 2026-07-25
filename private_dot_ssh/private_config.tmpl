@@ -1,0 +1,46 @@
+{{- /*
+  ~/.ssh/config — generated from the `ssh:` block in .chezmoidata.yaml.
+
+  DO NOT hand-edit the rendered ~/.ssh/config; `chezmoi apply` overwrites it.
+  Add or change a host in .chezmoidata.yaml instead (or, per machine, in that
+  box's ~/.config/chezmoi/chezmoi.toml under [data.ssh]).
+
+  Emission order is load-bearing: ssh_config is first-match-wins per keyword, so
+  specific blocks render before general ones — ssh.hosts, then the expanded
+  ssh.jump.hosts, then the ssh.multiplex catch-all last.
+
+  `_block` renders one `Host` stanza. An option value that is a list emits the
+  keyword once per element (repeatable keywords like IdentityFile / LocalForward);
+  any other value emits a single line. Keywords come out in sorted order, which
+  ssh treats identically and which keeps the rendered file stable across applies.
+*/ -}}
+
+{{- define "_block" -}}
+Host {{ .patterns | join " " }}
+{{- range $keyword, $value := .options }}
+{{- if kindIs "slice" $value }}
+{{- range $v := $value }}
+  {{ $keyword }} {{ $v }}
+{{- end }}
+{{- else }}
+  {{ $keyword }} {{ $value }}
+{{- end }}
+{{- end }}
+{{ end -}}
+
+# Managed by chezmoi: private_dot_ssh/private_config.tmpl
+# Generated from the `ssh:` block in .chezmoidata.yaml — edit there, not here.
+
+{{ range .ssh.hosts }}
+{{- template "_block" . }}
+{{ end -}}
+
+{{- with .ssh.jump }}
+{{- range $address := .hosts }}
+{{- template "_block" (dict "patterns" (list $address) "options" $.ssh.jump.options) }}
+{{ end -}}
+{{- end }}
+
+{{- with .ssh.multiplex }}
+{{- template "_block" . }}
+{{- end }}
