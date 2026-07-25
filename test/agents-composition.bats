@@ -44,7 +44,9 @@ setup() {
     "## Signal Message Formatting" \
     "## URLs" \
     "## Outline Daily Log" \
-    "## Creating repositories" \
+    "## Creating and configuring repositories" \
+    "## Workflow (CI/CD) expectations" \
+    "## Cairn" \
     "## Code quality" \
     "## Communication"
   do
@@ -106,7 +108,7 @@ setup() {
 @test "the joestump-agent identity drops the on-behalf-of footer" {
   local agent_id
   agent_id="$(cat "$REPO_ROOT/.chezmoitemplates/agents/identity-joestump-agent.md")"
-  grep -qF "Do not use the" <<< "$agent_id"
+  grep -qF "must **not** carry the" <<< "$agent_id"
   run grep -cE '^🤖 Posted on behalf of' <<< "$agent_id"
   [ "$output" -eq 0 ]
 }
@@ -148,20 +150,141 @@ setup() {
 # Joe's forges are Gitea.
 @test "git workflow is stated host-agnostically" {
   echo "$CLAUDE_OUT" | grep -qF "host-, OS- and harness-agnostic"
-  echo "$CLAUDE_OUT" | grep -qF "Origin of truth for shared repos"
+  # Spell out what Gitea is authoritative FOR, not just that it is.
+  echo "$CLAUDE_OUT" | grep -qF "Origin of truth for their git history, issues, PRs and CI"
   echo "$CLAUDE_OUT" | grep -qF "never push here"
+  echo "$CLAUDE_OUT" | grep -qF "read-only downstream mirror"
 }
 
 @test "worktree guidance is concrete and portable" {
   echo "$CLAUDE_OUT" | grep -qF "git worktree add"
   echo "$CLAUDE_OUT" | grep -qF "git worktree remove"
-  # Nested worktrees get swept up by builds and ls-files globs.
-  echo "$CLAUDE_OUT" | grep -qF "never nested inside it"
+  # The binding rule is invisibility to git, not physical location — see
+  # "worktree rule defers to the harness convention" below.
+  echo "$CLAUDE_OUT" | grep -qF "must never be visible to git"
 }
 
 @test "stump.wtf is the repo-creation default and is mirrored, not pushed" {
   echo "$CLAUDE_OUT" | grep -qF "stump.wtf"
   echo "$CLAUDE_OUT" | grep -qF "push_mirrors"
+}
+
+# ────── repo creation + CI/CD expectations (PR #96 review) ──────
+
+@test "repo creation covers org, agent collaborator, metadata, protection and CI" {
+  local rule
+  for rule in \
+    "Default to the \`stump.wtf\` org" \
+    "push_mirrors" \
+    "joestump-agent" \
+    "Topics / labels" \
+    "Website URL" \
+    "Gitea Pages" \
+    "branch protection on \`main\`" \
+    "must be marked required" \
+    "make test" \
+    "gitleaks"
+  do
+    echo "$CLAUDE_OUT" | grep -qF "$rule" || { echo "missing repo-setup rule: $rule"; return 1; }
+  done
+}
+
+# Gitea runs the real CI (it is the authoritative remote); GitHub Actions is only
+# for publishing public artifacts, so the matrix must not be duplicated there.
+@test "workflow expectations distinguish Gitea CI from GitHub publishing" {
+  echo "$CLAUDE_OUT" | grep -qF "Gitea Actions is the real CI"
+  echo "$CLAUDE_OUT" | grep -qF "only for publishing public artifacts"
+}
+
+@test "every repo must expose make test / make lint" {
+  echo "$CLAUDE_OUT" | grep -qF 'Always run `make test lint` before pushing'
+  echo "$CLAUDE_OUT" | grep -qF "must work from a clean checkout"
+  # The Makefile wraps the native tool rather than replacing it.
+  echo "$CLAUDE_OUT" | grep -qF "gofumpt"
+  echo "$CLAUDE_OUT" | grep -qF "ruff"
+}
+
+# ────── issue routing (PR #96 review) ──────
+
+# Two different rules — infra centralises, products keep their own tracker.
+@test "issue routing distinguishes StumpCloud infra from stump.wtf products" {
+  echo "$CLAUDE_OUT" | grep -qF "StumpCloud (infra) → one central tracker"
+  echo "$CLAUDE_OUT" | grep -qF "their own repo's tracker"
+}
+
+# ────── reviewing (PR #96 review) ──────
+
+@test "reviewers fix things in our repos and must post a summary comment" {
+  echo "$CLAUDE_OUT" | grep -qF "Fix it rather than just flagging it"
+  echo "$CLAUDE_OUT" | grep -qF "The comment is not optional"
+  echo "$CLAUDE_OUT" | grep -qF "never push to a third party's branch"
+}
+
+# ────── worktrees defer to the harness (PR #96 review) ──────
+
+# Claude Code keeps worktrees at .claude/worktrees/ INSIDE the repo, gitignored.
+# The rule that matters is "never visible to git", not "never nested".
+@test "worktree rule defers to the harness convention" {
+  echo "$CLAUDE_OUT" | grep -qF ".claude/worktrees/"
+  echo "$CLAUDE_OUT" | grep -qF "because the path is gitignored"
+  run grep -cF "never nested inside it" <<< "$CLAUDE_OUT"
+  [ "$output" -eq 0 ]
+}
+
+# ────── channels + Cairn (PR #96 review) ──────
+
+@test "replies go back on the originating channel" {
+  echo "$CLAUDE_OUT" | grep -qF "Always reply on the channel the request came in on"
+}
+
+# Joe wants the Signal backlog — the old "don't proactively message" rule is gone.
+@test "Signal backlog is opt-out, not opt-in" {
+  echo "$CLAUDE_OUT" | grep -qF "Send him a note when work lands, without waiting to be asked"
+  run grep -cF "Do not proactively send Signal messages" <<< "$CLAUDE_OUT"
+  [ "$output" -eq 0 ]
+}
+
+@test "Cairn is the escape hatch for large artifacts, and never for secrets" {
+  echo "$CLAUDE_OUT" | grep -qF "cairn.stump.wtf"
+  echo "$CLAUDE_OUT" | grep -qF "instead of pasting something huge"
+  echo "$CLAUDE_OUT" | grep -qF "Never put a secret"
+}
+
+@test "Switchboard points at the skill instead of duplicating mechanics" {
+  echo "$CLAUDE_OUT" | grep -qF "/switchboard"
+}
+
+@test "the chezmoi skill is referenced before editing managed files" {
+  echo "$CLAUDE_OUT" | grep -qF "Load the \`/chezmoi\` skill"
+}
+
+# ────── attribution footers (PR #96 review) ──────
+
+# The harness is known at apply time and templated in; the model is only known at
+# runtime, so it stays a placeholder the agent fills in.
+@test "footer names the harness per target and leaves the model to runtime" {
+  echo "$CLAUDE_OUT" | grep -qF "using [Claude Code](https://claude.ai)."
+  echo "$CRUSH_OUT"  | grep -qF "using [Crush](https://github.com/charmbracelet/crush)."
+  # AGENTS.md has no harness, so it must not claim one.
+  run grep -cF "using [Claude Code]" <<< "$AGENTS_OUT"
+  [ "$output" -eq 0 ]
+}
+
+@test "footer requires a backticked model linked to OpenRouter" {
+  echo "$CLAUDE_OUT" | grep -qF '[`<model>`](<openrouter-url>)'
+  echo "$CLAUDE_OUT" | grep -qF "https://openrouter.ai/<vendor>/<model-slug>"
+  echo "$CLAUDE_OUT" | grep -qF "say so in the body"
+}
+
+@test "the agent identity signs autonomously rather than on Joe's behalf" {
+  local out
+  out="$(chezmoi execute-template --source "$REPO_ROOT" <<'EOF'
+{{ includeTemplate "agents/identity-joestump-agent.md" (merge (dict "harnessName" "Crush" "harnessUrl" "https://x") .) }}
+EOF
+)"
+  grep -qF "This was posted autonomously by" <<< "$out"
+  run grep -cF "Posted on behalf of" <<< "$out"
+  [ "$output" -eq 0 ]
 }
 
 @test "the retired hand-maintained CRUSH.md is gone" {

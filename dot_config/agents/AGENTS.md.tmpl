@@ -11,4 +11,6 @@
 */ -}}
 {{ template "agents/base.md" . }}
 
-{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) . }}
+{{- /* No harness by definition, so harnessName is empty: the identity overlay
+       falls back to telling the agent to name its own harness. */}}
+{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) (merge (dict "harnessName" "" "harnessUrl" "") .) }}

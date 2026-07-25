@@ -10,6 +10,6 @@
 */ -}}
 {{ template "agents/base.md" . }}
 
-{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) . }}
+{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) (merge (dict "harnessName" "Claude Code" "harnessUrl" "https://claude.ai") .) }}
 
 {{ template "agents/harness-claude-code.md" . }}

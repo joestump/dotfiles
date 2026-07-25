@@ -13,6 +13,6 @@
 */ -}}
 {{ template "agents/base.md" . }}
 
-{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) . }}
+{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) (merge (dict "harnessName" "Crush" "harnessUrl" "https://github.com/charmbracelet/crush") .) }}
 
 {{ template "agents/harness-crush.md" . }}
