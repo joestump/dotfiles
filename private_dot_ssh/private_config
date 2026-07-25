@@ -12,14 +12,6 @@ Host github.com
   # rejects any later change), matching how the 192.168.100.* blocks below work.
   StrictHostKeyChecking accept-new
 
-# One per ~/src checkout on ops01; %n passes the local host alias (e.g.
-# "claude-payments") so each session lands in the right checkout.
-Host claude-*
-  HostName ops01.stump.rocks
-  User joestump
-  RequestTTY yes
-  RemoteCommand ~/.cargo/bin/shpool -d attach --cmd "~/.local/bin/claude --dangerously-skip-permissions --dir ~/src %n"
-
 # ie02 on dagda (DUB) — reachable only via ProxyJump through the hypervisor
 Host 192.168.100.213
     HostName 192.168.100.213
@@ -54,7 +46,7 @@ Host cloud01.stump.rocks
 
 # Connection multiplexing for StumpCloud/infra hosts: reuse one TCP connection
 # per host so heavy-SSH sessions don't exhaust local ephemeral ports
-# (EADDRNOTAVAIL / "Can't assign requested address"). Excludes github + claude-*.
+# (EADDRNOTAVAIL / "Can't assign requested address"). Excludes github.
 Host *.stump.rocks *.stump.wtf 192.168.100.* 179.237.64.122 lir dagda
     ControlMaster auto
     ControlPath ~/.ssh/cm-%C
