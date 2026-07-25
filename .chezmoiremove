@@ -19,3 +19,13 @@
 .oh-my-zsh/custom/crush-signal-channel.zsh
 Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
 .config/systemd/user/crush-signal-channel.service
+
+# zsh-harnessd — retired 2026-07-25, superseded by the Go `harness` binary
+# (gitea.stump.rocks/stump.wtf/harness, installed via go-tools.txt). The plugin
+# was still being cloned as an external on every machine but was never listed in
+# `plugins=()` in dot_zshrc, so nothing sourced it — a ~200KB clone and a pull on
+# every apply for a plugin no shell ever loaded. Supervision, attach and profiles
+# all live in `harness` now; config is ~/.config/harness/harness.toml.
+# The legacy zsh-harnessd.service on Linux nodes is stopped/disabled separately
+# by .chezmoiscripts/run_onchange_after_51-harness-daemon-service.sh.tmpl.
+.oh-my-zsh/custom/plugins/zsh-harnessd

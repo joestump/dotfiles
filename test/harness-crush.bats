@@ -8,7 +8,11 @@ load test_helper
 
 HARNESS_TOML="$REPO_ROOT/dot_config/harness/create_harness.toml.tmpl"
 HARNESS_ENV="$REPO_ROOT/dot_config/harness/crush-glm.env.tmpl"
-MODEL_PIN="$REPO_ROOT/dot_local/share/crush-glm/create_crush.json.tmpl"
+# private_ (0600) matches the mode crush itself writes the file with. Without it
+# chezmoi wants to chmod 644 on every apply, and because crush has also rewritten
+# the contents it stops to ask "…has changed since chezmoi last wrote it?" —
+# which wedges any non-interactive apply. Attribute order is create_ then private_.
+MODEL_PIN="$REPO_ROOT/dot_local/share/crush-glm/create_private_crush.json.tmpl"
 CRUSH_JSON="$REPO_ROOT/dot_config/crush/crush.json.tmpl"
 
 _render() {
@@ -20,6 +24,18 @@ _render() {
   # normally-managed file would be clobbered on the next apply.
   [ -f "$HARNESS_TOML" ]
   [ -f "$MODEL_PIN" ]
+}
+
+@test "harness: the crush model pin is private_ (0600) so apply never prompts" {
+  # crush writes this file 0600. If the source is 0644 chezmoi has a pending chmod
+  # forever, and since crush also edits the contents, apply blocks on a y/n prompt
+  # with no TTY under launchd/systemd. Guard both the name and the committed mode.
+  # The mode comes from the filename attribute, not the file's own bits — git
+  # only records the exec bit, so 0600 can never be carried by the blob.
+  case "$MODEL_PIN" in
+    */create_private_crush.json.tmpl) ;;
+    *) fail "model pin must be create_private_ (0600), got: $MODEL_PIN" ;;
+  esac
 }
 
 @test "harness: rendered harness.toml is valid TOML with one harness" {
