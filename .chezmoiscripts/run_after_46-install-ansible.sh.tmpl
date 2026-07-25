@@ -78,8 +78,17 @@ chmod +x "$HOME/.local/bin/pipenv"
 export PIPENV_IGNORE_VIRTUALENVS=1
 export PIPENV_VENV_IN_PROJECT=1
 
-if ! step "syncing pipenv venv" -- pipenv sync --quiet --dir "$repo" 2>/dev/null; then
+# Capture rather than discard: sending stderr to /dev/null made every failure
+# look identical ("pipenv sync failed") with no clue what actually broke. Keep
+# the output off the clean `step` line on success, but surface the tail of it
+# when the sync fails.
+pipenv_log="$(mktemp)"
+trap 'rm -f "$pipenv_log"' EXIT
+if ! step "syncing pipenv venv" -- pipenv sync --quiet --dir "$repo" >"$pipenv_log" 2>&1; then
   warn "pipenv sync failed; first run may cold-start"
+  while IFS= read -r line; do
+    warn "  $line"
+  done < <(tail -5 "$pipenv_log")
 fi
 
 item ok "ansible ready at $repo (run: pipenv run ansible-playbook ...)"

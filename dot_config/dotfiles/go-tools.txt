@@ -14,7 +14,7 @@ gitea.com/gitea/gitea-mcp@latest
 # and hopping between long-running harnesses (agent CLIs, REPLs, watchers).
 # Successor to the zsh-harnessd plugin. Config at ~/.config/harness/harness.toml;
 # runs as a systemd --user service (harness.service).
-gitea.stump.rocks/stump.wtf/harness@latest
+gitea.stump.rocks/stump.wtf/harness/cmd/harness@latest
 
 # Examples (uncomment or add your own):
 # github.com/jesseduffield/lazygit@latest
