@@ -11,23 +11,30 @@
 # Full field reference: ~/.local/share/harness-src/harness.toml.example and
 # `harness daemon -h`. Fields not used here: restart_delay, tmux_socket, and
 # backend (defaults to "native", which runs the process under the daemon's own
-# PTY per ADR-0003 — that's what a full-screen TUI like crush needs; "tmux" is
-# the compat escape hatch).
+# PTY per ADR-0003 — that's what a full-screen TUI like crush or claude needs;
+# "tmux" is the compat escape hatch).
+#
+# Both agents below run with permission prompts off, so both are
+# `enabled = false`: the daemon will NOT autostart them on boot. Start one
+# deliberately with `harness start <name>`. Both also inherit the daemon's
+# environment (spawn.go does `env := os.Environ()` and appends env_file on top),
+# so start `harness daemon` from a shell that has sourced
+# ~/.config/vault/secrets-static.env — that's where every provider and MCP token
+# lives.
 
 # Crush driven from Signal, on Z.ai's GLM-5.2, with permission prompts off.
 #
 # MODEL PINNING. Crush has no --model flag; the model comes from config, and the
 # last config file wins (GlobalConfig → GlobalConfigData → project configs).
 # CRUSH_GLOBAL_DATA, set in the env_file below, repoints GlobalConfigData at
-# ~/.local/share/crush-glm/crush.json, which pins glm-5.2 on the zai provider for
-# THIS harness only. The `crush` you run interactively keeps its own model — the
-# shared ~/.config/crush/crush.json still pins nothing, by design.
+# ~/.local/share/crush-signal/crush.json, which pins glm-5.2 on the zai provider
+# for THIS harness only. The `crush` you run interactively keeps its own model —
+# the shared ~/.config/crush/crush.json still pins nothing, by design.
 #
 # --yolo auto-accepts every permission prompt. That's the point of an agent you
 # drive from your phone — nobody is at the keyboard to approve a bash call — and
-# it's also exactly why `enabled = false`: the daemon will NOT autostart this on
-# boot. Start it deliberately with `harness start crush-glm`. Flip to true only
-# if you want a permission-free agent live in ~/src from the moment you log in.
+# it's also exactly why `enabled = false`. Flip to true only if you want a
+# permission-free agent live in ~/src from the moment you log in.
 #
 # --channels signal opts the `signal` MCP server into the fork's channel feature,
 # so inbound Signal messages arrive as live events mid-session rather than only
@@ -39,10 +46,39 @@
 # REQUIRED: signal-mcp drops any inbound message that doesn't start with `cc` on
 # a word boundary. "cc deploy" and "cc: deploy" match, "ccdeploy" does not, and
 # the prefix is stripped before the text reaches the agent.
-[harness.crush-glm]
+[harness.crush-signal]
 cmd = "{{ .chezmoi.homeDir }}/.local/bin/crush"
 args = ["--yolo", "--channels", "signal"]
 workdir = "{{ .chezmoi.homeDir }}/src"
-env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-glm.env"
+env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
 description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel (cc prefix)"
+enabled = false
+
+# Claude Code in ~/src, driven from the Claude app / claude.ai via Remote Control.
+#
+# --remote-control starts a normal interactive session and registers it for
+# remote drive-by, so the phone is a second keyboard on THIS session rather than
+# a separate cloud one: same working tree, same MCP servers, same ~/.claude.json.
+# The session name is auto-generated from the hostname
+# (--remote-control-session-name-prefix overrides that) — take the name from
+# `harness logs claude-code` on first start.
+#
+# Deliberately NOT Signal-driven: the `signal` MCP in ~/.claude.json is wired
+# WITHOUT --channel (see .chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl),
+# and the `cc` prefix already belongs to crush-signal above. If you ever do want a
+# Signal-channel Claude, give it an env_file setting SIGNAL_MCP_CHANNEL=1 and its
+# own SIGNAL_MCP_PREFIX — signal-mcp reads both from the environment — rather than
+# sharing a prefix with crush, or both agents answer the same message.
+#
+# --dangerously-skip-permissions is the claude equivalent of crush's --yolo, and
+# carries the same consequence: `enabled = false`, start it by hand.
+#
+# cmd is the ~/.local/bin/claude shim (a symlink into
+# ~/.local/share/claude/versions/<v>), so a claude self-update is picked up on the
+# next restart without editing this file.
+[harness.claude-code]
+cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
+args = ["--remote-control", "--dangerously-skip-permissions"]
+workdir = "{{ .chezmoi.homeDir }}/src"
+description = "Claude Code · ~/src · Remote Control · skip-permissions"
 enabled = false
