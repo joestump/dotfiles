@@ -31,10 +31,49 @@ case "$(uname -s)" in
       echo "WARN: $plist not found (is Library/ applied?); skipping"
       exit 0
     fi
+
+    # MIGRATION: rocks.stump.signal-cli was a hand-rolled LaunchAgent from before
+    # this repo managed the daemon. It runs `signal-cli daemon --socket` with
+    # KeepAlive, was never chezmoi-managed, and so survived the switch to the
+    # --tcp daemon. Two agents cannot share the account: signal-cli takes an
+    # exclusive lock on its data dir, and the loser blocks forever on "Config
+    # file is in use by another instance, waiting…". On this Mac the legacy agent
+    # sat blocked for five days, then grabbed the lock the moment the managed
+    # daemon reloaded — port 7583 went dead (every Signal MCP + notify with it)
+    # while `launchctl list` still showed a healthy job. Reap it, once, anywhere
+    # it exists.
+    legacy="$HOME/Library/LaunchAgents/rocks.stump.signal-cli.plist"
+    if launchctl print "gui/$(id -u)/rocks.stump.signal-cli" >/dev/null 2>&1 || [ -f "$legacy" ]; then
+      launchctl bootout "gui/$(id -u)/rocks.stump.signal-cli" 2>/dev/null || true
+      rm -f "$legacy"
+      echo "removed legacy rocks.stump.signal-cli LaunchAgent (superseded by signal-daemon)"
+    fi
+
     # Reload so updated args take effect; tolerate 'not loaded' on first run.
     launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+    # Drain the lock before starting the replacement. bootout returns as soon as
+    # it has signalled the job, but the JVM can take seconds to release the data
+    # dir — and a replacement started inside that window does not fail, it blocks
+    # forever holding a port nobody is listening on. Wait for every signal-cli
+    # daemon to actually go away, then force the stragglers.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      pgrep -f 'signal-cli .*daemon' >/dev/null 2>&1 || break
+      sleep 1
+    done
+    if pgrep -f 'signal-cli .*daemon' >/dev/null 2>&1; then
+      pkill -KILL -f 'signal-cli .*daemon' 2>/dev/null || true
+      sleep 1
+    fi
+
     if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
-      :   # quiet on success
+      # Loaded is not the same as serving: confirm the JSON-RPC port comes up, so
+      # a daemon stuck behind a lock is reported instead of silently accepted.
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        nc -z 127.0.0.1 7583 >/dev/null 2>&1 && break
+        sleep 1
+      done
+      nc -z 127.0.0.1 7583 >/dev/null 2>&1 \
+        || echo "WARN: signal-daemon loaded but 127.0.0.1:7583 is not listening — check 'signal-daemon log'."
     else
       echo "WARN: couldn't load signal-daemon; start it later with 'signal-daemon start'."
     fi

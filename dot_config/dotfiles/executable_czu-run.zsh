@@ -96,7 +96,15 @@ else
   item no "Vault Agent — check 'vault-agent status'"
 fi
 
-if [[ "$(get_state)" == "failed" ]]; then
-  notify "✅ czu on ${HOST_SHORT}: back to normal — sync succeeded."
-fi
+# Record success BEFORE the recovery ping, not after. The ping is best-effort —
+# it reaches out to signal-cli — while the state file is the thing that decides
+# whether the NEXT run pings at all. With the old order, anything that made
+# notify hang (a wedged signal-cli holding its data-dir lock) and got Ctrl-C'd
+# left the state at "failed", so every subsequent czu walked back into the same
+# stall. State first means a run that got this far is recorded as the success it
+# was, whatever the notification does. notify itself is bounded (signal-notify.sh).
+was_failed=0   # not `local` — this is script scope, not a function
+[[ "$(get_state)" == "failed" ]] && was_failed=1
 set_state ok
+(( was_failed )) && notify "✅ czu on ${HOST_SHORT}: back to normal — sync succeeded."
+true
