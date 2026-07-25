@@ -9,6 +9,11 @@
   specific blocks render before general ones — ssh.hosts, then the expanded
   ssh.jump.hosts, then the ssh.multiplex catch-all last.
 
+  Every lookup goes through `dig` with a default. chezmoi renders templates with
+  missingkey=error, so a bare .ssh.jump on a machine whose [data.ssh] override
+  drops that key would abort the ENTIRE apply, not just this file. Defaulting to
+  an empty list/dict degrades to "omit that group" instead.
+
   `_block` renders one `Host` stanza. An option value that is a list emits the
   keyword once per element (repeatable keywords like IdentityFile / LocalForward);
   any other value emits a single line. Keywords come out in sorted order, which
@@ -16,8 +21,8 @@
 */ -}}
 
 {{- define "_block" -}}
-Host {{ .patterns | join " " }}
-{{- range $keyword, $value := .options }}
+Host {{ dig "patterns" (list) . | join " " }}
+{{- range $keyword, $value := (dig "options" (dict) .) }}
 {{- if kindIs "slice" $value }}
 {{- range $v := $value }}
   {{ $keyword }} {{ $v }}
@@ -28,19 +33,22 @@ Host {{ .patterns | join " " }}
 {{- end }}
 {{ end -}}
 
+{{- $hosts := dig "hosts" (list) .ssh -}}
+{{- $jump := dig "jump" (dict) .ssh -}}
+{{- $multiplex := dig "multiplex" (dict) .ssh -}}
+
 # Managed by chezmoi: private_dot_ssh/private_config.tmpl
 # Generated from the `ssh:` block in .chezmoidata.yaml — edit there, not here.
 
-{{ range .ssh.hosts }}
+{{ range $hosts }}
 {{- template "_block" . }}
 {{ end -}}
 
-{{- with .ssh.jump }}
-{{- range $address := .hosts }}
-{{- template "_block" (dict "patterns" (list $address) "options" $.ssh.jump.options) }}
+{{- $jumpOptions := dig "options" (dict) $jump -}}
+{{- range $address := dig "hosts" (list) $jump }}
+{{- template "_block" (dict "patterns" (list $address) "options" $jumpOptions) }}
 {{ end -}}
-{{- end }}
 
-{{- with .ssh.multiplex }}
+{{- with $multiplex }}
 {{- template "_block" . }}
 {{- end }}

@@ -244,6 +244,41 @@ YAML
   [ "$(grep -c 'User jumpuser' <<<"$output")" -eq 3 ]
 }
 
+@test "ssh-config: a missing group is omitted, not an apply-aborting error" {
+  # chezmoi renders with missingkey=error, and a template error aborts the WHOLE
+  # apply — not just this file. A machine whose [data.ssh] override drops a group
+  # must degrade to "skip that group" instead of taking the apply down with it.
+  run _render_with_data <<'YAML'
+ssh:
+  hosts:
+    - patterns: ["only"]
+      options:
+        User: "u"
+YAML
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host only"* ]]
+  [[ "$output" != *"ProxyJump"* ]]
+  [[ "$output" != *"ControlMaster"* ]]
+}
+
+@test "ssh-config: an empty ssh block renders headers only, no error" {
+  run _render_with_data <<'YAML'
+ssh: {}
+YAML
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^Host ' <<<"$output")" -eq 0 ]
+}
+
+@test "ssh-config: a block with no options still renders its Host line" {
+  run _render_with_data <<'YAML'
+ssh:
+  hosts:
+    - patterns: ["bare"]
+YAML
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host bare"* ]]
+}
+
 # ────── per-machine [data.ssh] overrides ──────
 
 # Render the REAL template + real data, but under a $HOME carrying a chezmoi.toml
