@@ -37,6 +37,15 @@ email: "joe@stump.rocks"
 # {{ .chezmoi.username }} (the OS login user), which stays machine-derived.
 githubUser: "joestump"
 
+# Which forge identity the agents on this machine act as. Drives which
+# .chezmoitemplates/agents/identity-*.md overlay is composed into ~/.claude/CLAUDE.md
+# and ~/.config/crush/CRUSH.md — mainly whether posts carry the "on behalf of
+# @joestump" attribution footer (joestump) or are signed as the agent itself
+# (joestump-agent). Default suits Joe's own machines; a box that runs as the agent
+# overrides it in its own ~/.config/chezmoi/chezmoi.toml [data] table, same as the
+# [data.claude] posture keys below. Valid: joestump | joestump-agent.
+agentIdentity: "joestump"
+
 # Shlink (URL shortener) base URL — non-secret config for the shlink OMZ plugin,
 # exported as SHLINK_API_URL from env.zsh. The API KEY is the secret half and comes
 # from OpenBao (secret/users/<you>/shlink → SHLINK_API_KEY), NOT here.
