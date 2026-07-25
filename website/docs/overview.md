@@ -31,7 +31,7 @@ flowchart TD
 
 | Layer | Tool | What it does |
 | --- | --- | --- |
-| **Dotfile management** | [chezmoi](https://chezmoi.io) | Source of truth at `~/.local/share/chezmoi`, pushed to Gitea. Renders `~/.zshrc` + `~/.oh-my-zsh/custom/` and a few configs. |
+| **Dotfile management** | [chezmoi](https://chezmoi.io) | Source of truth at `~/src/dotfiles`, pushed to Gitea. Renders `~/.zshrc` + `~/.oh-my-zsh/custom/` and a few configs. |
 | **Shell** | Oh My Zsh | Curated plugins, helper functions auto-loaded from `$ZSH_CUSTOM`, spaceship prompt. |
 | **Secrets** | OpenBao + Vault Agent | A launchd agent renders every `secret/users/<you>/*` to env files + SSH keys on a schedule. Nothing secret is committed. |
 | **Packages** | Homebrew (macOS) / apt (Linux) | A `Brewfile` and an apt list, installed by `run_onchange_` scripts. |
