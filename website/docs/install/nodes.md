@@ -41,7 +41,7 @@ chezmoi ssh <host> https://gitea.stump.rocks/joestump/dotfiles.git
 
 ```bash
 sh -c "$(curl -fsLS get.chezmoi.io)" -- \
-  init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+  init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
 ```
 
 ### What's different from the hub
@@ -69,6 +69,6 @@ vault-agent start
 > cache and re-run; it re-clones HEAD cleanly:
 
 > ```bash
-> rm -rf ~/.local/share/chezmoi ~/.config/chezmoi ~/.cache/chezmoi
-> sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+> rm -rf ~/src/dotfiles ~/.local/share/chezmoi ~/.config/chezmoi ~/.cache/chezmoi
+> sh -c "$(curl -fsLS get.chezmoi.io)" -- init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
 > ```

@@ -32,7 +32,7 @@
 #
 #   export VAULT_ADDR=https://vault.stump.rocks
 #   vault login -method=oidc          # admin
-#   ~/.local/share/chezmoi/scripts/openbao-approle-setup.sh ie01
+#   ~/src/dotfiles/scripts/openbao-approle-setup.sh ie01
 #
 # Prints the role_id at the end (role_id is NOT a secret on its own — it needs a
 # secret_id to authenticate).

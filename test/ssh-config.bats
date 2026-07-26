@@ -19,12 +19,9 @@ SSH_CONFIG="$REPO_ROOT/private_dot_ssh/private_config"
   grep -Eq '^\s*Port\s+443' "$SSH_CONFIG"
 }
 
-@test "ssh-config: claude-* RemoteCommand is quoted (no bare backslash-space escape)" {
-  local rc_line
-  rc_line=$(grep 'RemoteCommand' "$SSH_CONFIG")
-  [[ "$rc_line" == *'--cmd "'* ]]
-  [[ "$rc_line" != *'\\ '* ]]
-}
+# The claude-* RemoteCommand quoting guard lived here until 79e39ab dropped the
+# dead claude-* shortcut from the ssh config. There is no RemoteCommand left to
+# assert on; restore the test alongside any block that reintroduces one.
 
 @test "ssh-config: ControlMaster block is present with %C ControlPath" {
   grep -Eq 'ControlMaster\s+auto' "$SSH_CONFIG"

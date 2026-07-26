@@ -11,7 +11,7 @@ Brewfile (`brew "zoxide"`).
 
 | Command | Does |
 |---|---|
-| `z chez` | jump to `~/.local/share/chezmoi` |
+| `z chez` | jump to `~/src/dotfiles` |
 | `z <a> <b>` | multiple fragments must all match, in order |
 | `z -` | previous directory (like `cd -`) |
 | `zi <frag>` | interactive picker (fzf) when the fragment is ambiguous |
@@ -19,7 +19,7 @@ Brewfile (`brew "zoxide"`).
 ## Pro tips
 
 - **Stop typing paths.** After a day of normal use, `z chez`, `z src`,
-  `z managed` land in `~/.local/share/chezmoi`, `~/src/*`, and
+  `z managed` land in `~/src/dotfiles`, `~/src/*`, and
   `~/Managed Files` from anywhere. The fragment matches anywhere in the path.
 - **Ambiguous fragment? `zi`** pops an fzf picker over the ranked candidates
   — perfect for `~/src` where a dozen repos share substrings.

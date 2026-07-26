@@ -1,0 +1,43 @@
+# Targets chezmoi should DELETE from the destination on apply.
+#
+# Deleting a file from the source tree only stops chezmoi managing it — the
+# rendered copy stays on every machine that already applied it. This file is how
+# a retired thing actually leaves those machines. Entries are idempotent: a path
+# that isn't there is a no-op, so they're safe to leave in place indefinitely.
+#
+# BE CAREFUL. Anything listed here is removed from $HOME on the next apply, on
+# every machine. Only list files this repo used to own.
+
+# crush-signal-channel — retired 2026-07-24, superseded by the harness in
+# ~/.config/harness/harness.toml (seeded as `crush-glm`, renamed `crush-signal`
+# on 2026-07-25 — see below; the near-identical names are a coincidence of both
+# describing the same job). The tmux + launchd/systemd wrapper
+# around a headless Crush arbitrating the Signal channel is now harness's job
+# (supervision, restart, attach), so the bespoke supervisor is dead weight.
+# NOTE: the data dir ~/.local/share/crush-signal-channel is deliberately NOT
+# listed — it holds that agent's session history and logs. Delete it by hand if
+# and when you want it gone.
+.local/bin/crush-signal-channel.sh
+.oh-my-zsh/custom/crush-signal-channel.zsh
+Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
+.config/systemd/user/crush-signal-channel.service
+
+# zsh-harnessd — retired 2026-07-25, superseded by the Go `harness` binary
+# (gitea.stump.rocks/stump.wtf/harness, installed via go-tools.txt). The plugin
+# was still being cloned as an external on every machine but was never listed in
+# `plugins=()` in dot_zshrc, so nothing sourced it — a ~200KB clone and a pull on
+# every apply for a plugin no shell ever loaded. Supervision, attach and profiles
+# all live in `harness` now; config is ~/.config/harness/harness.toml.
+# The legacy zsh-harnessd.service on Linux nodes is stopped/disabled separately
+# by .chezmoiscripts/run_onchange_after_51-harness-daemon-service.sh.tmpl.
+.oh-my-zsh/custom/plugins/zsh-harnessd
+
+# crush-glm — renamed 2026-07-25 to `crush-signal`, which says what the harness
+# IS (the Signal-driven crush) rather than which model it happens to pin; the
+# claude-code harness landed alongside it and the pair needed parallel names.
+# Only the env_file is listed: harness.toml itself is `create_` (the TUI owns it,
+# so chezmoi must not touch it — rename the [harness.*] table by hand or in the
+# TUI on machines that already have it), and ~/.local/share/crush-glm is a data
+# dir holding that agent's session history — `mv` it to crush-signal to keep the
+# history, or leave it and let a fresh pin be seeded.
+.config/harness/crush-glm.env

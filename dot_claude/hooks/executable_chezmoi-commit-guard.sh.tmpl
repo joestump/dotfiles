@@ -13,7 +13,7 @@
 # Managed by chezmoi: dot_claude/hooks/executable_chezmoi-commit-guard.sh
 set -euo pipefail
 
-CHEZMOI_SRC="$HOME/.local/share/chezmoi"
+CHEZMOI_SRC={{ .chezmoi.sourceDir | quote }}
 
 command -v jq >/dev/null 2>&1 || exit 0
 

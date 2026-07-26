@@ -9,7 +9,7 @@
 # Run from a shell where the old ~/.zprofile is still sourced, after login:
 #     export VAULT_ADDR=https://vault.stump.rocks
 #     vault login -method=oidc
-#     ~/.local/share/chezmoi/scripts/load-static-secrets.sh
+#     ~/src/dotfiles/scripts/load-static-secrets.sh
 set -euo pipefail
 
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"

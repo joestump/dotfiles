@@ -10,6 +10,37 @@
 # broken box doesn't spam every 6h. State lives in ~/.cache/czu-scheduled-state.
 emulate -L zsh
 
+# Load the Vault-Agent-rendered secrets BEFORE anything else, because several
+# templates gate on `env "SOME_API_KEY"` at APPLY time and render a smaller file
+# when the var is absent. Interactively that never bites — your login shell has
+# already sourced this via ~/.oh-my-zsh/custom/00-secrets.zsh. The scheduled run
+# is the problem: launchd's plist carries only PATH + VAULT_ADDR, and the systemd
+# unit sets no EnvironmentFile at all, so a 6-hourly czu was applying with an
+# empty secret environment. Concretely, that rendered crush.json with
+# `"providers": {}` and silently disabled every Crush provider until the next
+# interactive apply — which in turn pushed you to paste an API key into Crush's
+# TUI, persisting a plaintext secret outside OpenBao.
+#
+# Sourcing here (not in the plist/unit) keeps ONE fix for both platforms and
+# preserves this script's contract that a scheduled run behaves exactly like
+# typing `czu`. `set -a` exports what each file defines; the guards make this a
+# no-op on a machine Vault Agent hasn't provisioned yet. It runs before the
+# PATH/VAULT_ADDR exports below so their ${VAR:-default} precedence still holds.
+#
+# BOTH files, in the same order oh-my-zsh loads them (00-secrets.zsh, then
+# env.zsh), because some vars the templates gate on are DERIVED rather than
+# rendered: env.zsh computes OPENAI_DIRECT_API_KEY from the raw OPENAI_API_KEY
+# before shadowing OPENAI_API_KEY with the LiteLLM gateway, and aliases
+# GITEA_ACCESS_TOKEN from GITEA_TOKEN. Sourcing only the secrets file would still
+# have silently dropped Crush's `openai` provider. env.zsh is a pure export file
+# (no compinit/bindkey/prompt), so it is safe outside an interactive shell.
+if [[ -r "$HOME/.config/vault/secrets-static.env" ]]; then
+  set -a
+  . "$HOME/.config/vault/secrets-static.env"
+  [[ -r "$HOME/.oh-my-zsh/custom/env.zsh" ]] && . "$HOME/.oh-my-zsh/custom/env.zsh"
+  set +a
+fi
+
 export PATH="$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export VAULT_ADDR="${VAULT_ADDR:-https://vault.stump.rocks}"
 
@@ -42,7 +73,7 @@ have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "⟳ czu · updating
 heading "📥 Sync"
 . "$HOME/.config/dotfiles/czu-lib.sh" 2>/dev/null \
   || fail "czu-lib.sh missing — run 'chezmoi apply' to reinstall it"
-CZU_SRC="$(chezmoi source-path 2>/dev/null || print -r -- "$HOME/.local/share/chezmoi")"
+CZU_SRC="$(chezmoi source-path 2>/dev/null || print -r -- "$HOME/src/dotfiles")"
 czu_out="$(czu_sync_branch "$CZU_SRC" 2>&1)"; czu_rc=$?
 case "$czu_out" in
   pulled)            item ok  "dotfiles — synced from fork" ;;
@@ -65,7 +96,15 @@ else
   item no "Vault Agent — check 'vault-agent status'"
 fi
 
-if [[ "$(get_state)" == "failed" ]]; then
-  notify "✅ czu on ${HOST_SHORT}: back to normal — sync succeeded."
-fi
+# Record success BEFORE the recovery ping, not after. The ping is best-effort —
+# it reaches out to signal-cli — while the state file is the thing that decides
+# whether the NEXT run pings at all. With the old order, anything that made
+# notify hang (a wedged signal-cli holding its data-dir lock) and got Ctrl-C'd
+# left the state at "failed", so every subsequent czu walked back into the same
+# stall. State first means a run that got this far is recorded as the success it
+# was, whatever the notification does. notify itself is bounded (signal-notify.sh).
+was_failed=0   # not `local` — this is script scope, not a function
+[[ "$(get_state)" == "failed" ]] && was_failed=1
 set_state ok
+(( was_failed )) && notify "✅ czu on ${HOST_SHORT}: back to normal — sync succeeded."
+true

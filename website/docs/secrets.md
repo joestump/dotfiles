@@ -67,10 +67,10 @@ compromised or retired box can be cut off without re-provisioning the fleet:
 ```bash
 # once per host, as admin — creates vault-agent-<host> and merges its login
 # alias into your identity entity (required for the templated policy):
-~/.local/share/chezmoi/scripts/openbao-approle-setup.sh ie01
+~/src/dotfiles/scripts/openbao-approle-setup.sh ie01
 
 # optionally pin its creds to the box's network:
-~/.local/share/chezmoi/scripts/openbao-approle-setup.sh --cidr 10.0.0.5/32 ie01
+~/src/dotfiles/scripts/openbao-approle-setup.sh --cidr 10.0.0.5/32 ie01
 
 czapprole joestump@ie01.stump.rocks   # auto-selects vault-agent-ie01
 

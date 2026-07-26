@@ -5,6 +5,21 @@
 # tcp 127.0.0.1:7583; the Signal MCP is a thin client to it. Verbs:
 #   start | stop | restart | status | log | ping
 # (`ping` checks the JSON-RPC port is listening.)
+# Wait for every signal-cli daemon to actually exit, then force the stragglers.
+# signal-cli holds an exclusive lock on its data dir; a replacement started while
+# the old JVM is still shutting down does NOT fail — it blocks forever on "Config
+# file is in use by another instance, waiting…", leaving a loaded launchd job
+# whose port never opens. Always drain between stop and start.
+_signal_daemon_drain() {
+  local i
+  for i in {1..10}; do
+    pgrep -f 'signal-cli .*daemon' >/dev/null 2>&1 || return 0
+    sleep 1
+  done
+  pkill -KILL -f 'signal-cli .*daemon' 2>/dev/null
+  sleep 1
+}
+
 signal-daemon() {
   emulate -L zsh
   local log="$HOME/.local/share/signal-cli/daemon.log"
@@ -12,9 +27,21 @@ signal-daemon() {
     local plist="$HOME/Library/LaunchAgents/rocks.stump.signal-daemon.plist"
     case "$1" in
       start|load)  launchctl load -w "$plist" && echo "signal-daemon loaded" ;;
-      stop|unload) launchctl unload -w "$plist" && echo "signal-daemon unloaded" ;;
-      restart)     launchctl unload "$plist" 2>/dev/null; launchctl load -w "$plist" && echo "signal-daemon restarted" ;;
-      status)      launchctl list | grep -E 'rocks\.stump\.signal-daemon' || echo "signal-daemon: not loaded" ;;
+      stop|unload) launchctl unload -w "$plist" && _signal_daemon_drain && echo "signal-daemon unloaded" ;;
+      restart)     launchctl unload "$plist" 2>/dev/null; _signal_daemon_drain; launchctl load -w "$plist" && echo "signal-daemon restarted" ;;
+      status)
+        launchctl list | grep -E 'rocks\.stump\.signal-daemon' || echo "signal-daemon: not loaded"
+        # Loaded ≠ serving. A daemon blocked on the data-dir lock looks perfectly
+        # healthy to launchctl while nothing can reach it, so always say whether
+        # the port is actually up.
+        if nc -z 127.0.0.1 7583 2>/dev/null; then
+          echo "signal-daemon: JSON-RPC up (127.0.0.1:7583)"
+        else
+          echo "signal-daemon: ⚠️  port 7583 NOT listening — likely blocked on the account lock"
+          pgrep -lf 'signal-cli .*daemon' 2>/dev/null | sed 's/^/  /'
+          echo "  fix: signal-daemon restart   (drains stale signal-cli processes first)"
+        fi
+        ;;
       log)         tail -f "$log" ;;
       ping)        nc -z 127.0.0.1 7583 && echo "signal-daemon: JSON-RPC up (127.0.0.1:7583)" || echo "signal-daemon: port 7583 not listening" ;;
       *) print -u2 "usage: signal-daemon {start|stop|restart|status|log|ping}"; return 2 ;;

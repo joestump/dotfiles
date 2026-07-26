@@ -28,7 +28,18 @@ LIST="$HOME/.config/dotfiles/claude-plugins.tsv"
 [ -f "$LIST" ] || { echo "no claude-plugins.tsv; skipping"; exit 0; }
 STATE="$HOME/.config/dotfiles/.claude-plugin-state"; mkdir -p "$STATE"
 
-installed="$(claude plugin list 2>/dev/null || true)"
+# One `name@marketplace` per line, stripped of decoration. `claude plugin list`
+# is a HUMAN-formatted listing, not a machine interface — it currently prints
+#     Installed plugins:
+#
+#       ❯ **claude-skills@joestump**
+#           Version: 1.0.0
+# so the old whole-line `grep -qxF` match never matched anything, and every
+# plugin silently took the "not installed" branch below forever. That made the
+# HEAD-moved refresh branch dead code, which is the real reason a freshly pushed
+# skill never reached the harnesses. Extracting the name@marketplace token
+# instead of trusting the layout survives the next cosmetic change to that output.
+installed="$(claude plugin list 2>/dev/null | grep -oE '[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+' || true)"
 
 # Clean progress via the shared UI lib (spinner on a TTY, quiet line otherwise);
 # fallback keeps the script working if the lib hasn't been applied yet.
@@ -61,6 +72,19 @@ while read -r src plugin _rest <&3 || [ -n "${src:-}" ]; do
   elif [ -n "$head" ] && [ "$head" != "$(cat "$sentinel" 2>/dev/null || true)" ]; then
     claude plugin marketplace update "$mp" </dev/null >/dev/null 2>&1 || true
     claude plugin uninstall "$plugin" </dev/null >/dev/null 2>&1 || true
+    # Purge the version-keyed cache before reinstalling. `claude` caches a plugin
+    # at ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/ and that dir
+    # SURVIVES `plugin uninstall`, so reinstalling at an unchanged version reuses
+    # the stale copy: the install reports success, we write the sentinel, and the
+    # newly pushed skill never appears — permanently, because from then on the
+    # sentinel matches and this branch stops firing. Bumping the plugin version
+    # also fixes it, but the whole reason this branch exists is that authors don't
+    # reliably bump versions, so don't depend on it. Guarded so a malformed line
+    # can never turn this into `rm -rf` on a short path.
+    pname="${plugin%@*}"
+    if [ -n "$pname" ] && [ -n "$mp" ]; then
+      rm -rf "$HOME/.claude/plugins/cache/$mp/$pname" 2>/dev/null || true
+    fi
     if step "$plugin → ${head:0:7}" -- claude plugin install "$plugin" </dev/null; then printf '%s' "$head" >"$sentinel"; else warn "refresh $plugin failed"; fi
   else
     item ok "$plugin"
