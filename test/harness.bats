@@ -40,18 +40,18 @@ _render() {
   esac
 }
 
-@test "harness: rendered harness.toml is valid TOML with both seeded harnesses" {
+@test "harness: rendered harness.toml is valid TOML with all seeded harnesses" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
 import tomllib,sys
 d = tomllib.load(sys.stdin.buffer)
-assert list(d[\"harness\"]) == [\"crush-signal\", \"claude-code\"], d[\"harness\"]
+assert list(d[\"harness\"]) == [\"crush-signal\", \"claude-code\", \"claude-headless\"], d[\"harness\"]
 c = d[\"harness\"][\"crush-signal\"]
 assert c[\"cmd\"].endswith(\"/.local/bin/crush\"), c[\"cmd\"]
 cc = d[\"harness\"][\"claude-code\"]
 assert cc[\"cmd\"].endswith(\"/.local/bin/claude\"), cc[\"cmd\"]
-# Both run with permission prompts off, so neither may autostart on boot.
+# All run with permission prompts off, so none may autostart on boot.
 for name, h in d[\"harness\"].items():
     assert h[\"enabled\"] is False, name
 '"

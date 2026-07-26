@@ -1,41 +1,127 @@
 #!/usr/bin/env bash
-# Installs and enables the harness daemon systemd --user service.
+# The Go `harness` daemon (ADR-0005) is the ONLY supervisor for background
+# Claude Code / Crush sessions. This script (1) tears down every legacy
+# mechanism — the zsh-harnessd era harness@.service units / harnessd.*
+# LaunchAgents + their tmux servers, the standalone claude-headless.service,
+# and the ~/.local/bin helper scripts — then (2) enables the daemon under
+# systemd --user (Linux, harness.service) or launchd (macOS,
+# rocks.stump.harness). The workloads themselves live in harness.toml.
 #
-# Governing: ADR-0005 (supervision and lifecycle). The Go-based `harness`
-# binary replaces the old zsh + tmux `harnessd` plugin. The binary is
-# installed via go-tools.txt (gitea.stump.rocks/stump.wtf/harness@latest).
-
+# run_onchange_: re-fires on every machine when this file's content changes.
 set -euo pipefail
 
-# Only run on Linux (systemd --user). macOS uses launchd (separate plist).
-if [[ "$(uname)" != "Linux" ]]; then
-  echo "harness-daemon-service: skipping on $(uname) (Linux/systemd only)"
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
+heading "🕹️ harness daemon"
+
+# Prefer the run_after_32-install-harness build (what the unit/plist exec);
+# fall back to a go-tools install for boxes the build script hasn't reached.
+HARNESS_BIN="$HOME/.local/bin/harness"
+[ -x "$HARNESS_BIN" ] || HARNESS_BIN="${GOBIN:-$HOME/go/bin}/harness"
+[ -x "$HARNESS_BIN" ] || HARNESS_BIN="$(command -v harness 2>/dev/null || true)"
+if [ -z "$HARNESS_BIN" ] || [ ! -x "$HARNESS_BIN" ]; then
+  item dim "harness binary not installed yet (run_after_32 / go-tools) — skipping"
   exit 0
 fi
 
-# Check if the binary exists (go-tools.txt install may not have run yet)
-if ! command -v harness &>/dev/null; then
-  GO_BIN="${GOBIN:-$HOME/go/bin}"
-  if [[ ! -x "$GO_BIN/harness" ]]; then
-    echo "harness-daemon-service: harness binary not found — run 'go install gitea.stump.rocks/stump.wtf/harness@latest'"
-    exit 0
+# Every seeded harness is enabled=false (they run permission-prompt-free, so
+# nothing autostarts). But if the LEGACY setup was actively serving an agent,
+# keep serving it under the new daemon rather than silently dropping it.
+# Legacy → seed name map: harnessd.claude-remote-control / harness@claude-remote-control
+# → claude-code; the crush-signal-channel supervisor → crush-signal.
+WANT_REMOTE_CONTROL=false
+WANT_CRUSH_SIGNAL=false
+
+if [ "$(uname)" = "Darwin" ]; then
+  # ---- legacy teardown: zsh-harnessd LaunchAgents (label harnessd.<name>) ----
+  for plist in "$HOME"/Library/LaunchAgents/harnessd.*.plist; do
+    [ -e "$plist" ] || continue
+    label="$(basename "$plist" .plist)"
+    [ "$label" = "harnessd.claude-remote-control" ] && WANT_REMOTE_CONTROL=true
+    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null \
+      || launchctl unload "$plist" 2>/dev/null || true
+    rm -f "$plist"
+    item ok "retired LaunchAgent $label"
+  done
+  # The pre-harness Crush Signal arbiter had its own LaunchAgent.
+  if launchctl print "gui/$(id -u)/rocks.stump.crush-signal-channel" >/dev/null 2>&1; then
+    WANT_CRUSH_SIGNAL=true
+    launchctl bootout "gui/$(id -u)/rocks.stump.crush-signal-channel" 2>/dev/null || true
+  fi
+  # The tmux servers those harnesses (and the old headless claude) ran inside.
+  tmux -L harness kill-server 2>/dev/null || true
+  tmux -L claude  kill-server 2>/dev/null || true
+
+  # ---- the one true supervisor ----
+  mkdir -p "$HOME/.local/state/harness"
+  PLIST="$HOME/Library/LaunchAgents/rocks.stump.harness.plist"
+  launchctl bootout "gui/$(id -u)/rocks.stump.harness" 2>/dev/null || true
+  step "bootstrap rocks.stump.harness" -- launchctl bootstrap "gui/$(id -u)" "$PLIST"
+  item ok "harness daemon under launchd"
+else
+  # ---- legacy teardown: units from the zsh-harnessd era + standalone headless ----
+  if systemctl --user is-active --quiet 'harness@claude-remote-control.service' 2>/dev/null; then
+    WANT_REMOTE_CONTROL=true
+  fi
+  if systemctl --user is-active --quiet 'harness@crush-signal-channel.service' 2>/dev/null \
+     || systemctl --user is-active --quiet 'crush-signal-channel.service' 2>/dev/null; then
+    WANT_CRUSH_SIGNAL=true
+  fi
+  systemctl --user stop 'harness@*' 2>/dev/null || true
+  for unit in harness@claude-remote-control.service harness@crush-signal-channel.service \
+              crush-signal-channel.service \
+              zsh-harnessd.service claude-headless.service; do
+    systemctl --user stop "$unit" 2>/dev/null || true
+    systemctl --user disable "$unit" 2>/dev/null || true
+  done
+  for f in "$HOME/.config/systemd/user/harness@.service" \
+           "$HOME/.config/systemd/user/claude-headless.service"; do
+    [ -e "$f" ] || continue
+    rm -f "$f"
+    item ok "retired $(basename "$f")"
+  done
+  # The tmux servers those units wrapped everything in.
+  tmux -L harness kill-server 2>/dev/null || true
+  tmux -L claude  kill-server 2>/dev/null || true
+  systemctl --user daemon-reload
+  systemctl --user reset-failed 2>/dev/null || true
+
+  # ---- the one true supervisor ----
+  systemctl --user enable harness.service 2>/dev/null || true
+  step "start harness.service" -- systemctl --user restart harness.service
+  item ok "harness daemon $(systemctl --user is-active harness.service 2>/dev/null || echo unknown)"
+fi
+
+# Legacy helper scripts (zsh-harnessd's harness-run symlink + the headless
+# wrapper). Also listed in .chezmoiremove; -f keeps this idempotent.
+rm -f "$HOME/.local/bin/harness-run" "$HOME/.local/bin/claude-headless.sh"
+
+if $WANT_REMOTE_CONTROL || $WANT_CRUSH_SIGNAL; then
+  # Give the daemon a moment to come up, then re-start what was live so the
+  # migration doesn't silently drop a running agent. Names are the SEED names;
+  # a machine whose create_-owned harness.toml predates them will warn — start
+  # the right harness by hand there (harness list shows what it knows).
+  for _ in 1 2 3 4 5; do
+    "$HARNESS_BIN" list >/dev/null 2>&1 && break
+    sleep 1
+  done
+  if $WANT_REMOTE_CONTROL; then
+    if "$HARNESS_BIN" start claude-code >/dev/null 2>&1; then
+      item ok "claude-code re-enabled (remote-control was live under the legacy units)"
+    else
+      warn "could not start claude-code — run 'harness start claude-code'"
+    fi
+  fi
+  if $WANT_CRUSH_SIGNAL; then
+    if "$HARNESS_BIN" start crush-signal >/dev/null 2>&1; then
+      item ok "crush-signal re-enabled (the legacy Signal arbiter was live)"
+    else
+      warn "could not start crush-signal — run 'harness start crush-signal'"
+    fi
   fi
 fi
-
-echo "harness-daemon-service: enabling harness.service"
-
-# Stop and disable the old zsh-harnessd if it exists (migration)
-if systemctl --user is-enabled --quiet zsh-harnessd.service 2>/dev/null; then
-  echo "harness-daemon-service: stopping and disabling legacy zsh-harnessd.service"
-  systemctl --user stop zsh-harnessd.service 2>/dev/null || true
-  systemctl --user disable zsh-harnessd.service 2>/dev/null || true
-fi
-
-# Reload systemd to pick up the new unit file
-systemctl --user daemon-reload
-
-# Enable and (re)start the harness daemon
-systemctl --user enable harness.service
-systemctl --user restart harness.service
-
-echo "harness-daemon-service: harness.service is $(systemctl --user is-active harness.service)"

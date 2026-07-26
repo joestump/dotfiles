@@ -27,14 +27,14 @@ flowchart TD
   *every* `secret/users/<you>/*` KV secret. Add a new secret → it shows up automatically
   (next render or `vault-agent restart`). `ssh` is skipped (it's files). This
   shell-format `secrets-static.env` is what most consumers read: `~/.oh-my-zsh`
-  sources it, and **harnessd harnesses** load it via `env_file` (harness-run
-  sources it in a shell context).
+  sources it, and on macOS the `rocks.stump.harness` LaunchAgent sources it
+  before exec'ing the **harness daemon**, so every supervised agent session
+  inherits the full set (harness layers each agent's `env_file` on top).
 - **systemd `EnvironmentFile` copy** — the agent *also* renders the same secrets
   to `secrets-static.systemd.env` in systemd `EnvironmentFile` syntax (no `export`,
   double-quoted), because systemd's `EnvironmentFile=` parser can't read the shell
-  format. It exists for systemd **user units** that need secrets; nothing consumes
-  it today (the Crush Signal arbiter moved to harnessd), but it's kept ready for
-  the next such unit.
+  format. `harness.service` consumes it (`EnvironmentFile=-…`), which is how
+  supervised agents get their secrets on Linux without a login shell in the loop.
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
   `secret/users/<you>/ssh`.
 

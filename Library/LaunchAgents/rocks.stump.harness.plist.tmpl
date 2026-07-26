@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>rocks.stump.harness</string>
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Source the Vault-Agent-rendered secrets BEFORE exec'ing the daemon:
+             harnesses inherit the daemon's environment (spawn.go layers env_file
+             on top of os.Environ()), and under launchd there is no login shell to
+             have sourced it. Same fix czu-run.zsh applies one level down; the
+             guard keeps an unprovisioned machine booting cleanly. The binary is
+             the run_after_32-install-harness build in ~/.local/bin. -->
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>. {{ .chezmoi.homeDir }}/.config/vault/secrets-static.env 2>/dev/null || true; exec {{ .chezmoi.homeDir }}/.local/bin/harness daemon</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- launchd's PATH is minimal; the daemon spawns agent CLIs (claude,
+             crush, uv, npx) from ~/.local/bin, plus brew on either prefix so it
+             works on Apple Silicon (/opt/homebrew) and Intel (/usr/local). -->
+        <key>PATH</key>
+        <string>{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>XDG_CONFIG_HOME</key>
+        <string>{{ .chezmoi.homeDir }}/.config</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/state/harness/daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/state/harness/daemon.log</string>
+</dict>
+</plist>
