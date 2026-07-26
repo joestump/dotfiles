@@ -1,0 +1,18 @@
+{{- /*
+  ~/.config/crush/CRUSH.md — global agent rules for Crush.
+
+  This file is pure composition — base policy + identity + harness overlay. Add a
+  new rule to the right partial under .chezmoitemplates/agents/, never inline
+  here, or it silently applies to Crush alone.
+
+  Replaces the former hand-maintained dot_config/crush/CRUSH.md, which had already
+  drifted from dot_claude/CLAUDE.md.tmpl: the Switchboard section was duplicated in
+  both with divergent wording, the git workflow rules existed only here, and the
+  Signal/URL/OMG/issue-tracker rules existed only in the Claude file. Same target
+  path, so nothing to add to .chezmoiremove.
+*/ -}}
+{{ template "agents/base.md" . }}
+
+{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) (merge (dict "harnessName" "Crush" "harnessUrl" "https://github.com/charmbracelet/crush") .) }}
+
+{{ template "agents/harness-crush.md" . }}
