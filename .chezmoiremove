@@ -41,3 +41,10 @@ Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
 # dir holding that agent's session history — `mv` it to crush-signal to keep the
 # history, or leave it and let a fresh pin be seeded.
 .config/harness/crush-glm.env
+
+# zsh-harnessd helper scripts — the harness-run symlink and the standalone
+# claude-headless wrapper from the tmux era. Their units/LaunchAgents are torn
+# down by run_onchange_after_51-harness-daemon-service, which also rm -f's
+# these; listing them here covers machines where that script has already fired.
+.local/bin/harness-run
+.local/bin/claude-headless.sh

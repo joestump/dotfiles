@@ -1,16 +1,29 @@
 [Unit]
 Description=Harness agent supervisor (Go)
 Documentation=https://gitea.stump.rocks/stump.wtf/harness
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart={{ env "GOBIN" | default (printf "%s/go/bin" .chezmoi.homeDir) }}/harness daemon
+# systemd gives --user services a minimal PATH; the daemon spawns agent CLIs
+# (claude, crush, and whatever they shell out to — uv, npx, go) that live in
+# ~/.local/bin and ~/go/bin. Without this they fail with "executable file not
+# found in $PATH".
+Environment=PATH=%h/.local/bin:%h/go/bin:/usr/local/bin:/usr/bin:/bin
+Environment=XDG_CONFIG_HOME=%h/.config
+# Harnesses inherit the daemon's environment (spawn.go layers env_file on top of
+# os.Environ()), and a boot-started --user unit has no login shell to have
+# sourced the Vault-Agent secrets. This is the systemd-syntax copy the agent
+# renders for exactly this case (see website/docs/secrets.md); `-` keeps an
+# unprovisioned machine booting cleanly.
+EnvironmentFile=-%h/.config/vault/secrets-static.systemd.env
+# The run_after_32-install-harness build. ~/go/bin stays on PATH above for the
+# CLIs the agents shell out to, but the daemon binary itself is the chezmoi one.
+ExecStart={{ .chezmoi.homeDir }}/.local/bin/harness daemon
+ExecReload={{ .chezmoi.homeDir }}/.local/bin/harness reload
 Restart=on-failure
 RestartSec=5
-
-# Environment
-Environment=XDG_CONFIG_HOME=%h/.config
 
 [Install]
 WantedBy=default.target

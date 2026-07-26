@@ -14,13 +14,15 @@
 # PTY per ADR-0003 — that's what a full-screen TUI like crush or claude needs;
 # "tmux" is the compat escape hatch).
 #
-# Both agents below run with permission prompts off, so both are
+# Every agent below runs with permission prompts off, so all are
 # `enabled = false`: the daemon will NOT autostart them on boot. Start one
-# deliberately with `harness start <name>`. Both also inherit the daemon's
-# environment (spawn.go does `env := os.Environ()` and appends env_file on top),
-# so start `harness daemon` from a shell that has sourced
-# ~/.config/vault/secrets-static.env — that's where every provider and MCP token
-# lives.
+# deliberately with `harness start <name>`. All also inherit the daemon's
+# environment (spawn.go does `env := os.Environ()` and appends env_file on top).
+# The daemon itself is supervised — systemd --user `harness.service` on Linux,
+# LaunchAgent `rocks.stump.harness` on macOS (ADR-0005) — and both units load
+# ~/.config/vault/secrets-static.env before exec, so every provider and MCP
+# token reaches the agents without a login shell in the loop. Running the
+# daemon by hand instead? Source that file first.
 
 # Crush driven from Signal, on Z.ai's GLM-5.2, with permission prompts off.
 #
@@ -81,4 +83,20 @@ cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
 args = ["--remote-control", "--dangerously-skip-permissions"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 description = "Claude Code · ~/src · Remote Control · skip-permissions"
+enabled = false
+
+# The always-on background worker: Claude Code sitting in ~/src waiting for
+# Switchboard doorbells and queue todos. Replaces the standalone
+# claude-headless.service + tmux while-loop the zsh-harnessd era used
+# (retired by run_onchange_after_51-harness-daemon-service).
+#
+# Deliberately NOT Signal-driven and NOT remote-control: claude-code above owns
+# the phone, crush-signal owns the Signal channel; this one just works the
+# queue. Same --dangerously-skip-permissions consequence as its siblings:
+# `enabled = false`, start it deliberately with `harness start claude-headless`.
+[harness.claude-headless]
+cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
+args = ["--dangerously-skip-permissions"]
+workdir = "{{ .chezmoi.homeDir }}/src"
+description = "Claude Code · ~/src · headless queue worker · skip-permissions"
 enabled = false
