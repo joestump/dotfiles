@@ -85,6 +85,45 @@ advance_origin() {
   [ "$output" = "pulled" ]
 }
 
+@test "auto-stashes a dirty tree so an unrelated ff-pull still succeeds" {
+  # Seed a tracked file and push it so local == origin (no divergence).
+  echo "base" > "$WORK/README.local"
+  git -C "$WORK" add -A && git -C "$WORK" commit --quiet -m "seed README.local"
+  git -C "$WORK" push --quiet origin main
+  advance_origin main                          # fork moves ahead (empty commit, unrelated)
+  echo "more wip" >> "$WORK/README.local"      # local uncommitted (dirty) edit
+  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "pulled" ]
+  # Advanced to the new commit AND the local edit survived on top.
+  [ "$(git -C "$WORK" rev-list --count HEAD)" -eq 3 ]
+  run grep -q "more wip" "$WORK/README.local"
+  [ "$status" -eq 0 ]
+}
+
+@test "keeps local edits in a stash (reports stash-conflict) when they collide with the pull" {
+  # Both sides change the SAME file on the SAME lines -> pop conflicts.
+  echo "base" > "$WORK/collide.txt"
+  git -C "$WORK" add -A && git -C "$WORK" commit --quiet -m "seed collide.txt"
+  git -C "$WORK" push --quiet origin main
+  # Fork advances collide.txt...
+  local scratch="$BATS_TEST_TMPDIR/scratch"; rm -rf "$scratch"
+  git clone --quiet "$REMOTE" "$scratch"
+  echo "theirs" > "$scratch/collide.txt"
+  git -C "$scratch" commit --quiet -am "fork edits collide.txt"
+  git -C "$scratch" push --quiet origin main
+  rm -rf "$scratch"
+  # ...and the box has a conflicting uncommitted edit to the same file.
+  echo "mine" > "$WORK/collide.txt"
+
+  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "stash-conflict" ]
+  # The pull still landed (box advanced) and the edit is preserved in the stash.
+  run git -C "$WORK" stash list
+  [ -n "$output" ]
+}
+
 @test "fails on a detached HEAD" {
   git -C "$WORK" checkout --quiet --detach
   run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
