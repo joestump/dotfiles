@@ -82,9 +82,13 @@ export PIPENV_VENV_IN_PROJECT=1
 # look identical ("pipenv sync failed") with no clue what actually broke. Keep
 # the output off the clean `step` line on success, but surface the tail of it
 # when the sync fails.
+#
+# Run from a subshell cd'd into the repo rather than `pipenv sync --dir`: the
+# `--dir` flag is missing on some pipenv builds (this box's pipenv 2026.6.2
+# rejects --dir and prints usage), and `cd` works on every version.
 pipenv_log="$(mktemp)"
 trap 'rm -f "$pipenv_log"' EXIT
-if ! step "syncing pipenv venv" -- pipenv sync --quiet --dir "$repo" >"$pipenv_log" 2>&1; then
+if ! ( cd "$repo" && step "syncing pipenv venv" -- pipenv sync --quiet ) >"$pipenv_log" 2>&1; then
   warn "pipenv sync failed; first run may cold-start"
   while IFS= read -r line; do
     warn "  $line"
