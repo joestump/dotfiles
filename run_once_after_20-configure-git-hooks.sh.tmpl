@@ -4,7 +4,7 @@
 # carried by `git clone`, so a freshly-cloned dotfiles repo needs this set once.
 set -euo pipefail
 
-SRC="${HOME}/.local/share/chezmoi"
+SRC={{ .chezmoi.sourceDir | quote }}
 if [ -d "${SRC}/.git" ] && [ -d "${SRC}/.githooks" ]; then
   git -C "${SRC}" config core.hooksPath .githooks
   chmod +x "${SRC}/.githooks/pre-commit" 2>/dev/null || true

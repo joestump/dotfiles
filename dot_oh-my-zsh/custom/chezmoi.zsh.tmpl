@@ -21,7 +21,7 @@ czu() {
 # czinit <host> — bootstrap a fresh node end-to-end over SSH, in one command:
 #   1. seed the node's git credential store with your Gitea token (piped over
 #      stdin — never in argv), so the private dotfiles repo can clone;
-#   2. install chezmoi from get.chezmoi.io and run `chezmoi init --apply`;
+#   2. install chezmoi from get.chezmoi.io and run `chezmoi init --source ~/src/dotfiles --apply`;
 #   3. log in to OpenBao via OIDC (vault-login: tunnel + login + agent kick) so
 #      secrets render. You just click Authorize in the browser when it opens.
 #   e.g.  czinit joestump@ie02.stump.rocks
@@ -43,7 +43,14 @@ czinit() {
     || { print -u2 "czinit: could not seed credentials on ${host}"; return 1 }
 
   print -u2 "→ installing chezmoi + applying dotfiles on ${host} (sudo may prompt) …"
-  ssh -t "$host" "sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- init --apply '${repo}'" \
+  # --source is REQUIRED, not cosmetic. Without it `chezmoi init` clones into its
+  # default ~/.local/share/chezmoi, then the very apply it runs writes a
+  # ~/.config/chezmoi/chezmoi.toml whose sourceDir points at ~/src/dotfiles — a
+  # directory that would not exist. Every chezmoi command after bootstrap would
+  # then read an empty source and want to delete the whole home directory. Cloning
+  # straight to the configured location keeps the node self-consistent from the
+  # first command. $HOME is escaped so the REMOTE shell expands it.
+  ssh -t "$host" "sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- init --source \"\$HOME/src/dotfiles\" --apply '${repo}'" \
     || { print -u2 "czinit: bootstrap failed on ${host}"; return 1; }
 
   # Provision the Vault Agent's machine identity so it renders secrets AND renews

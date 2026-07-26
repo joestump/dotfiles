@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Build harness ("systemctl for your agents") → ~/.local/bin/harness.
+#
+# Structural twin of run_after_30-install-crush.sh — see that script for the full
+# rationale; the differences are called out inline below.
+#
+# The source is cloned by the chezmoi external at ~/.local/share/harness-src
+# ({{ .harnessRepo }}). The repo ships no release binaries, so there's nothing to
+# download — we build from that clone into ~/.local/bin, which sorts ahead of
+# /opt/homebrew/bin on PATH (see env.zsh).
+#
+# Rerun model (mirrors install-crush): runs on EVERY apply but is cheap when
+# nothing changed — it fingerprints the clone by git HEAD and only rebuilds when
+# HEAD moves (or the binary is missing). run_onchange wouldn't work here: the repo
+# gaining commits doesn't change this script, so an onchange gate would never
+# re-fire. For an immediate pull + rebuild: `chezmoi apply --refresh-externals`.
+set -euo pipefail
+
+# ~/.local/bin may not be on PATH in the shell that invoked chezmoi (a login shell
+# opened before env.zsh added it). Add it so `command -v`/go resolve.
+export PATH="$HOME/.local/bin:$PATH"
+
+SRC="$HOME/.local/share/harness-src"
+BIN="$HOME/.local/bin/harness"
+STATE="$HOME/.config/dotfiles/.harness-build-state"
+
+# Clean progress via the shared UI lib (spinner on a TTY, quiet otherwise);
+# fallback keeps the script working if the lib hasn't been applied yet.
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
+# The external clones the source; if it isn't there yet, there's nothing to build.
+[ -d "$SRC/.git" ] || { echo "harness source not cloned yet ($SRC); skipping build"; exit 0; }
+
+# Keep the managed clone pointed at the configured repo. chezmoi's git-repo
+# external clones a fresh machine from {{ .harnessRepo }} correctly, but it will
+# NOT re-point an EXISTING clone when .harnessRepo changes (it just `git pull`s the
+# old remote) — so reconcile the remote here. Safe on the managed clone: nothing is
+# developed in it (ff-only pull), and the reset just tracks the new default branch.
+WANT="{{ .harnessRepo }}"
+if [ "$(git -C "$SRC" remote get-url origin 2>/dev/null)" != "$WANT" ]; then
+  echo "==> repointing harness clone → $WANT"
+  git -C "$SRC" remote set-url origin "$WANT"
+fi
+
+# Always fetch and sync to origin's default branch on every apply so we have the
+# absolute latest commits without waiting for chezmoi's external refresh period.
+# Safe because nothing is developed in this clone.
+if git -C "$SRC" fetch --quiet --prune origin; then
+  DEF="$(git -C "$SRC" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+  git -C "$SRC" reset --hard "$DEF" >/dev/null 2>&1 || git -C "$SRC" reset --hard origin/main >/dev/null 2>&1 || true
+else
+  warn "fetch failed — building from current local state"
+fi
+
+# Building needs the Go toolchain (Brewfile installs it on macOS; on a headless
+# Linux node without `go` this is a graceful no-op). GOTOOLCHAIN=auto lets an older
+# Go fetch the exact version go.mod pins.
+command -v go >/dev/null 2>&1 || { echo "go toolchain absent; skipping harness build"; exit 0; }
+
+heading "🛠  harness"
+
+head="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
+if [ -x "$BIN" ] && [ -n "$head" ] && [ "$head" = "$(cat "$STATE" 2>/dev/null || true)" ]; then
+  item ok "harness ${head:0:7} (up to date)"
+  exit 0
+fi
+
+# Flags mirror the repo's own Makefile `build` target (GOFLAGS + LDFLAGS) so a
+# chezmoi-built binary is identical to a `make install` one. We invoke `go build`
+# directly rather than `make install` to avoid depending on make, exactly as the
+# crush script does — if the Makefile's flags change upstream, update these to match.
+# Deliberately NOT setting CGO_ENABLED=0 (crush does): harness's Makefile leaves
+# cgo at the default, and forcing it off here would build a different binary.
+ver="$(git -C "$SRC" describe --tags --always --dirty 2>/dev/null || echo dev)"
+mkdir -p "$(dirname "$BIN")" "$(dirname "$STATE")"
+
+say "building harness ${ver}…"
+if ( cd "$SRC" && GOTOOLCHAIN=auto \
+       go build -trimpath \
+         -ldflags "-X gitea.stump.rocks/stump.wtf/harness/internal/buildinfo.Version=${ver}" \
+         -o "$BIN" ./cmd/harness ); then
+  printf '%s' "$head" >"$STATE"
+  item ok "harness ${ver} → $BIN"
+else
+  warn "harness build failed — 'cd $SRC && go build ./cmd/harness' by hand to see why"
+fi

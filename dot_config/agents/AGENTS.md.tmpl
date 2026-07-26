@@ -1,0 +1,16 @@
+{{- /*
+  ~/.config/agents/AGENTS.md — the canonical, harness-agnostic copy of the rules.
+
+  Nothing reads this automatically today: Claude Code reads ~/.claude/CLAUDE.md and
+  Crush reads ~/.config/crush/{AGENTS,CRUSH,CLAUDE}.md, and both get the same content
+  composed for them. This file exists so there is ONE artifact to point a human (or a
+  future harness) at without picking a harness first, and so a new tool that follows
+  the AGENTS.md convention can be wired up by pointing at a path that already exists.
+
+  Base + identity only — no harness overlay, by definition.
+*/ -}}
+{{ template "agents/base.md" . }}
+
+{{- /* No harness by definition, so harnessName is empty: the identity overlay
+       falls back to telling the agent to name its own harness. */}}
+{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) (merge (dict "harnessName" "" "harnessUrl" "") .) }}

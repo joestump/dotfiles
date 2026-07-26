@@ -44,13 +44,40 @@ except Exception:
 PY
 }
 
+# Run a command under a wall-clock budget, portably. macOS ships no `timeout`
+# (that's GNU coreutils, and `gtimeout` only exists if you brewed it), so fall
+# back to a watchdog: run in the background, kill it if it outlives the budget.
+# Works under both bash and zsh, which both source this file.
+_signal_bounded() {
+  local secs="$1"; shift
+  if _signal_have timeout;  then timeout  "$secs" "$@"; return $?; fi
+  if _signal_have gtimeout; then gtimeout "$secs" "$@"; return $?; fi
+  local pid wd rc
+  "$@" & pid=$!
+  ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null; sleep 2; kill -KILL "$pid" 2>/dev/null ) 2>/dev/null & wd=$!
+  wait "$pid" 2>/dev/null; rc=$?
+  kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+  return "$rc"
+}
+
 notify() {
   local msg="$1"
   # 1) warm signal-cli daemon — fast, no cold JVM.
   _signal_send_via_daemon "$msg" && return 0
   # 2) cold signal-cli send (note-to-self) — reliable where the daemon isn't up.
+  #
+  # MUST be bounded. signal-cli takes an exclusive lock on its data dir, and when
+  # something else holds it (a wedged daemon, a second LaunchAgent, another cold
+  # invocation) it does not fail — it prints "Config file is in use by another
+  # instance, waiting…" and blocks FOREVER. With this call's output sent to
+  # /dev/null that is an invisible, unbounded hang inside whatever was merely
+  # trying to send a notification: it wedged `czu` right after the Vault Agent
+  # reload, and the headless 6-hourly czu along with it (whose stuck process then
+  # held chezmoi's state lock, so the NEXT run failed too). A notification must
+  # never be able to outlive the thing it is reporting on. 25s is a generous cold
+  # JVM start; past that, fall through to the log.
   if _signal_have signal-cli; then
-    signal-cli -a "$SIGNAL_NUMBER" send -m "$msg" "$SIGNAL_NUMBER" >/dev/null 2>&1 && return 0
+    _signal_bounded 25 signal-cli -a "$SIGNAL_NUMBER" send -m "$msg" "$SIGNAL_NUMBER" >/dev/null 2>&1 && return 0
   fi
   # 3) last resort so it is at least discoverable in the system log.
   _signal_have logger && logger -t signal-notify "$msg"

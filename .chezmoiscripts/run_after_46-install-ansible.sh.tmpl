@@ -77,14 +77,48 @@ chmod +x "$HOME/.local/bin/pipenv"
 # Use the wrapper pipenv which points to our isolated venv.
 export PIPENV_IGNORE_VIRTUALENVS=1
 export PIPENV_VENV_IN_PROJECT=1
+# `pipenv sync` has no --dir flag (that was invented); the documented way to run it
+# against a repo you aren't cd'd into is PIPENV_PIPFILE. Passing --dir made pipenv
+# exit 2 on argparse ("unrecognized arguments") on every single apply.
+export PIPENV_PIPFILE="$repo/Pipfile"
+
+# Pin the interpreter. The Pipfile only asks for python_version = "3", so pipenv
+# builds the venv with whatever `python3` is newest — currently 3.14, where the
+# pinned rpds-py has no wheel and its Rust build fails, taking the whole sync down.
+# Newest-known-good first; PIPENV_VENV_IN_PROJECT puts the venv at $repo/.venv.
+pipenv_python=""
+for _py in python3.13 python3.12; do
+  if command -v "$_py" >/dev/null 2>&1; then
+    pipenv_python="$(command -v "$_py")"
+    break
+  fi
+done
+
+pipenv_args=()
+if [ -n "$pipenv_python" ]; then
+  pipenv_args=(--python "$pipenv_python")
+  # A venv already built on a too-new interpreter stays broken forever, because
+  # pipenv reuses it and --python is ignored once .venv exists. Discard it first.
+  if [ -x "$repo/.venv/bin/python" ] && \
+     ! "$repo/.venv/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] < (3, 14) else 1)' 2>/dev/null; then
+    say "discarding .venv built on an unsupported python"
+    rm -rf "$repo/.venv"
+  fi
+else
+  warn "no python3.13/3.12 found — letting pipenv choose (may fail on 3.14)"
+fi
 
 # Capture rather than discard: sending stderr to /dev/null made every failure
 # look identical ("pipenv sync failed") with no clue what actually broke. Keep
 # the output off the clean `step` line on success, but surface the tail of it
 # when the sync fails.
+#
+# Run from a subshell cd'd into the repo rather than `pipenv sync --dir`: the
+# `--dir` flag is missing on some pipenv builds (this box's pipenv 2026.6.2
+# rejects --dir and prints usage), and `cd` works on every version.
 pipenv_log="$(mktemp)"
 trap 'rm -f "$pipenv_log"' EXIT
-if ! step "syncing pipenv venv" -- pipenv sync --quiet --dir "$repo" >"$pipenv_log" 2>&1; then
+if ! step "syncing pipenv venv" -- pipenv sync --quiet ${pipenv_args[@]+"${pipenv_args[@]}"} >"$pipenv_log" 2>&1; then
   warn "pipenv sync failed; first run may cold-start"
   while IFS= read -r line; do
     warn "  $line"

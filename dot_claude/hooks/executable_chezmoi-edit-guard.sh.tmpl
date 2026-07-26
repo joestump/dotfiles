@@ -8,7 +8,7 @@
 # Managed by chezmoi: dot_claude/hooks/executable_chezmoi-edit-guard.sh
 set -euo pipefail
 
-CHEZMOI_SRC="$HOME/.local/share/chezmoi"
+CHEZMOI_SRC={{ .chezmoi.sourceDir | quote }}
 
 # Never wedge the user: if jq is missing, silently no-op.
 command -v jq >/dev/null 2>&1 || exit 0

@@ -21,7 +21,7 @@ tooling assumes. Spokes can be Linux; the hub can't.
 
 ```bash
 sh -c "$(curl -fsLS get.chezmoi.io)" -- \
-  init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+  init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
 ```
 
 This installs `chezmoi`, clones the repo, and runs the install end-to-end.

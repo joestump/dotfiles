@@ -1,3 +1,21 @@
+# chezmoi's own config. Managed by chezmoi (source: this file) — edit here, never
+# the rendered ~/.config/chezmoi/chezmoi.toml.
+
+# The source tree is a NORMAL checkout under ~/src, edited like every other repo,
+# rather than chezmoi's default private ~/.local/share/chezmoi. One checkout, one
+# branch, no drift between "the repo I edit" and "the repo that renders". The old
+# location used to be a second clone that could silently sit on a different branch
+# — meaning `chezmoi apply` rendered a tree nobody was looking at.
+#
+# Anything reading this path at runtime should ask `chezmoi source-path` (shell) or
+# use {{ "{{ .chezmoi.sourceDir }}" }} (templates) rather than hardcoding it again.
+sourceDir = {{ printf "%s/src/dotfiles" .chezmoi.homeDir | quote }}
+
 [git]
-    autoCommit = true
-    autoPush = true
+    # Deliberately OFF. With these on, chezmoi committed and pushed on its own
+    # whenever it touched the source tree — edits landed on the remote with no
+    # review, no message you wrote, and no chance to run `bats test/` first. This
+    # repo is a production service; commits here are deliberate. Use the normal
+    # git flow in the source dir instead.
+    autoCommit = false
+    autoPush = false

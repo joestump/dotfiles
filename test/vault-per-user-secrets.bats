@@ -41,9 +41,17 @@ V="$REPO_ROOT/dot_config/vault"
   grep -q 'destination = "{{ .chezmoi.homeDir }}/.config/vault/secrets-static.systemd.env"' "$V/agent.hcl.tmpl"
 }
 
-@test "signal-crush harness sources the vault static env" {
-  local harness="$REPO_ROOT/dot_config/harness/harness.toml"
-  grep -q 'env_file = "~/.config/vault/secrets-static.env"' "$harness"
+@test "the harness seed keeps secrets out of the repo" {
+  # Under zsh-harnessd the harness pointed env_file straight at
+  # secrets-static.env. The Go harness inherits the daemon's (login-shell)
+  # environment instead, so its env_file carries only per-harness knobs — and
+  # therefore must never carry a credential. The seed itself is a template now
+  # (dot_config/harness/create_harness.toml.tmpl); test/harness.bats owns the
+  # rest of its couplings.
+  local seed="$REPO_ROOT/dot_config/harness/create_harness.toml.tmpl"
+  [ -f "$seed" ]
+  run grep -nE "API_KEY *=|TOKEN *=|SECRET *=|PASSWORD *=" "$seed"
+  [ "$status" -ne 0 ]
 }
 
 @test "secrets-aws.env.ctmpl reads secret/users/\$USER/aws" {

@@ -31,7 +31,7 @@ The reader-facing docs live on the **[published site](https://joestump.pages.stu
 ## Set up on a new machine (one command)
 
 ```sh
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
 ```
 
 Installs Homebrew + tools + Oh My Zsh, clones themes/plugins, and applies
