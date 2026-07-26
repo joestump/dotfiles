@@ -5,6 +5,12 @@ Host github.com
   ServerAliveInterval 600
   TCPKeepAlive yes
   IPQoS=throughput
+  # github.com is routed to ssh.github.com:443 (above), whose host key lives
+  # under the [ssh.github.com]:443 identity in known_hosts. On a fresh box with
+  # no known_hosts yet, strict checking makes the first clone fail with "No
+  # ED25519 host key is known". accept-new pins the key on first contact (and
+  # rejects any later change), matching how the 192.168.100.* blocks below work.
+  StrictHostKeyChecking accept-new
 
 # One per ~/src checkout on ops01; %n passes the local host alias (e.g.
 # "claude-payments") so each session lands in the right checkout.
