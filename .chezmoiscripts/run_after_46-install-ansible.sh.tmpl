@@ -88,7 +88,7 @@ export PIPENV_VENV_IN_PROJECT=1
 # rejects --dir and prints usage), and `cd` works on every version.
 pipenv_log="$(mktemp)"
 trap 'rm -f "$pipenv_log"' EXIT
-if ! step "syncing pipenv venv" -- bash -c 'cd "$0" && exec pipenv sync --quiet' "$repo" >"$pipenv_log" 2>&1; then
+if ! ( cd "$repo" && step "syncing pipenv venv" -- pipenv sync --quiet ) >"$pipenv_log" 2>&1; then
   warn "pipenv sync failed; first run may cold-start"
   while IFS= read -r line; do
     warn "  $line"
