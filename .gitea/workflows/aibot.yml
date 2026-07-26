@@ -41,6 +41,13 @@ jobs:
       - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          # The head branch may live on a FORK (e.g. joestump-agent/dotfiles).
+          # Without `repository:` the checkout resolves head.ref against THIS
+          # repo's origin, where a fork branch does not exist — the job then dies
+          # with "A branch or tag with the name '<ref>' could not be found" before
+          # the bot ever runs, failing the required check on every fork PR.
+          # Falls back to this repo for same-repo PRs and non-PR events.
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           # PR branch so `address` mode can commit + push back to it.
           ref: ${{ github.event.pull_request.head.ref || github.head_ref }}
           fetch-depth: 0
