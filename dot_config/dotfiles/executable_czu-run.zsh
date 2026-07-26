@@ -47,6 +47,8 @@ czu_out="$(czu_sync_branch "$CZU_SRC" 2>&1)"; czu_rc=$?
 case "$czu_out" in
   pulled)            item ok  "dotfiles — synced from fork" ;;
   skip-local-branch) item dim "dotfiles — branch not on fork yet; nothing to pull" ;;
+  stash-conflict)
+    fail "git sync: your local edits in $CZU_SRC conflict with what was pulled. The pull SUCCEEDED and your edits are safe in a git stash — run 'git -C $CZU_SRC stash pop' and resolve, or 'git -C $CZU_SRC stash drop' to discard them, then re-run czu." ;;
 esac
 (( czu_rc == 0 )) \
   || fail "git sync failed ($czu_out) — check for local edits/conflicts in $CZU_SRC"

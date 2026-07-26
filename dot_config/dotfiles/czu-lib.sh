@@ -20,8 +20,20 @@
 #   branch NOT on the fork yet -> nothing to sync; skip cleanly (rc 0)
 #   detached HEAD / non-ff / git error -> failure (rc 1)
 #
+# A dirty working tree — uncommitted edits made directly in the chezmoi source
+# dir — is the single most common way this box gets stuck: `git pull --ff-only`
+# hard-fails ("Your local changes would be overwritten by merge") the instant an
+# incoming commit touches a locally-modified file, even though `git status` says
+# the branch "can be fast-forwarded". Left alone the tree never clears, so every
+# subsequent sync fails too — a permanent deadlock. czu_sync_branch defuses this
+# by auto-stashing local changes around the pull: set them aside, fast-forward,
+# then restore them on top. Nothing is ever discarded — if restoring conflicts
+# (a local edit and an incoming commit changed the same lines), the stash is
+# KEPT and we report `stash-conflict` so the box advances and the conflict is
+# visible, instead of staying stuck forever.
+#
 # Exactly one status token is printed on stdout so callers and tests can branch
-# on the outcome: pulled | skip-local-branch | detached | nonff
+# on the outcome: pulled | skip-local-branch | detached | nonff | stash-conflict
 czu_sync_branch() {
   _czu_dir=$1
 
@@ -33,10 +45,32 @@ czu_sync_branch() {
   if git -C "$_czu_dir" ls-remote --exit-code --heads origin "$_czu_br" >/dev/null 2>&1; then
     # Best-effort: keep tracking correct so a bare `git pull` works next time.
     git -C "$_czu_dir" branch --set-upstream-to="origin/$_czu_br" "$_czu_br" >/dev/null 2>&1 || true
+
+    # Stash a dirty tree (tracked + untracked) so it can't block the ff pull.
+    _czu_stashed=0
+    if ! git -C "$_czu_dir" diff --quiet 2>/dev/null \
+       || ! git -C "$_czu_dir" diff --cached --quiet 2>/dev/null \
+       || [ -n "$(git -C "$_czu_dir" ls-files --others --exclude-standard 2>/dev/null)" ]; then
+      if git -C "$_czu_dir" stash push --include-untracked --quiet -m czu-autostash >/dev/null 2>&1; then
+        _czu_stashed=1
+      fi
+    fi
+
     if git -C "$_czu_dir" pull --ff-only origin "$_czu_br" >/dev/null 2>&1; then
+      if [ "$_czu_stashed" -eq 1 ]; then
+        # Restore local edits on top of the freshly pulled tree.
+        if ! git -C "$_czu_dir" stash pop --quiet >/dev/null 2>&1; then
+          # Conflict: keep the stash (do not drop it) so nothing is lost.
+          echo stash-conflict
+          return 1
+        fi
+      fi
       echo pulled
       return 0
     fi
+
+    # Pull failed for some other reason — restore the tree we set aside.
+    [ "$_czu_stashed" -eq 1 ] && git -C "$_czu_dir" stash pop --quiet >/dev/null 2>&1
     echo nonff
     return 1
   fi
