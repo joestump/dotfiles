@@ -95,6 +95,9 @@ desired="$(mcp_base | jq \
   # cairn: native http + static Bearer (baked). Same both-halves rule as switchboard.
   | (if $cn != "" and $cnurl != "" then .cairn = {type:"http", url:$cnurl,
                 headers:{"Authorization": ("Bearer " + $cn)}} else . end)
+  # msgbrowse: local-only http mcp; darwin only (Claude Code is macOS-desktop-native).
+  # No auth — localhost-only.
+  | (if "{{ .chezmoi.os }}" == "darwin" then .msgbrowse = {type:"http", url:"http://127.0.0.1:60769/mcp"} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {type:"stdio", command:$uv,
                args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}","--transport","stdio"],

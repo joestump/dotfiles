@@ -71,6 +71,8 @@ desired="$(mcp_base | jq \
   # dotfiles#15).
   | (if $cn != "" and $cnurl != "" then .cairn = {command:"npx", args:["-y","mcp-remote",$cnurl,
                                       "--header", ("Authorization:Bearer " + $cn)]} else . end)
+  # msgbrowse: local-only http mcp via the mcp-remote stdio bridge; darwin-only.
+  | (if "{{ .chezmoi.os }}" == "darwin" then .msgbrowse = {command:"npx", args:["-y","mcp-remote","http://127.0.0.1:60769/mcp"]} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {command:$uv,
                args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}","--transport","stdio"],
