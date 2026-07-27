@@ -40,6 +40,25 @@ OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "
 # mcp_secret's live fallback avoids blanking a working token on a transient miss.
 # Claude Code ONLY — deliberately NOT added to the Claude Desktop merge (44).
 SB="$(mcp_secret switchboard SWITCHBOARD_CLAUDE_CODE_API_KEY "$(jq -r '(.mcpServers.switchboard.headers.Authorization // "") | ltrimstr("Bearer ")' "$CJ")")"
+# cairn: native http + a STATIC Bearer, baked at apply time (same reason as outline
+# and switchboard — Claude Code doesn't expand ${VAR} in http headers). Crush has
+# had this server since it was stood up; both Claude clients were simply never
+# given it, so agents here could not read or post trajectories at all.
+CN="$(mcp_secret cairn CAIRN_API_TOKEN "$(jq -r '(.mcpServers.cairn.headers.Authorization // "") | ltrimstr("Bearer ")' "$CJ")")"
+
+# Both base URLs are pushed in from OpenBao (secrets-static.env), same as the
+# tokens — NOT hardcoded here. Crush already reaches both servers through these
+# very vars ($CAIRN_BASE_URL, $SWITCHBOARD_BASE_URL); it expands them at runtime,
+# whereas Claude Code doesn't expand ${VAR} in an http url, so bake them at apply
+# time. Fallback recovers the URL already in the live config, so a transient miss
+# leaves a working entry alone. The switchboard path segment is per-client and
+# minted by switchboard, so it stays in chezmoidata.
+SB_URL="$(mcp_env SWITCHBOARD_BASE_URL "")"
+SB_URL="${SB_URL:+${SB_URL}{{ .switchboardMcpPath }}}"
+SB_URL="${SB_URL:-$(jq -r '.mcpServers.switchboard.url // ""' "$CJ")}"
+CN_URL="$(mcp_env CAIRN_BASE_URL "")"
+CN_URL="${CN_URL:+${CN_URL}/mcp}"
+CN_URL="${CN_URL:-$(jq -r '.mcpServers.cairn.url // ""' "$CJ")}"
 
 # signal is OS-specific: the uv binary path and env PATH differ macOS vs Linux; the
 # repo dir is ~/src/signal-mcp on both (Joe's dev checkout on the Mac, a chezmoi
@@ -55,7 +74,8 @@ SIG_PATH="{{ .chezmoi.homeDir }}/.local/bin:/usr/bin:/bin:/usr/local/bin"
 SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
 
 desired="$(mcp_base | jq \
-  --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" --arg sb "$SB" \
+  --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" --arg sb "$SB" --arg cn "$CN" \
+  --arg sburl "$SB_URL" --arg cnurl "$CN_URL" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
     (if $kk != "" then .karakeep.env.KARAKEEP_API_KEY = $kk else . end)
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
@@ -67,11 +87,14 @@ desired="$(mcp_base | jq \
   # outline: native http + a STATIC Bearer token (no OAuth/refresh tokens), baked.
   | (if $ot != "" then .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
                 headers:{"Authorization": ("Bearer " + $ot)}} else . end)
-  # switchboard: native http + static Bearer (baked). Claude Code ONLY. The per-client
-  # endpoint comes from chezmoidata. Only set when the token resolved non-empty so a
-  # fresh machine never bakes a broken "Bearer " (cf. github, dotfiles#15).
-  | (if $sb != "" then .switchboard = {type:"http", url:"{{ .switchboardMcpEndpoint }}",
+  # switchboard: native http + static Bearer (baked). Claude Code ONLY. Both halves
+  # resolved above; only set when BOTH are non-empty so a fresh machine never bakes a
+  # broken "Bearer " or a url-less entry (cf. github, dotfiles#15).
+  | (if $sb != "" and $sburl != "" then .switchboard = {type:"http", url:$sburl,
                 headers:{"Authorization": ("Bearer " + $sb)}} else . end)
+  # cairn: native http + static Bearer (baked). Same both-halves rule as switchboard.
+  | (if $cn != "" and $cnurl != "" then .cairn = {type:"http", url:$cnurl,
+                headers:{"Authorization": ("Bearer " + $cn)}} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {type:"stdio", command:$uv,
                args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}","--transport","stdio"],
