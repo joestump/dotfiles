@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Keep msgbrowse current from the stump-wtf Homebrew tap (macOS only).
+#
+# msgbrowse ships two artefacts from that tap: the `msgbrowse` CLI formula and
+# the `msgbrowse-desktop` cask. The cask is the one that matters to the rest of
+# this repo — the desktop shell is what serves the local MCP endpoint the three
+# harness configs point at ({{ .msgbrowseMcpEndpoint }}).
+#
+# Rerun model: run_after, so this fires on EVERY apply — i.e. every `czu` picks
+# up whatever main has published since the last one. run_onchange would be wrong
+# for the same reason it is wrong for install-crush: a new upstream build does
+# not change this script, so an onchange gate would never re-fire.
+#
+# Freshness: `brew update` is what makes "latest from main" true — without it
+# Homebrew only re-reads the tap on its own ~24h auto-update timer, so a czu
+# could happily reinstall yesterday's build. It is the one slow step here, and
+# it is the point of the script.
+#
+# It deliberately does NOT `git pull` the tap directly. That was tried first and
+# is too fragile: a tap checkout is Homebrew's to manage, and this machine's was
+# already sitting detached with unmerged files, where a bare `git pull` fails
+# with a misleading "offline?" warning. `brew update` handles its own checkouts.
+#
+# Everything soft-fails — an unreachable tap, or a cask upgrade that wants a
+# running app closed, must never abort the rest of the apply. It retries on the
+# next czu.
+set -euo pipefail
+
+{{- if eq .chezmoi.os "darwin" }}
+
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  warn() { echo "  WARN: $*" >&2; }
+}
+
+heading "💬 msgbrowse"
+
+command -v brew >/dev/null 2>&1 || { item dim "no Homebrew — skipping"; exit 0; }
+
+TAP="stump-wtf/tap"
+if ! brew tap | grep -qx "$TAP"; then
+  brew tap "$TAP" >/dev/null 2>&1 || { warn "could not tap $TAP; retrying next apply"; exit 0; }
+  item ok "tapped $TAP"
+fi
+
+# Pull down whatever main has published since the last czu. Soft-fail: offline,
+# or a tap checkout Homebrew is unhappy about, both just mean we install from
+# the cached formulae this time round.
+brew update --quiet >/dev/null 2>&1 || warn "brew update failed; installing from the cached formulae"
+
+# install-or-upgrade, per package, each independently soft-failing.
+brew_sync() {
+  local kind="$1" pkg="$2" label="$3"
+  if brew list $kind "$pkg" >/dev/null 2>&1; then
+    if brew outdated $kind "$pkg" >/dev/null 2>&1 && [ -n "$(brew outdated $kind "$pkg" 2>/dev/null)" ]; then
+      if brew upgrade $kind "$pkg" >/dev/null 2>&1; then item ok "$label upgraded"
+      else warn "$label upgrade failed (app running?); retrying next apply"; fi
+    else
+      item ok "$label up to date"
+    fi
+  else
+    if brew install $kind "$pkg" >/dev/null 2>&1; then item ok "$label installed"
+    else warn "$label install failed; retrying next apply"; fi
+  fi
+}
+
+brew_sync ""       "$TAP/msgbrowse"         "msgbrowse (cli)"
+brew_sync "--cask" "$TAP/msgbrowse-desktop" "msgbrowse-desktop"
+
+{{- else }}
+# The tap publishes macOS artefacts only; nothing to manage elsewhere.
+exit 0
+{{- end }}

@@ -69,6 +69,12 @@ switchboardMcpPath: "/mcp/joestump-claude-code-f47b11a4"
 # OpenBao ($CAIRN_BASE_URL + CAIRN_API_TOKEN in secrets-static.env), exactly as
 # Crush already reaches it. See run_after_43/44-claude-*-mcp-merge.
 
+# msgbrowse's local MCP endpoint. The desktop shell binds a FIXED port (8789)
+# precisely so this URL survives a relaunch — it used to take an ephemeral port
+# and the MCP URL changed every time (msgbrowse 56123e1). Loopback-only, so
+# there is no token: the port is the whole address.
+msgbrowseMcpEndpoint: "http://127.0.0.1:8789/mcp"
+
 # Z.ai model metadata for Crush. Prices are USD per 1M tokens and override the
 # corresponding models returned by Z.ai discovery; newly discovered models remain
 # available without pricing until they are added here. Cached output is not listed
