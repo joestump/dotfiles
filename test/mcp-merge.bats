@@ -39,6 +39,31 @@ _home_with() {
   [ "$output" = "gh_agent" ]
 }
 
+@test "mcp_env returns the env-injected base URL" {
+  local h; h="$(_home_with 'export CAIRN_BASE_URL="https://cairn.example"')"
+  run bash -c 'export HOME="'"$h"'"; . "'"$LIB"'"; mcp_env CAIRN_BASE_URL "https://stale.example"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://cairn.example" ]
+}
+
+@test "mcp_env falls back to the live URL when the var is absent" {
+  # A transient OpenBao miss must not blank a working endpoint.
+  local h; h="$(_home_with 'export SOMETHING_ELSE="x"')"
+  run bash -c 'export HOME="'"$h"'"; unset CAIRN_BASE_URL; . "'"$LIB"'"; mcp_env CAIRN_BASE_URL "https://live.example/mcp"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "https://live.example/mcp" ]
+}
+
+@test "neither cairn nor switchboard hardcodes a host in the merge scripts" {
+  # Both halves come from OpenBao; only switchboard's per-client PATH is in
+  # chezmoidata. A hostname reappearing here is the regression this guards.
+  run grep -nE 'https?://[^ ]*(cairn|switchboard)' \
+    "$REPO_ROOT/.chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl" \
+    "$REPO_ROOT/.chezmoiscripts/run_after_44-claude-desktop-mcp-merge.sh.tmpl" \
+    "$REPO_ROOT/.chezmoidata.yaml"
+  [ "$status" -eq 1 ]   # grep exits 1 = no matches
+}
+
 @test "the lib no longer runs a vault query for secrets (code, not comments)" {
   # Strip comments, then assert no active `vault kv get` / secret/personal remains.
   run bash -c "grep -vE '^[[:space:]]*#' \"$LIB\" | grep -nE 'vault kv get|secret/personal'"

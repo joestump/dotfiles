@@ -19,10 +19,20 @@ command -v item >/dev/null 2>&1 || {
 #   SHARED path AND needed a live vault token at merge time; when none was present it
 #   returned empty and blanked the outline/github/karakeep Bearers (dotfiles OMG,
 #   2026-07-05). The env-injection path is per-user and needs no vault call.
-mcp_secret() {
+mcp_secret() { mcp_env "$2" "$3"; }
+
+# mcp_env <env-var> <live-fallback>
+#   The same read as mcp_secret, for the NON-secret half of a server definition —
+#   a service base URL. Those are pushed in from OpenBao alongside the tokens
+#   (CAIRN_BASE_URL, SWITCHBOARD_BASE_URL), so an endpoint move is one OpenBao
+#   write rather than a commit here, and Crush already reaches both servers through
+#   exactly these vars. Named honestly so a base URL isn't dressed up as a
+#   credential. Falls back to the live value so a transient miss never blanks a
+#   working config.
+mcp_env() {
   local v
-  v="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${!2:-}" )"
-  [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$3"
+  v="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${!1:-}" )"
+  [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$2"
 }
 
 # mcp_base  — emit the shared non-secret server defs (._comment stripped).

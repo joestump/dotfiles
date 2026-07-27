@@ -29,6 +29,16 @@ KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.kar
 # baked here at apply time — read straight from the Vault-Agent-rendered secrets
 # (path-agnostic). Never written to the chezmoi repo.
 OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${OUTLINE_API_TOKEN:-}" )"
+# cairn: same story as outline — Desktop is GUI-launched with no shell env, so the
+# Bearer is baked at apply time. The fallback recovers the prior token from the
+# mcp-remote bridge's --header arg, exactly as github's does.
+CN="$(mcp_secret cairn CAIRN_API_TOKEN "$(jq -r '(([.mcpServers.cairn.args[]?] | map(select(startswith("Authorization:Bearer ")))[0]) // "") | ltrimstr("Authorization:Bearer ")' "$DC")")"
+# The endpoint is pushed in from OpenBao too ($CAIRN_BASE_URL in secrets-static.env),
+# not hardcoded here — same var Crush expands at runtime. Fallback recovers the URL
+# already in the bridge's argv, so a transient miss leaves a working entry alone.
+CN_URL="$(mcp_env CAIRN_BASE_URL "")"
+CN_URL="${CN_URL:+${CN_URL}/mcp}"
+CN_URL="${CN_URL:-$(jq -r '([.mcpServers.cairn.args[]?] | map(select(startswith("http")))[0]) // ""' "$DC")}"
 
 # signal is OS-specific (uv path + env PATH differ by OS; repo dir is ~/src/signal-mcp).
 # Claude Desktop only exists on macOS/Windows, so in practice this is the macOS branch,
@@ -45,7 +55,8 @@ SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
 # Claude Desktop entries carry NO "type" field; outline uses the npx mcp-remote stdio
 # bridge with a STATIC Bearer header (no OAuth, no refresh tokens to expire).
 desired="$(mcp_base | jq \
-  --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" \
+  --arg gt "$GT" --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" --arg cn "$CN" \
+  --arg cnurl "$CN_URL" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
     (if $gt != "" then .gitea.env.GITEA_ACCESS_TOKEN = $gt else . end)
   | (if $kk != "" then .karakeep.env.KARAKEEP_API_KEY = $kk else . end)
@@ -55,6 +66,11 @@ desired="$(mcp_base | jq \
                                      "--header", ("Authorization:Bearer " + $gh)]} else . end)
   | (if $ot != "" then .outline = {command:"npx", args:["-y","mcp-remote","https://outline.stump.rocks/mcp",
                                       "--header", ("Authorization:Bearer " + $ot)]} else . end)
+  # cairn: http MCP via the mcp-remote stdio bridge + static Bearer. Both halves come
+  # from OpenBao and are resolved above; only set when BOTH are non-empty (cf. github,
+  # dotfiles#15).
+  | (if $cn != "" and $cnurl != "" then .cairn = {command:"npx", args:["-y","mcp-remote",$cnurl,
+                                      "--header", ("Authorization:Bearer " + $cn)]} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {command:$uv,
                args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}","--transport","stdio"],
