@@ -1,52 +1,65 @@
 {
   "$schema": "https://charm.land/crush.json",
-{{- /* Providers render only when their secret is present in the env at apply
-       time (Vault Agent renders them into the shell that runs `czu`). No provider
-       is hardcoded and no default model is pinned — Crush picks from whatever
-       providers materialized. Leading-comma separator ($sep) keeps the JSON valid
-       when any subset (including none) is enabled.
+{{- /* Every provider renders UNCONDITIONALLY, and every credential is emitted as a
+       "$VAR" reference that Crush expands at runtime — never a literal value. Do
+       not reintroduce apply-time `if env` gates around these blocks. (Written
+       without the surrounding braces on purpose — test/czu-run-env.bats greps
+       this file for the real thing.)
 
-       Secret origins (all from OpenBao at secret/users/<you>/…):
+       Why: a gate is evaluated at APPLY time, but the secret is only needed at
+       CRUSH RUN time, so the gate buys nothing (no key lands in this file either
+       way) while creating a silent, recurring outage. Any `chezmoi apply` from a
+       shell without the Vault-rendered environment — an agent's non-interactive
+       Bash, a launchd/systemd timer, a plain `chezmoi apply` typed in a subshell —
+       saw every gate as false and wrote `"providers": {}`. That is valid JSON and
+       exits 0, so nothing failed loudly; Crush simply refused to start with
+       "default providers are disabled and there are no custom providers are
+       configured", and the usual next step was pasting a key into Crush's TUI,
+       persisting a plaintext secret outside OpenBao. czu-run.zsh sources the
+       secrets for its own apply, but it cannot defend the bare-apply path — and
+       ~/.claude/hooks/chezmoi-edit-guard.sh instructs every agent that edits this
+       repo to run exactly that. Rendering unconditionally removes the failure mode
+       at the source instead of chasing each caller.
+
+       Trade-off, accepted deliberately: on a machine that genuinely lacks a key,
+       the provider is listed and fails when selected. One dead entry beats zero
+       providers and an unusable Crush.
+
+       Credential origins (all from OpenBao at secret/users/<you>/…, rendered into
+       ~/.config/vault/secrets-static.env by Vault Agent; OPENAI_DIRECT_API_KEY is
+       DERIVED in ~/.oh-my-zsh/custom/env.zsh from the raw OPENAI_API_KEY before the
+       LiteLLM gateway shadows it):
          OPENAI_DIRECT_API_KEY  openai
          LITELLM_API_KEY        litellm (StumpCloud gateway)
          GEMINI_API_KEY         gemini (Google AI Studio direct)
          ZAI_API_TOKEN          zai (Z.ai GLM Coding Plan)
          HYPER_API_KEY          hyper (charm.land)
-       */ -}}
+
+       No default model is pinned — Crush persists the user's pick in its own data
+       config (~/.local/share/crush/crush.json), which chezmoi does not manage. */ -}}
   "providers": {
-{{- $sep := "" }}
-{{- if env "OPENAI_DIRECT_API_KEY" }}
-    {{ $sep }}"openai": {
+    "openai": {
       "type": "openai",
       "name": "OpenAI",
       "base_url": "https://api.openai.com/v1",
       "api_key": "$OPENAI_DIRECT_API_KEY",
       "discover_models": true
-    }
-{{- $sep = "," }}
-{{- end }}
-{{- if env "LITELLM_API_KEY" }}
-    {{ $sep }}"litellm": {
+    },
+    "litellm": {
       "type": "litellm",
       "name": "LiteLLM (StumpCloud)",
       "base_url": "{{ .litellmUrl }}",
       "api_key": "$LITELLM_API_KEY",
       "discover_models": true
-    }
-{{- $sep = "," }}
-{{- end }}
-{{- if env "GEMINI_API_KEY" }}
-    {{ $sep }}"gemini": {
+    },
+    "gemini": {
       "type": "openai-compat",
       "name": "Google Gemini",
       "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
       "api_key": "$GEMINI_API_KEY",
       "discover_models": true
-    }
-{{- $sep = "," }}
-{{- end }}
-{{- if env "ZAI_API_TOKEN" }}
-    {{ $sep }}"zai": {
+    },
+    "zai": {
       "type": "openai-compat",
       "name": "Z.ai (GLM Coding Plan)",
       "base_url": "$ZAI_BASE_URL",
@@ -64,19 +77,14 @@
         }
 {{- end }}
       ]
-    }
-{{- $sep = "," }}
-{{- end }}
-{{- if env "HYPER_API_KEY" }}
-    {{ $sep }}"hyper": {
+    },
+    "hyper": {
       "type": "openai-compat",
       "name": "Hyper (charm.land)",
       "base_url": "https://hyper.charm.land/v1",
       "api_key": "$HYPER_API_KEY",
       "discover_models": true
     }
-{{- $sep = "," }}
-{{- end }}
   },
   "lsp": {
     "go": {

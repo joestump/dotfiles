@@ -52,25 +52,51 @@ CRUSH_TMPL="$REPO_ROOT/dot_config/crush/crush.json.tmpl"
   [ "$status" -eq 0 ]
 }
 
-@test "crush.json: an empty secret environment renders NO providers (the bug)" {
+# The tests below previously pinned the OPPOSITE behaviour: an empty environment
+# was expected to render `"providers": {}`, documenting the bug so the gating
+# could not be changed silently. It has now been changed deliberately — the gates
+# are gone (see the comment at the top of crush.json.tmpl). Sourcing the secrets
+# in czu-run.zsh fixed the scheduled-apply path but could never fix a BARE
+# `chezmoi apply`, which ~/.claude/hooks/chezmoi-edit-guard.sh tells every agent
+# editing this repo to run — so the outage kept coming back on a different path.
+# These now pin the fix: the render must not depend on the apply-time environment
+# at all.
+
+@test "crush.json: an empty secret environment still renders every provider" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # Pins the failure mode itself, so the gating change is never made silently.
+  # The regression this guards: any provider gated on `env "..."` silently
+  # vanishes here, and Crush refuses to start with "default providers are
+  # disabled and there are no custom providers are configured".
   run bash -c "env -u OPENAI_DIRECT_API_KEY -u LITELLM_API_KEY -u GEMINI_API_KEY \
-      -u ZAI_API_TOKEN -u HYPER_API_KEY \
+      -u ZAI_API_TOKEN -u ZAI_BASE_URL -u HYPER_API_KEY \
       chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_TMPL' \
-    | python3 -c 'import json,sys; p=json.load(sys.stdin)[\"providers\"]; assert p == {}, p'"
+    | python3 -c 'import json,sys
+p = json.load(sys.stdin)[\"providers\"]
+want = {\"openai\", \"litellm\", \"gemini\", \"zai\", \"hyper\"}
+assert set(p) == want, \"got %s, want %s\" % (sorted(p), sorted(want))'"
   [ "$status" -eq 0 ]
 }
 
-@test "crush.json: sourcing the env recovers every provider" {
+@test "crush.json: credentials are \$VAR references, never literal values" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  [ -r "$HOME/.config/vault/secrets-static.env" ] || skip "node not provisioned by Vault Agent"
-  # Exactly what czu-run.zsh now does, from a launchd-shaped environment.
-  run bash -c "set -a; . \"\$HOME/.config/vault/secrets-static.env\"; \
-      [ -r \"\$HOME/.oh-my-zsh/custom/env.zsh\" ] && . \"\$HOME/.oh-my-zsh/custom/env.zsh\"; set +a; \
+  # Unconditional rendering is only safe because Crush expands these at RUN time.
+  # If a real key ever leaked into the render it would land in a world-readable
+  # file outside OpenBao — the exact thing the old gating was reaching for.
+  run bash -c "set -a; [ -r \"\$HOME/.config/vault/secrets-static.env\" ] && . \"\$HOME/.config/vault/secrets-static.env\"; set +a; \
       chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_TMPL' \
-    | python3 -c 'import json,sys; p=json.load(sys.stdin)[\"providers\"]; assert p, \"no providers rendered\"'"
+    | python3 -c 'import json,sys
+for name, prov in json.load(sys.stdin)[\"providers\"].items():
+    key = prov.get(\"api_key\", \"\")
+    assert key.startswith(\"\$\"), \"%s: api_key is not a \\\$VAR reference: %r\" % (name, key)'"
   [ "$status" -eq 0 ]
+}
+
+@test "crush.json: no apply-time env gates remain around the providers" {
+  # The mechanism itself, not just its output: `{{ if env "..." }}` is what made
+  # the file environment-dependent. `env "X" | default "y"` is fine (it always
+  # produces a value); a bare conditional is not.
+  run grep -nE '\{\{-? *if +env +"' "$CRUSH_TMPL"
+  [ "$status" -ne 0 ]
 }
