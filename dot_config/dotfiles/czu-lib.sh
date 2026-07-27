@@ -78,3 +78,50 @@ czu_sync_branch() {
   echo skip-local-branch
   return 0
 }
+
+# czu_branch_drift DIR
+# Report how far the checked-out branch has drifted from `origin/main`, so czu can
+# say so out loud before it applies.
+#
+# Why this exists: czu applies whatever branch happens to be checked out, and two
+# of czu_sync_branch's outcomes are silently benign — `skip-local-branch` (rc 0)
+# when a local feature branch isn't on the fork yet, and `pulled` when a feature
+# branch fast-forwards from its own stale counterpart. Neither says anything about
+# `main`. A box left parked on a feature branch therefore keeps rendering the whole
+# home directory from that branch, indefinitely, with no signal. That is exactly
+# how this laptop ended up applying a tree 43 commits behind main — and, because
+# the branch had since been merged and rewritten on the fork, eventually wedging
+# czu with `nonff` on every run.
+#
+# Deliberately ADVISORY, never fatal: it always returns 0. In-flight feature-branch
+# work is legitimate and must still apply. The goal is only that you cannot drift
+# dozens of commits without being told.
+#
+# Exactly one status token on stdout, so callers and tests can branch on it:
+#   current | behind:<n> | off-main:<branch>:<n> | detached | unknown
+czu_branch_drift() {
+  _czu_dir=$1
+
+  _czu_dbr=$(git -C "$_czu_dir" symbolic-ref --quiet --short HEAD 2>/dev/null) || {
+    echo detached
+    return 0
+  }
+
+  # No origin/main to compare against (fresh clone, odd remote) — say so rather
+  # than guessing; a missing ref must not read as "you're current".
+  if ! git -C "$_czu_dir" rev-parse --verify --quiet origin/main >/dev/null 2>&1; then
+    echo unknown
+    return 0
+  fi
+
+  _czu_behind=$(git -C "$_czu_dir" rev-list --count "HEAD..origin/main" 2>/dev/null) || _czu_behind=""
+  [ -n "$_czu_behind" ] || { echo unknown; return 0; }
+
+  if [ "$_czu_dbr" != "main" ]; then
+    echo "off-main:${_czu_dbr}:${_czu_behind}"
+    return 0
+  fi
+
+  [ "$_czu_behind" -gt 0 ] && echo "behind:${_czu_behind}" || echo current
+  return 0
+}

@@ -145,3 +145,74 @@ advance_origin() {
   [ "$status" -eq 1 ]
   [ "$output" = "detached" ]
 }
+
+# --- czu_branch_drift ---------------------------------------------------------
+# Advisory check that runs between sync and apply. It exists because czu applies
+# whatever branch is checked out, and czu_sync_branch reports success both when a
+# feature branch isn't on the fork yet and when it fast-forwards from its own
+# stale counterpart — neither says anything about main. A box parked on a feature
+# branch therefore rendered $HOME from a tree 43 commits behind main, silently,
+# until the branch was merged+rewritten upstream and czu wedged on `nonff`.
+# It must NEVER fail the run: in-flight feature-branch work still has to apply.
+
+@test "drift: reports current when on main and level with origin/main" {
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "current" ]
+}
+
+@test "drift: reports how far main is behind origin/main" {
+  advance_origin main
+  advance_origin main
+  git -C "$WORK" fetch --quiet origin
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "behind:2" ]
+}
+
+@test "drift: names the branch and the gap when parked off main (the 43-commit case)" {
+  git -C "$WORK" checkout --quiet -b feat/parked
+  advance_origin main
+  advance_origin main
+  advance_origin main
+  git -C "$WORK" fetch --quiet origin
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "off-main:feat/parked:3" ]
+}
+
+@test "drift: a feature branch level with main is not warned about" {
+  git -C "$WORK" checkout --quiet -b feat/fresh
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "off-main:feat/fresh:0" ]
+}
+
+@test "drift: reports detached HEAD without failing" {
+  git -C "$WORK" checkout --quiet --detach
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "detached" ]
+}
+
+@test "drift: a missing origin/main reads as unknown, never as current" {
+  git -C "$WORK" remote remove origin
+  git -C "$WORK" update-ref -d refs/remotes/origin/main
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "unknown" ]
+}
+
+@test "drift: is advisory — it never returns non-zero, on any repo state" {
+  # The whole point is that it cannot wedge czu the way czu_sync_branch can.
+  for state in main detach nobranch; do
+    case "$state" in
+      detach)   git -C "$WORK" checkout --quiet --detach ;;
+      nobranch) git -C "$WORK" checkout --quiet -b feat/x ;;
+    esac
+    run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+    [ "$status" -eq 0 ]
+  done
+  run bash -c '. "$LIBFILE"; czu_branch_drift "/nonexistent/path"'
+  [ "$status" -eq 0 ]
+}

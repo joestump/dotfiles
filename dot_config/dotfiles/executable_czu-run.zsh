@@ -81,8 +81,40 @@ case "$czu_out" in
   stash-conflict)
     fail "git sync: your local edits in $CZU_SRC conflict with what was pulled. The pull SUCCEEDED and your edits are safe in a git stash — run 'git -C $CZU_SRC stash pop' and resolve, or 'git -C $CZU_SRC stash drop' to discard them, then re-run czu." ;;
 esac
+if (( czu_rc != 0 )) && [[ "$czu_out" == nonff ]]; then
+  # By far the most common cause: this box is parked on a feature branch that was
+  # merged upstream through a fork PR, so origin's copy was rewritten and the two
+  # histories diverged. Nothing is wrong with the local tree — it is just finished
+  # work. Say that, instead of "check for local edits/conflicts", which sends you
+  # hunting for a dirty file that isn't there.
+  _czu_br="$(git -C "$CZU_SRC" symbolic-ref --quiet --short HEAD 2>/dev/null || print -r -- '?')"
+  fail "git sync: '$_czu_br' has diverged from origin/$_czu_br and cannot fast-forward, so NOTHING WAS APPLIED. If that branch is already merged, 'git -C $CZU_SRC checkout main && git -C $CZU_SRC pull --ff-only' and re-run czu. Otherwise rebase it onto origin/main."
+fi
 (( czu_rc == 0 )) \
   || fail "git sync failed ($czu_out) — check for local edits/conflicts in $CZU_SRC"
+
+# Advisory only — czu still applies. czu_sync_branch reports success both when a
+# feature branch has nothing to pull and when it fast-forwards from its own stale
+# counterpart, so neither outcome says anything about how far the tree has fallen
+# behind main. Without this, a box parked on a feature branch renders $HOME from
+# that branch forever, silently. See czu_branch_drift in czu-lib.sh.
+czu_drift="$(czu_branch_drift "$CZU_SRC" 2>/dev/null)"
+czu_drift_parts=(${(s.:.)czu_drift})
+case "$czu_drift" in
+  current)
+    item ok "dotfiles — on main, current" ;;
+  behind:*)
+    warn "dotfiles — main is ${czu_drift_parts[2]} commits behind origin/main; applying anyway" ;;
+  off-main:*)
+    if (( ${czu_drift_parts[3]:-0} > 0 )); then
+      warn "dotfiles — applying from branch '${czu_drift_parts[2]}', ${czu_drift_parts[3]} commits BEHIND origin/main. Your \$HOME is being rendered from a stale tree; switch to main once this work is merged."
+    else
+      item dim "dotfiles — on branch '${czu_drift_parts[2]}' (level with origin/main)"
+    fi ;;
+  detached)
+    warn "dotfiles — detached HEAD; applying from an unnamed commit" ;;
+esac
+
 # Source the vault-rendered env so env-conditional templates (e.g. crush.json
 # providers) render populated, not empty, when apply runs outside a login shell.
 set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vault/secrets-static.env"; set +a
