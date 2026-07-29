@@ -147,3 +147,37 @@ assert sig["args"][idx+1]=="+15551234567", sig["args"]
   [ "$status" -eq 0 ]
   grep -F -- '+15551234567' <<<"$output" >/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# signal-mcp venv script: pulling to HEAD is not enough — a running harness
+# keeps the OLD signal-mcp process (CHANNEL_INSTRUCTIONS is read once at MCP
+# initialize), so a HEAD change must bounce the running signal harnesses.
+# ---------------------------------------------------------------------------
+
+VENV_SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_45-signal-mcp-venv.sh.tmpl"
+
+@test "signal-mcp script fingerprints HEAD and restarts via the harness daemon" {
+  run _render_tmpl -- "$VENV_SCRIPT"
+  [ "$status" -eq 0 ]
+  # Fingerprint across applies — restart exactly once per upstream change.
+  [[ "$output" == *'.signal-mcp-head'* ]]
+  [[ "$output" == *'harness restart'* ]]
+}
+
+@test "signal-mcp restart targets only RUNNING harnesses matched by name" {
+  run _render_tmpl -- "$VENV_SCRIPT"
+  [ "$status" -eq 0 ]
+  # Names are create_-seeded and differ per box (crush-signal vs
+  # crush-signal-channel) — must match by substring, never a hardcoded name.
+  [[ "$output" == *'"state") == "running"'* ]]
+  [[ "$output" == *'"signal" in h.get("name"'* ]]
+  [[ "$output" != *'harness restart crush-signal'* ]]
+}
+
+@test "signal-mcp first run records the fingerprint without restarting" {
+  run _render_tmpl -- "$VENV_SCRIPT"
+  [ "$status" -eq 0 ]
+  # No baseline to compare against — bouncing a possibly-mid-conversation
+  # agent for no code change is worse than waiting one cycle.
+  [[ "$output" == *'restart on next change'* ]]
+}

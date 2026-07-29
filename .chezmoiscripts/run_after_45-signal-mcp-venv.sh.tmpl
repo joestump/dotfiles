@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
-# Pull signal-mcp to HEAD and warm its uv venv (Linux only).
+# Pull signal-mcp to HEAD, warm its uv venv, and bounce its consumers (Linux only).
 #
 # The Signal MCP is launched with `uv run --directory ~/src/signal-mcp`. The
 # chezmoi external refreshes the clone on a 168h period, but `czu` runs more
 # often than that — so we fetch + ff-only pull here on EVERY apply to get the
 # absolute latest. Then we run `uv sync` to keep the venv in sync with whatever
 # pyproject.toml changed.
+#
+# Pulling is not enough on its own: a long-running harness (the Signal channel
+# bot) spawned signal-mcp at startup and keeps the OLD process — and things like
+# CHANNEL_INSTRUCTIONS are read ONCE at MCP initialize (signal-mcp PR #44), so
+# new code never reaches a running agent. When the clone's HEAD moves we
+# therefore restart every RUNNING harness whose name contains "signal", via the
+# harness daemon. The HEAD is fingerprinted across applies (same idiom as the
+# crush/harness build scripts) so the restart fires exactly once per upstream
+# change, never on every czu.
 #
 # On macOS this is Joe's own dev checkout of signal-mcp, so we never touch it.
 set -euo pipefail
@@ -41,10 +50,48 @@ else
 fi
 
 # Keep the venv in sync with pyproject.toml after the pull.
+# (If uv is absent, signal-mcp can't run here at all — nothing to restart either.)
 have uv || { item dim "uv absent — skipping venv sync"; exit 0; }
 
 if ! step "syncing uv venv" -- uv sync --directory "$repo" --quiet; then
   warn "uv sync failed; first launch may cold-start"
+fi
+
+# ---- restart running signal harnesses when the clone actually moved ----
+# Fingerprint file: the HEAD this box last served signal-mcp from. First run
+# records only (no restart) — there is nothing to compare against, and bouncing
+# a possibly-mid-conversation agent for no code change is worse than waiting
+# one cycle.
+state="$HOME/.config/dotfiles/.signal-mcp-head"
+new_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
+old_head="$(cat "$state" 2>/dev/null || true)"
+if [ -n "$new_head" ] && [ "$new_head" != "$old_head" ]; then
+  mkdir -p "${state%/*}"
+  printf '%s' "$new_head" >"$state"
+  if [ -z "$old_head" ]; then
+    item dim "signal-mcp fingerprint recorded — restart on next change"
+  elif have harness && have python3; then
+    # Only RUNNING harnesses; a stopped one stays stopped. Matched by name
+    # ("signal") rather than hardcoded, because the config is create_-seeded
+    # and boxes name the channel bot differently (crush-signal vs
+    # crush-signal-channel).
+    while IFS= read -r name; do
+      if step "restarting ${name} (signal-mcp ${new_head:0:7})" -- harness restart "$name"; then
+        :
+      else
+        warn "harness restart ${name} failed — old signal-mcp still loaded there"
+      fi
+    done < <(harness --json list 2>/dev/null | python3 -c '
+import json, sys
+try:
+    for h in json.load(sys.stdin):
+        if h.get("state") == "running" and "signal" in h.get("name", ""):
+            print(h["name"])
+except Exception:
+    pass')
+  else
+    item dim "harness daemon not available — consumers keep the old signal-mcp until restarted"
+  fi
 fi
 {{- else }}
 :  # macOS: signal-mcp is a dev checkout — leave it alone.
