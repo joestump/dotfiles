@@ -170,6 +170,30 @@ advance_origin() {
   [ "$output" = "behind:2" ]
 }
 
+@test "drift: reports how far main is ahead of origin/main (the silent local-divergence case)" {
+  # The recovery-session shape from #109: local main got commits origin/main
+  # doesn't have (e.g. a fork merge), and nothing was pushed. This MUST NOT read
+  # as "current" — it renders a tree no other machine has and wedges on nonff.
+  git -C "$WORK" commit --quiet --allow-empty -m "local-only 1"
+  git -C "$WORK" commit --quiet --allow-empty -m "local-only 2"
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "ahead:2" ]
+}
+
+@test "drift: reports diverged when main is both behind and ahead of origin/main" {
+  # Divergence in both directions — the state that hard-wedges with nonff on the
+  # next upstream commit. Must surface as its own token so the WARN names both
+  # gaps and tells the operator to rebase or reset.
+  git -C "$WORK" commit --quiet --allow-empty -m "local-only"
+  advance_origin main
+  advance_origin main
+  git -C "$WORK" fetch --quiet origin
+  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "diverged:2:1" ]
+}
+
 @test "drift: names the branch and the gap when parked off main (the 43-commit case)" {
   git -C "$WORK" checkout --quiet -b feat/parked
   advance_origin main
