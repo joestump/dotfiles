@@ -93,14 +93,15 @@ setup() {
 
 # ────── identity axis ──────
 
-@test "the identity overlay follows whoami (agentIdentity defaults empty)" {
+@test "the identity role follows whoami (agentIdentity defaults empty)" {
   grep -q '^agentIdentity: ""$' "$REPO_ROOT/.chezmoidata.yaml"
-  # Resolve the identity exactly as the compositions do, then assert the
-  # matching overlay was composed — deterministic on every box and in CI.
+  # Resolve the ROLE exactly as the compositions do ($USER / $USER-agent
+  # convention), then assert the matching overlay was composed —
+  # deterministic on every box and in CI.
   local who
   who="$(chezmoi execute-template --source "$REPO_ROOT" \
-    '{{ $w := .agentIdentity | default .chezmoi.username }}{{ if list "joestump" "joestump-agent" | has $w }}{{ $w }}{{ else }}joestump{{ end }}')"
-  if [ "$who" = "joestump-agent" ]; then
+    '{{ $u := .agentIdentity | default .chezmoi.username }}{{ hasSuffix "-agent" $u | ternary "agent" "human" }}')"
+  if [ "$who" = "agent" ]; then
     echo "$CLAUDE_OUT" | grep -qF "your **own** accounts"
     ! echo "$CLAUDE_OUT" | grep -qF "Posted on behalf of"
   else
@@ -109,15 +110,15 @@ setup() {
   fi
 }
 
-@test "both identity overlays exist so the printf lookup can never miss" {
-  [ -f "$REPO_ROOT/.chezmoitemplates/agents/identity-joestump.md" ]
-  [ -f "$REPO_ROOT/.chezmoitemplates/agents/identity-joestump-agent.md" ]
+@test "both role overlays exist so the printf lookup can never miss" {
+  [ -f "$REPO_ROOT/.chezmoitemplates/agents/identity-human.md" ]
+  [ -f "$REPO_ROOT/.chezmoitemplates/agents/identity-agent.md" ]
 }
 
 # The agent signs as itself; using Joe's footer would misattribute the work.
-@test "the joestump-agent identity drops the on-behalf-of footer" {
+@test "the agent role drops the on-behalf-of footer" {
   local agent_id
-  agent_id="$(cat "$REPO_ROOT/.chezmoitemplates/agents/identity-joestump-agent.md")"
+  agent_id="$(cat "$REPO_ROOT/.chezmoitemplates/agents/identity-agent.md")"
   grep -qF "must **not** carry the" <<< "$agent_id"
   run grep -cE '^🤖 Posted on behalf of' <<< "$agent_id"
   [ "$output" -eq 0 ]
@@ -186,7 +187,7 @@ setup() {
   for rule in \
     "Default to the \`stump.wtf\` org" \
     "push_mirrors" \
-    "joestump-agent" \
+    "as a collaborator with **write** access" \
     "Topics / labels" \
     "Website URL" \
     "Gitea Pages" \
@@ -289,7 +290,7 @@ setup() {
 @test "the agent identity signs autonomously rather than on Joe's behalf" {
   local out
   out="$(chezmoi execute-template --source "$REPO_ROOT" <<'EOF'
-{{ includeTemplate "agents/identity-joestump-agent.md" (merge (dict "harnessName" "Crush" "harnessUrl" "https://x") .) }}
+{{ includeTemplate "agents/identity-agent.md" (merge (dict "harnessName" "Crush" "harnessUrl" "https://x") .) }}
 EOF
 )"
   grep -qF "This was posted autonomously by" <<< "$out"

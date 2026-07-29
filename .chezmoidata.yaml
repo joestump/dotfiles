@@ -6,14 +6,18 @@
 # To change one, edit here and `chezmoi apply`.
 
 # ---------- Identity ----------
-# ONE repo serves multiple identities — joestump on Joe's own machines,
-# joestump-agent on agent boxes — with separate, unique forge handles, emails,
-# and Signal numbers. NO identity value (username, email, phone number) lives
-# in this repo. Everything resolves from exactly two sources:
+# ONE repo serves multiple identities — the human on their own machines, the
+# agent on agent boxes — with separate, unique forge handles, emails, and
+# Signal numbers. NO identity value (username, email, phone number) lives in
+# this repo. Everything resolves from exactly two sources:
 #
-#   1. `whoami` — the OS login user IS the forge handle (.chezmoi.username at
-#      apply time, $(whoami) in runtime scripts). It also keys the per-user
-#      OpenBao bag, which makes the env below whoami-scoped by construction.
+#   1. `whoami` + the $USER / $USER-agent convention — the OS login user IS
+#      the forge handle (.chezmoi.username at apply time, $(whoami) in runtime
+#      scripts), and every install pairs a human user with a `<human>-agent`
+#      bot user. That makes BOTH handles and the acting ROLE derivable from
+#      whoami alone: a login with the `-agent` suffix is the bot; stripping
+#      the suffix names its human. whoami also keys the per-user OpenBao bag,
+#      which makes the env below whoami-scoped by construction.
 #   2. OpenBao env injection — Vault Agent renders secret/users/<whoami>/* into
 #      ~/.config/vault/secrets-static.env; login shells source it
 #      (00-secrets.zsh), czu sources it before apply, and the harness daemon
@@ -35,12 +39,12 @@
 # the env values at apply time, still env-only, no committed fallback).
 
 # Explicit override of the acting identity for a box whose OS login user does
-# not match an identity overlay. Empty = derive from `whoami`
+# not follow the $USER / $USER-agent convention. Empty = derive from `whoami`
 # (.chezmoi.username). Set it in that box's ~/.config/chezmoi/chezmoi.toml
-# [data] table, same as the [data.claude] posture keys below. Drives which
-# .chezmoitemplates/agents/identity-*.md overlay is composed into
-# ~/.claude/CLAUDE.md, ~/.config/crush/CRUSH.md and ~/.config/agents/AGENTS.md.
-# Valid: joestump | joestump-agent.
+# [data] table, same as the [data.claude] posture keys below. The `-agent`
+# suffix (or its absence) picks which .chezmoitemplates/agents/identity-*.md
+# role overlay (agent | human) is composed into ~/.claude/CLAUDE.md,
+# ~/.config/crush/CRUSH.md and ~/.config/agents/AGENTS.md.
 agentIdentity: ""
 
 # UPSTREAM REPO OWNER — the account whose repos the externals, claude-plugins

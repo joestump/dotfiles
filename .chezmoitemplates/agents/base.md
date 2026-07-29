@@ -1,7 +1,13 @@
+{{- /* The $USER / $USER-agent convention: every install pairs a human OS user
+       with a `<human>-agent` bot user, so both handles derive from whoami
+       alone — no identity data is committed anywhere. */ -}}
+{{- $user := .agentIdentity | default .chezmoi.username -}}
+{{- $human := trimSuffix "-agent" $user -}}
+{{- $agent := printf "%s-agent" $human }}
 {{- /*
   Harness-agnostic agent policy — the single source of truth for every agent
   Joe runs (Claude Code, Claude Desktop's embedded Claude Code, Crush) under
-  every identity (@joestump, @joestump-agent).
+  every identity (@{{ $human }}, @{{ $agent }}).
 
   Nothing harness-specific belongs here. If a rule mentions a tool that only
   one harness has, or a path only one harness reads, it belongs in
@@ -59,10 +65,10 @@ You may open pull requests, issues, and fork repos **without asking** in these o
 | Gitea  | `stump.wtf`      | Shared products. **Origin of truth for their git history, issues, PRs and CI** — branch, push, PR, and file issues here |
 | Gitea  | `stumpcloud`     | Infra, and the single issue tracker for all StumpCloud work    |
 | Gitea  | `{{ .githubUser }}`       | Older personal repos, migrating to `stump.wtf` over time      |
-| Gitea  | `joestump-agent` | The agent's own repos + forks                                  |
+| Gitea  | `{{ $agent }}` | The agent's own repos + forks                                  |
 | GitHub | `stump-wtf`      | Downstream push-mirror of `stump.wtf` — **never push here**    |
 | GitHub | `{{ .githubUser }}`       | Personal repos + public mirrors                               |
-| GitHub | `joestump-agent` | The agent's own repos + forks                                  |
+| GitHub | `{{ $agent }}` | The agent's own repos + forks                                  |
 
 **You MUST NOT open PRs, issues, or any other contributions against ANY other organization or user on GitHub or Gitea without EXPLICIT, prior, per-action approval from Joe.** When in doubt, ASK FIRST — never assume permission.
 
@@ -148,7 +154,7 @@ A PR that will not merge is not automatically a wedge to force through:
 - **Then post a summary comment saying what you changed and why.** Pushing to someone's branch silently is how a reviewer loses track of their own PR. The comment is not optional.
 - Keep your fixes in **separate commits** from the author's, so they can see exactly what you touched.
 - **Fix, don't redesign.** Nits, failing tests, and missing coverage are fair game. If the change you want is architectural, or you would be rewriting the author's approach, say so in a comment and let them decide.
-- This applies to repos under `stump.wtf`, `stumpcloud`, `{{ .githubUser }}`, and `joestump-agent`. Anywhere else, comment only — never push to a third party's branch.
+- This applies to repos under `stump.wtf`, `stumpcloud`, `{{ .githubUser }}`, and `{{ $agent }}`. Anywhere else, comment only — never push to a third party's branch.
 
 ## Code quality
 
@@ -292,14 +298,14 @@ Creating a repo is not "make it and push a README." A repo is not finished until
 - **Set up the GitHub push mirror**: create `github.com/stump-wtf/<repo>` first, then `POST /repos/stump.wtf/<repo>/push_mirrors`. Gitea stays authoritative; GitHub is read-only downstream.
 - **Name it idiomatically for its ecosystem** — an Oh My Zsh plugin uses the community `zsh-<name>` convention, a Terraform provider `terraform-provider-<name>`, and so on.
 
-### 2. Always add `joestump-agent`
+### 2. Always add `{{ $agent }}`
 
-You MUST ALWAYS add the `joestump-agent` account as a collaborator with **write** access — never hand back a repo Joe's agent cannot reach. This applies to every repo you make "for us," public or private, regardless of who asked or which platform.
+You MUST ALWAYS add the `{{ $agent }}` account as a collaborator with **write** access — never hand back a repo Joe's agent cannot reach. This applies to every repo you make "for us," public or private, regardless of who asked or which platform.
 
-`joestump-agent` is Joe's personal agent account — Gitea user `joestump-agent` (email `agent@stump.wtf`), GitHub user `joestump-agent`.
+`{{ $agent }}` is Joe's personal agent account — Gitea user `{{ $agent }}` GitHub user `{{ $agent }}`.
 
-- **Gitea:** `PUT /repos/<owner>/<repo>/collaborators/joestump-agent` with `{"permission":"write"}` (via the Gitea MCP/API).
-- **GitHub:** `gh api -X PUT /repos/<owner>/<repo>/collaborators/joestump-agent -f permission=push` (GitHub sends an invitation the agent account accepts).
+- **Gitea:** `PUT /repos/<owner>/<repo>/collaborators/{{ $agent }}` with `{"permission":"write"}` (via the Gitea MCP/API).
+- **GitHub:** `gh api -X PUT /repos/<owner>/<repo>/collaborators/{{ $agent }} -f permission=push` (GitHub sends an invitation the agent account accepts).
 
 ### 3. Fill in the metadata
 

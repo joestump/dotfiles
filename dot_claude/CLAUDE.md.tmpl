@@ -10,11 +10,12 @@
 */ -}}
 {{ template "agents/base.md" . }}
 
-{{/* Acting identity = whoami (.chezmoi.username), overridable per box via
-       .agentIdentity. The guard mirrors the identity-*.md overlays that
-       actually exist; an unknown OS user composes the joestump baseline. */ -}}
-{{- $who := .agentIdentity | default .chezmoi.username -}}
-{{- if not (list "joestump" "joestump-agent" | has $who) }}{{ $who = "joestump" }}{{ end -}}
-{{ includeTemplate (printf "agents/identity-%s.md" $who) (merge (dict "harnessName" "Claude Code" "harnessUrl" "https://claude.ai") .) }}
+{{/* Acting ROLE derives from whoami (.chezmoi.username, overridable per box
+       via .agentIdentity) under the $USER / $USER-agent convention: a login
+       carrying the `-agent` suffix is the bot, anything else is the human.
+       See the Identity section in .chezmoidata.yaml. */ -}}
+{{- $user := .agentIdentity | default .chezmoi.username -}}
+{{- $role := hasSuffix "-agent" $user | ternary "agent" "human" -}}
+{{ includeTemplate (printf "agents/identity-%s.md" $role) (merge (dict "harnessName" "Claude Code" "harnessUrl" "https://claude.ai") .) }}
 
 {{ template "agents/harness-claude-code.md" . }}

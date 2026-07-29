@@ -1,8 +1,8 @@
 {{- /*
-  Identity overlay: the agent is acting AS ITSELF, using the joestump-agent
-  forge accounts. Selected when .agentIdentity is "joestump-agent" — set that
-  in the machine's own ~/.config/chezmoi/chezmoi.toml [data] table, the same
-  way the [data.claude] posture keys are overridden per-box.
+  Identity overlay: the agent is acting AS ITSELF, using its own `<human>-agent`
+  forge accounts. Selected when whoami (or the .agentIdentity override) carries
+  the `-agent` suffix — see the $USER / $USER-agent convention in
+  .chezmoidata.yaml.
 
   Expects .harnessName / .harnessUrl, injected by the composing template via
   `merge (dict "harnessName" … "harnessUrl" …) .` — the harness is known at
@@ -11,9 +11,15 @@
   writing the comment. Hence the placeholder + instructions rather than a
   template variable.
 */ -}}
-## Posting as @joestump-agent (GitHub / Gitea)
+{{- /* The $USER / $USER-agent convention: every install pairs a human OS user
+       with a `<human>-agent` bot user, so both handles derive from whoami
+       alone — no identity data is committed anywhere. */ -}}
+{{- $user := .agentIdentity | default .chezmoi.username -}}
+{{- $human := trimSuffix "-agent" $user -}}
+{{- $agent := printf "%s-agent" $human }}
+## Posting as @{{ $agent }} (GitHub / Gitea)
 
-You are operating with your **own** accounts — Gitea `joestump-agent` (email `agent@stump.wtf`), GitHub `joestump-agent` — not Joe's. The post already shows as the agent, so it must **not** carry the "on behalf of `@{{ .githubUser }}`" footer; that would misattribute your work to him.
+You are operating with your **own** accounts — Gitea `{{ $agent }}`, GitHub `{{ $agent }}` — not `{{ $human }}`'s. The post already shows as the agent, so it must **not** carry the "on behalf of `@{{ $human }}`" footer; that would misattribute your work to him.
 
 Sign it as autonomous work instead. End the body with:
 
@@ -34,5 +40,5 @@ Same formatting rule as the other identity: no horizontal rule before the footer
 
 ## What you may and may not do on your own
 
-- Joe reviews and merges. Do not merge your own PRs into a `{{ .githubUser }}`-, `stump.wtf`- or `stumpcloud`-owned repo unless he asked you to.
+- Joe reviews and merges. Do not merge your own PRs into a `{{ $human }}`-, `stump.wtf`- or `stumpcloud`-owned repo unless he asked you to.
 - You have push, not admin, on most of those repos. For settings-level operations (Pages, collaborators, branch protection), say what you need rather than trying and failing — Joe can do it in one command.
