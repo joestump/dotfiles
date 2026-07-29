@@ -93,10 +93,20 @@ setup() {
 
 # ────── identity axis ──────
 
-@test "the default identity is joestump and carries the attribution footer" {
-  grep -q '^agentIdentity: "joestump"$' "$REPO_ROOT/.chezmoidata.yaml"
-  echo "$CLAUDE_OUT" | grep -qF "Posted on behalf of"
-  echo "$CRUSH_OUT"  | grep -qF "Posted on behalf of"
+@test "the identity overlay follows whoami (agentIdentity defaults empty)" {
+  grep -q '^agentIdentity: ""$' "$REPO_ROOT/.chezmoidata.yaml"
+  # Resolve the identity exactly as the compositions do, then assert the
+  # matching overlay was composed — deterministic on every box and in CI.
+  local who
+  who="$(chezmoi execute-template --source "$REPO_ROOT" \
+    '{{ $w := .agentIdentity | default .chezmoi.username }}{{ if list "joestump" "joestump-agent" | has $w }}{{ $w }}{{ else }}joestump{{ end }}')"
+  if [ "$who" = "joestump-agent" ]; then
+    echo "$CLAUDE_OUT" | grep -qF "your **own** accounts"
+    ! echo "$CLAUDE_OUT" | grep -qF "Posted on behalf of"
+  else
+    echo "$CLAUDE_OUT" | grep -qF "Posted on behalf of"
+    echo "$CRUSH_OUT"  | grep -qF "Posted on behalf of"
+  fi
 }
 
 @test "both identity overlays exist so the printf lookup can never miss" {

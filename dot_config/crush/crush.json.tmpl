@@ -162,6 +162,13 @@
       "timeout": 120,
       "disabled": false
     },
+{{- /* NO identity is rendered here — deliberately. signal-mcp resolves
+       SIGNAL_MCP_ACCOUNT (the number this box sends AS), SIGNAL_MCP_OPERATOR
+       (the human it serves) and SIGNAL_MCP_PREFIX from its RUNTIME env, which
+       OpenBao provisions per-user (secret/users/<whoami>/signal →
+       secrets-static.env; the harness daemon loads the systemd flavor, login
+       shells source it via 00-secrets.zsh). Rendering numbers here would bake
+       one identity's config into every box; see .chezmoidata.yaml. */ -}}
     "signal": {
       "type": "stdio",
       "command": "uv",
@@ -172,13 +179,7 @@
         "signal-mcp",
         "--transport",
         "stdio",
-        "--account",
-        "{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}",
-        "--operator",
-        "{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}",
-        "--channel",
-        "--prefix",
-        "{{ env "SIGNAL_MCP_PREFIX" | default "" }}"
+        "--channel"
       ],
       "timeout": 60,
       "disabled": false

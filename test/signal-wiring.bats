@@ -63,7 +63,7 @@ _render_tmpl() {
 # ---------------------------------------------------------------------------
 
 @test "systemd signal-daemon unit runs in multi-account mode (no -a flag)" {
-  run _render_tmpl SIGNAL_MCP_ACCOUNT=+353871760709 -- "$SYSTEMD_UNIT"
+  run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 -- "$SYSTEMD_UNIT"
   [ "$status" -eq 0 ]
   # The daemon must NOT pin `-a` to a single account, even when SIGNAL_MCP_ACCOUNT
   # is set (the env var is for the signal-mcp client, not the daemon).
@@ -74,54 +74,47 @@ _render_tmpl() {
 }
 
 @test "launchd signal-daemon plist runs in multi-account mode (no -a flag)" {
-  run _render_tmpl SIGNAL_MCP_ACCOUNT=+353871760709 -- "$LAUNCHD_PLIST"
+  run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 -- "$LAUNCHD_PLIST"
   [ "$status" -eq 0 ]
   # No `-a` <string> element in the ProgramArguments array, even with the env
   # var set — the daemon serves all linked accounts.
   ! grep -F -- '<string>-a</string>' <<<"$output" >/dev/null
-  ! grep -F -- '<string>+353871760709</string>' <<<"$output" >/dev/null
+  ! grep -F -- '<string>+15550001111</string>' <<<"$output" >/dev/null
   # The plist still launches the daemon subcommand.
   grep -F -- '<string>daemon</string>' <<<"$output" >/dev/null
 }
 
 # ---------------------------------------------------------------------------
-# signal-mcp invocation (crush block + claude merge scripts): --operator must
-# honor SIGNAL_MCP_OPERATOR, falling back to .signalNumber. The allowlists are
-# env-only and MUST NOT appear as flags.
+# signal-mcp invocation (crush block + claude merge scripts): identity comes
+# from the RUNTIME env (SIGNAL_MCP_ACCOUNT / _OPERATOR / _PREFIX, provisioned
+# per-user by OpenBao — secret/users/<whoami>/signal), so rendered configs
+# carry NO identity at all: no numbers, no account/operator/prefix flags. The
+# one exception is the Claude Desktop merge: a GUI app inherits no shell env,
+# so run_after_44 bakes the env values at apply time — env-only, no committed
+# fallback.
 # ---------------------------------------------------------------------------
 
-@test "crush signal block uses SIGNAL_MCP_OPERATOR for --operator when set" {
-  run _render_tmpl SIGNAL_MCP_OPERATOR=+15551234567 -- "$CRUSH_TMPL"
-  [ "$status" -eq 0 ]
-  # Rendered JSON is valid.
-  printf '%s' "$output" | python3 -c 'import json,sys; json.load(sys.stdin)'
-  # --operator receives the env-provided number, not the .signalNumber default.
-  grep -F -- '"--operator",' <<<"$output" >/dev/null
-  grep -F -- '"+15551234567",' <<<"$output" >/dev/null
-}
-
-@test "crush signal block --operator falls back to .signalNumber without SIGNAL_MCP_OPERATOR" {
+@test "crush signal block renders identity-free (no account/operator/prefix flags)" {
   run _render_tmpl -- "$CRUSH_TMPL"
-  [ "$status" -eq 0 ]
-  printf '%s' "$output" | python3 -c 'import json,sys; json.load(sys.stdin)'
-  grep -F -- '"--operator",' <<<"$output" >/dev/null
-  grep -F -- '"+12062257886",' <<<"$output" >/dev/null
-}
-
-@test "crush signal block --account honors SIGNAL_MCP_ACCOUNT" {
-  run _render_tmpl SIGNAL_MCP_ACCOUNT=+353871760709 SIGNAL_MCP_OPERATOR=+15551234567 -- "$CRUSH_TMPL"
   [ "$status" -eq 0 ]
   printf '%s' "$output" | python3 -c '
 import json,sys
 d=json.load(sys.stdin)
-sig=d["mcp"]["signal"]
-assert "--account" in sig["args"], sig
-idx=sig["args"].index("--account")
-assert sig["args"][idx+1]=="+353871760709", sig["args"]
-assert "--operator" in sig["args"], sig
-idx=sig["args"].index("--operator")
-assert sig["args"][idx+1]=="+15551234567", sig["args"]
+args=d["mcp"]["signal"]["args"]
+assert "--channel" in args, args
+for flag in ("--account","--operator","--prefix"):
+    assert flag not in args, args
 '
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
+}
+
+@test "crush signal block stays identity-free even when SIGNAL_MCP_* env is set" {
+  # The env vars are for signal-mcp at RUNTIME; the template must never bake
+  # them into the render, or one identity's numbers reach every box.
+  run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 SIGNAL_MCP_OPERATOR=+15550002222 SIGNAL_MCP_PREFIX=cc -- "$CRUSH_TMPL"
+  [ "$status" -eq 0 ]
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
+  ! grep -F -- '"--prefix"' <<<"$output" >/dev/null
 }
 
 @test "crush signal block NEVER renders --trusted-recipient flags (env-only)" {
@@ -136,16 +129,17 @@ assert sig["args"][idx+1]=="+15551234567", sig["args"]
   ! grep -F -- '"--trusted-recipient"' <<<"$output" >/dev/null
 }
 
-@test "claude-code merge script uses SIGNAL_MCP_OPERATOR for --operator" {
-  run _render_tmpl SIGNAL_MCP_OPERATOR=+15551234567 -- "$CODE_MERGE"
+@test "claude-code merge script renders identity-free (runtime env resolves it)" {
+  run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 SIGNAL_MCP_OPERATOR=+15550002222 -- "$CODE_MERGE"
   [ "$status" -eq 0 ]
-  grep -F -- '+15551234567' <<<"$output" >/dev/null
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
 }
 
-@test "claude-desktop merge script uses SIGNAL_MCP_OPERATOR for --operator" {
-  run _render_tmpl SIGNAL_MCP_OPERATOR=+15551234567 -- "$DESKTOP_MERGE"
+@test "claude-desktop merge script bakes the env values (GUI app, no shell env)" {
+  run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 SIGNAL_MCP_OPERATOR=+15550002222 -- "$DESKTOP_MERGE"
   [ "$status" -eq 0 ]
-  grep -F -- '+15551234567' <<<"$output" >/dev/null
+  grep -F -- '+15550001111' <<<"$output" >/dev/null
+  grep -F -- '+15550002222' <<<"$output" >/dev/null
 }
 
 # ---------------------------------------------------------------------------

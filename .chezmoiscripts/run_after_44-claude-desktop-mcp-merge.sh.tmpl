@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+{{- /* Claude Desktop is a GUI app: unlike every other consumer it inherits NO
+       shell env, so signal-mcp cannot read SIGNAL_MCP_* at runtime here. The
+       values are baked at APPLY time from the OpenBao-provisioned env (czu
+       sources secrets-static.env before applying) — env-only, no committed
+       fallback, so nothing identity-specific lives in the repo. */}}
 # Merge the shared MCP server set into Claude Desktop's config.
 # Reruns when the base defs or lib change:
 # base hash: {{ include "dot_config/dotfiles/mcp-servers.json" | sha256sum }}
@@ -75,7 +80,7 @@ desired="$(mcp_base | jq \
   | (if "{{ .chezmoi.os }}" == "darwin" then .msgbrowse = {command:"npx", args:["-y","mcp-remote","{{ .msgbrowseMcpEndpoint }}"]} else . end)
   # signal: thin JSON-RPC client launched via uv; paths resolved per-OS above.
   | .signal = {command:$uv,
-               args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" | default .signalNumber }}","--transport","stdio"],
+               args:["run","--directory",$sigdir,"signal-mcp","--account","{{ env "SIGNAL_MCP_ACCOUNT" }}","--operator","{{ env "SIGNAL_MCP_OPERATOR" }}","--transport","stdio"],
                env:{PATH:$sigpath}}
 ')"
 

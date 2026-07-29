@@ -136,26 +136,26 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
   done
 }
 
-@test "harness: the signal MCP prefix defaults to empty on Joe's own number" {
+@test "harness: the crush signal MCP renders identity-free" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  # The signal MCP defaults to NO prefix, so a dedicated signal-channel bot
-  # receives every trusted-sender message unconditionally. General-purpose
-  # harnesses opt back into a prefix via SIGNAL_MCP_PREFIX in their env_file
-  # (see dot_config/harness/crush-signal.env.tmpl).
+  # Identity (account, operator, prefix) is resolved by signal-mcp from its
+  # RUNTIME env, provisioned per-user by OpenBao — the render carries none of
+  # it, so the same file is correct on every box and for every identity.
   run env -u SIGNAL_MCP_PREFIX bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
   [ "$status" -eq 0 ]
   [[ "$output" == *'"--channel"'* ]]
-  [[ "$output" == *'"--prefix"'* ]]
-  [[ "$output" != *'"cc"'* ]]
-  [[ "$output" == *'"+12062257886"'* ]]
+  [[ "$output" != *'"--account"'* ]]
+  [[ "$output" != *'"--operator"'* ]]
+  [[ "$output" != *'"--prefix"'* ]]
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
 }
 
-@test "harness: SIGNAL_MCP_PREFIX opts a harness back into the cc prefix" {
+@test "harness: SIGNAL_MCP_* env never leaks into the crush render" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  run env SIGNAL_MCP_PREFIX=cc bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
+  run env SIGNAL_MCP_PREFIX=cc SIGNAL_MCP_ACCOUNT=+15550001111 bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"--prefix"'* ]]
-  [[ "$output" == *'"cc"'* ]]
+  [[ "$output" != *'"cc"'* ]]
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
 }
 
 @test "harness: crush-signal's env file carries the cc opt-in" {

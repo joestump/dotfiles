@@ -13,6 +13,11 @@
 */ -}}
 {{ template "agents/base.md" . }}
 
-{{ includeTemplate (printf "agents/identity-%s.md" .agentIdentity) (merge (dict "harnessName" "Crush" "harnessUrl" "https://github.com/charmbracelet/crush") .) }}
+{{/* Acting identity = whoami (.chezmoi.username), overridable per box via
+       .agentIdentity. The guard mirrors the identity-*.md overlays that
+       actually exist; an unknown OS user composes the joestump baseline. */ -}}
+{{- $who := .agentIdentity | default .chezmoi.username -}}
+{{- if not (list "joestump" "joestump-agent" | has $who) }}{{ $who = "joestump" }}{{ end -}}
+{{ includeTemplate (printf "agents/identity-%s.md" $who) (merge (dict "harnessName" "Crush" "harnessUrl" "https://github.com/charmbracelet/crush") .) }}
 
 {{ template "agents/harness-crush.md" . }}

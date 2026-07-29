@@ -11,7 +11,7 @@ Before you edit anything, load the `/chezmoi` skill — it ships from the privat
 - **[dot_oh-my-zsh/custom/](dot_oh-my-zsh/custom/)** — every zsh helper lives here as one file per concern (`dot.zsh`, `chezmoi.zsh.tmpl`, `vault-agent.zsh`, `signal-daemon.zsh`, `gum-ui.zsh`, `motd.zsh`, `00-secrets.zsh`, etc.). OMZ auto-sources them; no `source` lines in `.zshrc`.
 - **[.chezmoiscripts/](.chezmoiscripts/)** — apply-time run scripts (`run_once_`, `run_onchange_`, `run_after_`). Ordered numerically (`10-`, `40-`, `42-`, …). Every one sources `~/.config/dotfiles/ui-lib.sh` (source: [dot_config/dotfiles/ui-lib.sh](dot_config/dotfiles/ui-lib.sh)) so their output matches czu's headings + ticks.
 - **[.chezmoiexternal.toml](.chezmoiexternal.toml)** — pinned upstream git repos (OMZ plugins, themes, the private Gitea skills marketplace, vim-plug). Every git-repo external MUST carry `[X.pull] args = ["--ff-only", "--quiet"]` — the `--quiet` is what keeps czu's output clean.
-- **[.chezmoidata.yaml](.chezmoidata.yaml)** — non-secret template data (`.signalNumber`, `.githubUser`, `.email`, `.shlinkApiUrl`). Reference in any `.tmpl` file.
+- **[.chezmoidata.yaml](.chezmoidata.yaml)** — non-secret template data (`.githubUser` = upstream repo owner, `.shlinkApiUrl`, …). Reference in any `.tmpl` file. Identity (usernames, emails, phone numbers) is NEVER data: it resolves from `whoami` + the OpenBao-provisioned env — see the Identity section at the top of that file.
 
 ## Non-obvious rules
 
