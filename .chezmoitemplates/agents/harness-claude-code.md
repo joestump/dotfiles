@@ -14,7 +14,7 @@
 
 ### Scheduled Tasks
 
-You have the scheduled-tasks MCP; the other harnesses do not. Every scheduled task must send a Signal Note to Self summary to {{ .signalNumber }} (Joe's Signal note-to-self number — use the phone number, NOT the email, or the send fails) via `mcp__signal__send_message_to_user` when the run completes. Mandatory for all new scheduled tasks.
+You have the scheduled-tasks MCP; the other harnesses do not. Every scheduled task must send a Signal Note to Self summary to the operator's number in `$SIGNAL_MCP_OPERATOR` (already exported in your environment from OpenBao — resolve it with `echo $SIGNAL_MCP_OPERATOR`; use the phone number, NOT an email, or the send fails) via `mcp__signal__send_message_to_user` when the run completes. Mandatory for all new scheduled tasks.
 
 - Exception: skip when nothing happened (e.g. `NO_CHANGES` in gitea-claude-sync, no replies sent in message-auto-reply).
 - Format: emoji + task name + date as the header line, then 1-3 key outcome lines.

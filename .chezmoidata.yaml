@@ -5,46 +5,53 @@
 # Single source of truth for values that were previously hardcoded in many places.
 # To change one, edit here and `chezmoi apply`.
 
-# Joe's personal Signal number (E.164) = the OPERATOR default: the human the
-# agent serves. Backs the signal-notify recipient and scheduled-task summaries.
-# Quoted so YAML keeps it a string.
+# ---------- Identity ----------
+# ONE repo serves multiple identities — the human on their own machines, the
+# agent on agent boxes — with separate, unique forge handles, emails, and
+# Signal numbers. NO identity value (username, email, phone number) lives in
+# this repo. Everything resolves from exactly two sources:
 #
-# Both identities are overridable by env vars provisioned from OpenBao
-# (secret/users/<you>/signal), with this number as the dev-box fallback:
+#   1. `whoami` + the $USER / $USER-agent convention — the OS login user IS
+#      the forge handle (.chezmoi.username at apply time, $(whoami) in runtime
+#      scripts), and every install pairs a human user with a `<human>-agent`
+#      bot user. That makes BOTH handles and the acting ROLE derivable from
+#      whoami alone: a login with the `-agent` suffix is the bot; stripping
+#      the suffix names its human. whoami also keys the per-user OpenBao bag,
+#      which makes the env below whoami-scoped by construction.
+#   2. OpenBao env injection — Vault Agent renders secret/users/<whoami>/* into
+#      ~/.config/vault/secrets-static.env; login shells source it
+#      (00-secrets.zsh), czu sources it before apply, and the harness daemon
+#      loads the systemd flavor. Identity values ride in as env vars:
+#        SIGNAL_MCP_ACCOUNT   the number this box sends AS. NOTE: the
+#                             signal-cli DAEMON runs in multi-account mode (no
+#                             `-a`) — see test/signal-wiring.bats — so this
+#                             scopes only the signal-mcp client, not the daemon.
+#        SIGNAL_MCP_OPERATOR  the human the agent serves (signal-notify target,
+#                             scheduled-task summaries, signal-mcp --operator).
+#        SIGNAL_MCP_TRUSTED_RECIPIENTS / SIGNAL_MCP_TRUSTED_SENDERS
+#                             allowlists, read by signal-mcp at runtime.
+#        FORGE_USER           escape hatch for a box whose OS login differs
+#                             from its forge handle (credential helper).
 #
-#   SIGNAL_MCP_ACCOUNT   signal-cli daemon `-a` and signal-mcp `--account`
-#                        (the number the agent runs AS). OpenBao-provisioned
-#                        nodes serve from the agent's own number (+353871760709).
-#   SIGNAL_MCP_OPERATOR  signal-mcp `--operator` (the human the agent serves).
-#                        Defaults to this number on a bare dev box without
-#                        OpenBao (account == operator == Joe → Note to Self).
-#   SIGNAL_MCP_TRUSTED_RECIPIENTS / SIGNAL_MCP_TRUSTED_SENDERS
-#                        Inbound/outbound allowlists. Read by signal-mcp from
-#                        the env at runtime; never rendered as CLI flags.
-#
-# Templates use `{{ env "SIGNAL_MCP_*" | default .signalNumber }}`, so omitting
-# an env var falls back to this number rather than breaking the apply.
-signalNumber: "+12062257886"
+# Rendered configs therefore carry NO identity: signal-mcp reads SIGNAL_MCP_*
+# from its runtime env wherever a shell/daemon env exists (the sole exception
+# is Claude Desktop — a GUI app with no shell env — where run_after_44 bakes
+# the env values at apply time, still env-only, no committed fallback).
 
-# Contact email. Not currently referenced anywhere (the repo had no real email — the
-# joestump@host strings are SSH targets), but kept here as the single place to set it
-# if a template ever needs {{ .email }}.
-email: "joe@stump.rocks"
+# Explicit override of the acting identity for a box whose OS login user does
+# not follow the $USER / $USER-agent convention. Empty = derive from `whoami`
+# (.chezmoi.username). Set it in that box's ~/.config/chezmoi/chezmoi.toml
+# [data] table, same as the [data.claude] posture keys below. The `-agent`
+# suffix (or its absence) picks which .chezmoitemplates/agents/identity-*.md
+# role overlay (agent | human) is composed into ~/.claude/CLAUDE.md,
+# ~/.config/crush/CRUSH.md and ~/.config/agents/AGENTS.md.
+agentIdentity: ""
 
-# Forge username — the Gitea AND GitHub handle (same on both). Used in repo/external
-# URLs, the Gitea git-credential helper, czinit, and the claude-plugins sources. Fork
-# this repo? Set this to your own handle and everything re-points. Distinct from
-# {{ .chezmoi.username }} (the OS login user), which stays machine-derived.
+# UPSTREAM REPO OWNER — the account whose repos the externals, claude-plugins
+# sources, and czinit clone from. This is NOT the acting identity (both
+# identities pull Joe's repos); for "who am I", use whoami + the env, above.
+# Fork this whole setup? Set this to your own handle and everything re-points.
 githubUser: "joestump"
-
-# Which forge identity the agents on this machine act as. Drives which
-# .chezmoitemplates/agents/identity-*.md overlay is composed into ~/.claude/CLAUDE.md
-# and ~/.config/crush/CRUSH.md — mainly whether posts carry the "on behalf of
-# @joestump" attribution footer (joestump) or are signed as the agent itself
-# (joestump-agent). Default suits Joe's own machines; a box that runs as the agent
-# overrides it in its own ~/.config/chezmoi/chezmoi.toml [data] table, same as the
-# [data.claude] posture keys below. Valid: joestump | joestump-agent.
-agentIdentity: "joestump"
 
 # Shlink (URL shortener) base URL — non-secret config for the shlink OMZ plugin,
 # exported as SHLINK_API_URL from env.zsh. The API KEY is the secret half and comes

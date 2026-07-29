@@ -1,6 +1,7 @@
 {{- /*
-  Identity overlay: the agent is acting AS Joe, using Joe's own forge accounts.
-  Selected when .agentIdentity is "joestump" (the default).
+  Identity overlay: the agent is acting AS the human operator, using their own
+  forge accounts. Selected when whoami (or the .agentIdentity override) has no
+  `-agent` suffix — see the $USER / $USER-agent convention in .chezmoidata.yaml.
 
   Expects .harnessName / .harnessUrl, injected by the composing template via
   `merge (dict "harnessName" … "harnessUrl" …) .` — the harness is known at
@@ -9,13 +10,19 @@
   writing the comment. Hence the placeholder + instructions rather than a
   template variable.
 */ -}}
-## Posting as @{{ .githubUser }} (GitHub / Gitea)
+{{- /* The $USER / $USER-agent convention: every install pairs a human OS user
+       with a `<human>-agent` bot user, so both handles derive from whoami
+       alone — no identity data is committed anywhere. */ -}}
+{{- $user := .agentIdentity | default .chezmoi.username -}}
+{{- $human := trimSuffix "-agent" $user -}}
+{{- $agent := printf "%s-agent" $human }}
+## Posting as @{{ $human }} (GitHub / Gitea)
 
 You are operating with Joe's own forge accounts, so anything you post carries his name. Say so — and say what actually wrote it.
 
-When posting on Joe's behalf as `@{{ .githubUser }}` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer:
+When posting on Joe's behalf as `@{{ $human }}` on GitHub or Gitea — issues, pull requests, comments, reviews — end the body with this attribution footer:
 
-🤖 Posted on behalf of `@{{ .githubUser }}` by [`<model>`](<openrouter-url>){{ if .harnessName }} using [{{ .harnessName }}]({{ .harnessUrl }}){{ end }}.
+🤖 Posted on behalf of `@{{ $human }}` by [`<model>`](<openrouter-url>){{ if .harnessName }} using [{{ .harnessName }}]({{ .harnessUrl }}){{ end }}.
 
 Filling in `<model>`:
 
@@ -30,5 +37,5 @@ Name the harness you are running under, linked to its home page.
 
 Two formatting rules that are easy to get wrong:
 
-- Keep `@{{ .githubUser }}` in backticks, so it renders as code and does not fire a live @mention/notification.
+- Keep `@{{ $human }}` in backticks, so it renders as code and does not fire a live @mention/notification.
 - Do NOT precede the footer with a horizontal rule: no `<hr/>`, and no Markdown rule equivalent (`---`, `***`, `___`). Just a blank line, then the footer line.

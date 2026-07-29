@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Install Ansible for StumpCloud infrastructure management.
 #
-# The stumpcloud/ansible repo (cloned by the chezmoi external at ~/src/ansible)
+# This script owns the ~/src/ansible clone — it is deliberately NOT a chezmoi
+# external, because agents develop there and an external's ff-only pull aborts
+# the whole apply when the checkout sits on a work branch (see
+# .chezmoiexternal.toml). The stumpcloud/ansible repo
 # uses Pipenv for dependency management. On Ubuntu 24.04+, PEP 668 blocks
 # `pip install --user`, so we use uv (already available) to create a venv
 # and install pipenv there. This avoids the externally-managed-environment error.
@@ -29,21 +32,29 @@ venv="$HOME/.local/share/ansible-venv"
 
 heading "🔧 Ansible (StumpCloud)"
 
-# The external clones the source; if it isn't there yet, there's nothing to set up.
-[ -d "$repo/.git" ] || { item dim "ansible repo not cloned yet ($repo); skipping"; exit 0; }
+# Clone if missing (this script replaced the chezmoi external as the owner).
+if [ ! -d "$repo/.git" ]; then
+  if ! step "cloning stumpcloud/ansible" -- git clone --quiet https://gitea.stump.rocks/stumpcloud/ansible.git "$repo"; then
+    warn "clone failed — skipping ansible setup"
+    exit 0
+  fi
+fi
 
-# Aggressively fetch + ff-only pull on every apply. This clone is managed (nothing
-# is developed here), so this is always safe.
-if git -C "$repo" fetch --quiet --prune origin 2>/dev/null; then
-  DEF="$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
-  if git -C "$repo" merge --ff-only --quiet "$DEF" 2>/dev/null; then
-    head="$(git -C "$repo" rev-parse --short HEAD)"
-    item ok "ansible at ${head}"
+# Refresh ONLY when the checkout is passively sitting on the default branch.
+# Agents develop here — work branches and fork remotes are normal, and touching
+# them (or failing on them) is how czu used to break. Skip quietly instead.
+DEF="$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+DEF="${DEF#origin/}"
+BRANCH="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null || echo detached)"
+if [ "$BRANCH" = "$DEF" ]; then
+  if git -C "$repo" fetch --quiet --prune origin 2>/dev/null \
+     && git -C "$repo" merge --ff-only --quiet "origin/$DEF" 2>/dev/null; then
+    item ok "ansible at $(git -C "$repo" rev-parse --short HEAD)"
   else
-    warn "ff-only merge failed (local commits?) — running from current HEAD"
+    warn "refresh failed (local commits? offline?) — running from current HEAD"
   fi
 else
-  warn "fetch failed — running from current local state"
+  item dim "ansible on work branch '$BRANCH' — leaving it alone"
 fi
 
 # Use uv to create a venv and install pipenv (avoids PEP 668 externally-managed-environment).
@@ -124,5 +135,6 @@ if ! step "syncing pipenv venv" -- pipenv sync --quiet ${pipenv_args[@]+"${pipen
     warn "  $line"
   done < <(tail -5 "$pipenv_log")
 fi
+rm -f "$pipenv_log"
 
 item ok "ansible ready at $repo (run: pipenv run ansible-playbook ...)"

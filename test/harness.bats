@@ -136,16 +136,32 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
   done
 }
 
-@test "harness: the signal MCP requires the cc prefix on Joe's own number" {
+@test "harness: the crush signal MCP renders identity-free" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  # The harness's --channels signal is only useful if the MCP is in channel mode;
-  # --prefix cc is what makes signal-mcp DROP unprefixed inbound messages.
-  run _render "$CRUSH_JSON"
+  # Identity (account, operator, prefix) is resolved by signal-mcp from its
+  # RUNTIME env, provisioned per-user by OpenBao — the render carries none of
+  # it, so the same file is correct on every box and for every identity.
+  run env -u SIGNAL_MCP_PREFIX bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
   [ "$status" -eq 0 ]
   [[ "$output" == *'"--channel"'* ]]
-  [[ "$output" == *'"--prefix"'* ]]
-  [[ "$output" == *'"cc"'* ]]
-  [[ "$output" == *'"+12062257886"'* ]]
+  [[ "$output" != *'"--account"'* ]]
+  [[ "$output" != *'"--operator"'* ]]
+  [[ "$output" != *'"--prefix"'* ]]
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
+}
+
+@test "harness: SIGNAL_MCP_* env never leaks into the crush render" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  run env SIGNAL_MCP_PREFIX=cc SIGNAL_MCP_ACCOUNT=+15550001111 bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'"cc"'* ]]
+  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
+}
+
+@test "harness: crush-signal's env file carries the cc opt-in" {
+  # The opt-in must live in the env_file the harness daemon loads, or the
+  # general-purpose agent silently starts answering every Signal message.
+  grep -q '^SIGNAL_MCP_PREFIX=cc$' "$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
 }
 
 @test "harness: the channel-enabled MCP server is actually named 'signal'" {

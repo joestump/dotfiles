@@ -7,10 +7,11 @@
     <key>ProgramArguments</key>
     <array>
         <!-- No -d: signal-cli uses its default data dir ($XDG_DATA_HOME/signal-cli,
-             i.e. ~/.local/share/signal-cli) — the same place `signal-cli link` writes. -->
+             i.e. ~/.local/share/signal-cli) — the same place `signal-cli link` writes.
+             No -a: multi-account mode serves every linked account; a single
+             unregistered account (expired linked device) only warns instead of
+             crash-looping the whole daemon (2026-07-18 tars incident). -->
         <string>{{ lookPath "signal-cli" | default "/opt/homebrew/bin/signal-cli" }}</string>
-        <string>-a</string>
-        <string>{{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }}</string>
         <string>daemon</string>
         <string>--tcp</string>
         <string>127.0.0.1:7583</string>

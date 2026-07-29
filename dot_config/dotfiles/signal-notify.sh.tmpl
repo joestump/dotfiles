@@ -7,7 +7,12 @@
 # Tries the warm signal-cli daemon first (JSON-RPC on 127.0.0.1:7583 — fast, no
 # cold JVM start), falls back to a cold signal-cli send, then to syslog as a last
 # resort so the failure is at least discoverable.
-SIGNAL_NUMBER="{{ .signalNumber }}"
+# The alert recipient is the HUMAN the agents serve, resolved from the
+# OpenBao-provisioned runtime env (secret/users/<whoami>/signal →
+# SIGNAL_MCP_OPERATOR) — no number is baked into this file. Callers (czu,
+# vault-agent-stale) source secrets-static.env before running; if the var is
+# genuinely absent (unprovisioned box) notify() degrades to syslog below.
+SIGNAL_NUMBER="${SIGNAL_MCP_OPERATOR:-}"
 
 _signal_have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -62,6 +67,12 @@ _signal_bounded() {
 
 notify() {
   local msg="$1"
+  # No operator in the env (unprovisioned box) → there is nobody to text.
+  # Syslog instead of failing, so the CALLER's exit code stays about its own work.
+  if [ -z "$SIGNAL_NUMBER" ]; then
+    logger -t signal-notify -- "SIGNAL_MCP_OPERATOR unset; alert dropped: $msg" 2>/dev/null
+    return 0
+  fi
   # 1) warm signal-cli daemon — fast, no cold JVM.
   _signal_send_via_daemon "$msg" && return 0
   # 2) cold signal-cli send (note-to-self) — reliable where the daemon isn't up.

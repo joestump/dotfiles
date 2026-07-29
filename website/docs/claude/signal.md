@@ -113,20 +113,21 @@ the per-OS `uv` path and `PATH` are injected by the
 
 ## Two numbers: account vs operator
 
-signal-mcp separates the number it runs **as** from the number it talks **to**:
+signal-mcp separates the number it runs **as** from the number it talks **to**,
+and both are resolved from the per-user OpenBao bag at **runtime** — no number
+is rendered into any config, so the same dotfiles serve every identity:
 
-- **`--account`** — the Signal number the daemon is logged in as (`signal-cli -a`);
-  messages are sent *from* it. On this agent box that's the agent's own number
-  (**+353871760709**), provisioned as `SIGNAL_MCP_ACCOUNT` in OpenBao
-  (`secret/users/<you>/signal`). On a personal machine with no OpenBao it falls
-  back to `.signalNumber`, so account == operator → Note to Self.
-- **`--operator`** — the human the agent serves: the default recipient of the
-  `send` tool and, in channel mode, the default trusted inbound sender. That's
-  **joestump, +12062257886** (`.signalNumber`).
+- **`SIGNAL_MCP_ACCOUNT`** — the Signal number messages are sent *from*. Each
+  identity has its own (provisioned in OpenBao at `secret/users/<whoami>/signal`).
+  When unset, signal-mcp defaults it to the operator — the single-number
+  Note-to-Self case.
+- **`SIGNAL_MCP_OPERATOR`** — the human the agent serves: the default recipient
+  of the `send` tool and, in channel mode, the default trusted inbound sender.
+  Also the target of `signal-notify.sh` alerts and scheduled-task summaries.
 
 The outbound allow-list is `SIGNAL_MCP_TRUSTED_RECIPIENTS` (same OpenBao secret) —
-a *gate* on who the agent may message, not an address it sends to. The daemon
-`-a`, the MCP `--account`, and `signal-notify.sh` all resolve `SIGNAL_MCP_ACCOUNT`;
-the MCP `--operator` and scheduled-task summaries use `.signalNumber`.
+a *gate* on who the agent may message, not an address it sends to. The signal-cli
+daemon itself runs in multi-account mode (no `-a`), so these env vars scope the
+signal-mcp client only.
 
 > Signal renders **no markdown** — plain text, emoji, and bare `https://` URLs only.

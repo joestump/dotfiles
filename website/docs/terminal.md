@@ -48,3 +48,18 @@ tabs, Option-as-Alt, copy-on-select. Reload in-app with **⌘⇧,**.
 
 > The fonts render via a Nerd Font — set your terminal font to **MesloLGS Nerd
 > Font** or the glyphs show as tofu boxes.
+
+### Installing the Nerd Font
+
+The `dot_Brewfile` installs it via the `font-meslo-lg-nerd-font` cask on macOS.
+On Linux there's no brew cask, so install it manually into your user font dir:
+
+```sh
+mkdir -p ~/.local/share/fonts && cd ~/.local/share/fonts
+curl -fsSLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Meslo.zip
+unzip -o Meslo.zip && rm Meslo.zip
+fc-cache -f ~/.local/share/fonts
+```
+
+Verify with `fc-match "MesloLGS Nerd Font"` — it should resolve to
+`MesloLGSNerdFont-Regular.ttf`. Then reload Ghostty.

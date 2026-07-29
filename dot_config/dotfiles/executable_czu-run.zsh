@@ -118,6 +118,12 @@ esac
 # Source the vault-rendered env so env-conditional templates (e.g. crush.json
 # providers) render populated, not empty, when apply runs outside a login shell.
 set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vault/secrets-static.env"; set +a
+# secrets-static.env alone is NOT enough: env.zsh DERIVES vars from it — e.g.
+# OPENAI_DIRECT_API_KEY is computed from the raw OpenAI key before the LiteLLM
+# shadow repoints OPENAI_API_KEY. Skip this and a scheduled apply renders
+# crush.json WITHOUT the openai provider, then the next interactive apply puts
+# it back — the file ping-pongs every 6h and czu always looks dirty.
+[ -r "$HOME/.oh-my-zsh/custom/env.zsh" ] && . "$HOME/.oh-my-zsh/custom/env.zsh"
 chezmoi apply "$@" \
   || fail "chezmoi apply failed — see ~/.cache/chezmoi-apply.log"
 
