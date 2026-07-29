@@ -43,10 +43,11 @@
 # when a tool is polled. Opt-in is per-server and CLI-only (there is no config
 # key for it — hence args), and both "signal" and "server:signal" are accepted.
 #
-# The signal MCP is already launched with `--operator {{ .signalNumber }} --channel
-# --prefix cc` (see dot_config/crush/crush.json.tmpl), so the cc prefix is
-# REQUIRED: signal-mcp drops any inbound message that doesn't start with `cc` on
-# a word boundary. "cc deploy" and "cc: deploy" match, "ccdeploy" does not, and
+# The signal MCP defaults to NO prefix (see dot_config/crush/crush.json.tmpl),
+# so a dedicated signal-channel bot receives every trusted-sender message
+# unconditionally. This general-purpose harness opts INTO the `cc` prefix via
+# SIGNAL_MCP_PREFIX=cc in its env_file, so messages must start with `cc` on a
+# word boundary ("cc deploy" and "cc: deploy" match, "ccdeploy" does not) and
 # the prefix is stripped before the text reaches the agent.
 [harness.crush-signal]
 cmd = "{{ .chezmoi.homeDir }}/.local/bin/crush"
