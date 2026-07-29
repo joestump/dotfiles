@@ -185,8 +185,11 @@
 {{ end -}}
 
 # ---------- StumpCloud Ansible (Infrastructure automation) ----------
-# ~/src/ansible is deliberately NOT an external. Agents develop there (work
-# branches, fork remotes), and a git-repo external's `git pull --ff-only`
-# aborts the ENTIRE apply the moment the checkout sits on a branch with no
-# upstream. run_after_46-install-ansible.sh owns the clone + a branch-aware
-# refresh instead. Do not re-add it here.
+# The StumpCloud infrastructure monorepo (stumpcloud/ansible on Gitea) deploys
+# services across the DUB/PDX/DTW clusters. Cloned to ~/src/ansible for local
+# development and agent-initiated deployment; the install-ansible script sets
+# up the venv. It is deliberately NOT a git-repo external, though: agents
+# develop there (work branches, fork remotes), and an external's
+# `git pull --ff-only` aborts the ENTIRE apply the moment the checkout sits on
+# a branch with no upstream. run_after_46-install-ansible.sh owns the clone +
+# a branch-aware refresh instead. Do not re-add it here.
