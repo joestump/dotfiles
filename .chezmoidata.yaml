@@ -12,9 +12,12 @@
 # Both identities are overridable by env vars provisioned from OpenBao
 # (secret/users/<you>/signal), with this number as the dev-box fallback:
 #
-#   SIGNAL_MCP_ACCOUNT   signal-cli daemon `-a` and signal-mcp `--account`
-#                        (the number the agent runs AS). OpenBao-provisioned
-#                        nodes serve from the agent's own number (+353871760709).
+#   SIGNAL_MCP_ACCOUNT   signal-mcp `--account` (the number the agent runs AS).
+#                        OpenBao-provisioned nodes serve from the agent's own
+#                        number (+353871760709). NOTE: the signal-cli DAEMON
+#                        runs in multi-account mode (no `-a`) — see
+#                        test/signal-wiring.bats — so SIGNAL_MCP_ACCOUNT
+#                        scopes only the signal-mcp client, not the daemon.
 #   SIGNAL_MCP_OPERATOR  signal-mcp `--operator` (the human the agent serves).
 #                        Defaults to this number on a bare dev box without
 #                        OpenBao (account == operator == Joe → Note to Self).

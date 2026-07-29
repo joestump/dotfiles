@@ -21,7 +21,12 @@ Wants=network-online.target
 # No -d: signal-cli uses its default data dir ($XDG_DATA_HOME/signal-cli, i.e.
 # ~/.local/share/signal-cli) — the same place `signal-cli link` writes.
 # Path is deterministic: the package script installs signal-cli to ~/.local/bin.
-ExecStart={{ .chezmoi.homeDir }}/.local/bin/signal-cli -a {{ env "SIGNAL_MCP_ACCOUNT" | default .signalNumber }} daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
+# No -a: multi-account mode serves every account in the local store, and a
+# single unregistered account (e.g. an expired linked device) only logs a
+# warning instead of killing the daemon for the healthy accounts too
+# (2026-07-18: -a <joe's number> crash-looped the daemon after that linked
+# device was deactivated remotely, taking the agent's own account down with it).
+ExecStart={{ .chezmoi.homeDir }}/.local/bin/signal-cli daemon --tcp 127.0.0.1:7583 --receive-mode on-start --no-receive-stdout
 Restart=on-failure
 RestartSec=5
 

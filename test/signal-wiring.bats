@@ -4,8 +4,8 @@
 # The signal-cli daemon and the signal-mcp client share two E.164 identities,
 # both provisioned by OpenBao into env vars at apply time:
 #
-#   SIGNAL_MCP_ACCOUNT   the number the daemon runs AS (signal-cli `-a` and
-#                        signal-mcp `--account`). Distinct from the operator on
+#   SIGNAL_MCP_ACCOUNT   the number the signal-mcp CLIENT identifies as
+#                        (signal-mcp `--account`). Distinct from the operator on
 #                        hosts where the agent has its own number.
 #   SIGNAL_MCP_OPERATOR  the human the agent serves (signal-mcp `--operator`).
 #
@@ -15,10 +15,18 @@
 # SIGNAL_MCP_TRUSTED_SENDERS) are read by signal-mcp from the env at runtime
 # and MUST NOT be rendered as CLI flags.
 #
+# signal-cli DAEMON design: the daemon runs in MULTI-ACCOUNT mode (no `-a`
+# flag) so it serves every linked account and a single unregistered account
+# (e.g. an expired linked device) only logs a warning instead of crash-looping
+# the daemon for the healthy accounts too. This deliberately reverts the `-a`
+# pin from #86: the 2026-07-18 tars incident (200+ restarts after a linked
+# device was deactivated remotely) showed the single-account pin is a
+# crash-loop footgun, so the daemon stays multi-account.
+#
 # These tests guard against regressions of:
-#   - dotfiles#80 (multi-account mode drop): the daemon MUST keep `-a` pinned
-#     to SIGNAL_MCP_ACCOUNT rather than running unscoped multi-account mode,
-#     so an unregistered linked device can't degrade healthy accounts.
+#   - The multi-account daemon design: the systemd unit and launchd plist MUST
+#     NOT render `-a` (multi-account mode), so an unregistered linked device
+#     can't crash-loop the daemon for healthy accounts.
 #   - The earlier `{{ .signalNumber }}` hardcode for `--operator`: that broke
 #     the dedicated-agent-number deployment, where account != operator.
 load test_helper
@@ -49,39 +57,31 @@ _render_tmpl() {
 }
 
 # ---------------------------------------------------------------------------
-# signal-cli daemon: MUST pin `-a` to SIGNAL_MCP_ACCOUNT (NOT multi-account).
-# Regression guard for dotfiles#80.
+# signal-cli daemon: MUST run in MULTI-ACCOUNT mode (no `-a` flag). A single
+# pinned account crash-loops the daemon when that account is unregistered
+# (2026-07-18 tars incident); multi-account mode degrades it to a warning.
 # ---------------------------------------------------------------------------
 
-@test "systemd signal-daemon unit pins -a to SIGNAL_MCP_ACCOUNT (no multi-account)" {
+@test "systemd signal-daemon unit runs in multi-account mode (no -a flag)" {
   run _render_tmpl SIGNAL_MCP_ACCOUNT=+353871760709 -- "$SYSTEMD_UNIT"
   [ "$status" -eq 0 ]
-  # Explicit `-a` flag is present, scoped to exactly the provisioned account.
-  grep -F -- "signal-cli -a +353871760709 daemon" <<<"$output" >/dev/null
-  # And no second `-a` / `--account` was injected by env-var expansion.
-  ! grep -E -- 'signal-cli -a .* -a ' <<<"$output" >/dev/null
+  # The daemon must NOT pin `-a` to a single account, even when SIGNAL_MCP_ACCOUNT
+  # is set (the env var is for the signal-mcp client, not the daemon).
+  ! grep -E -- 'signal-cli(\s+\S+)*\s+-a\s' <<<"$output" >/dev/null
+  ! grep -F -- 'signal-cli -a' <<<"$output" >/dev/null
+  # The daemon line still launches signal-cli daemon.
+  grep -F -- 'signal-cli daemon' <<<"$output" >/dev/null
 }
 
-@test "systemd signal-daemon -a falls back to .signalNumber without SIGNAL_MCP_ACCOUNT" {
-  run _render_tmpl -- "$SYSTEMD_UNIT"
-  [ "$status" -eq 0 ]
-  # .signalNumber from .chezmoidata.yaml is +12062257886.
-  grep -F -- "signal-cli -a +12062257886 daemon" <<<"$output" >/dev/null
-}
-
-@test "launchd signal-daemon plist pins -a to SIGNAL_MCP_ACCOUNT (no multi-account)" {
+@test "launchd signal-daemon plist runs in multi-account mode (no -a flag)" {
   run _render_tmpl SIGNAL_MCP_ACCOUNT=+353871760709 -- "$LAUNCHD_PLIST"
   [ "$status" -eq 0 ]
-  # The plist passes `-a` and the account number as separate <string> elements.
-  grep -F -- '<string>-a</string>' <<<"$output" >/dev/null
-  grep -F -- '<string>+353871760709</string>' <<<"$output" >/dev/null
-}
-
-@test "launchd signal-daemon -a falls back to .signalNumber without SIGNAL_MCP_ACCOUNT" {
-  run _render_tmpl -- "$LAUNCHD_PLIST"
-  [ "$status" -eq 0 ]
-  grep -F -- '<string>-a</string>' <<<"$output" >/dev/null
-  grep -F -- '<string>+12062257886</string>' <<<"$output" >/dev/null
+  # No `-a` <string> element in the ProgramArguments array, even with the env
+  # var set — the daemon serves all linked accounts.
+  ! grep -F -- '<string>-a</string>' <<<"$output" >/dev/null
+  ! grep -F -- '<string>+353871760709</string>' <<<"$output" >/dev/null
+  # The plist still launches the daemon subcommand.
+  grep -F -- '<string>daemon</string>' <<<"$output" >/dev/null
 }
 
 # ---------------------------------------------------------------------------
