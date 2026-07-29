@@ -56,6 +56,21 @@ _render_tmpl() {
     bash -c 'chezmoi execute-template --source "$0" < "$1"' "$REPO_ROOT" "$tmpl"
 }
 
+# Same as _render_tmpl, but forces the Linux branch of {{ if eq .chezmoi.os }}
+# gates. The signal-mcp venv script is Linux-only and its tests must see the
+# full script body regardless of the host running `make test`.
+_render_tmpl_linux() {
+  local vars=()
+  while [ "$1" != "--" ]; do
+    vars+=("$1")
+    shift
+  done
+  shift  # consume --
+  local tmpl="$1"
+  env -i HOME="$HOME" PATH="$PATH" "${vars[@]}" \
+    bash -c 'chezmoi execute-template --source "$0" --override-data '\''{"chezmoi":{"os":"linux"}}'\'' < "$1"' "$REPO_ROOT" "$tmpl"
+}
+
 # ---------------------------------------------------------------------------
 # signal-cli daemon: MUST run in MULTI-ACCOUNT mode (no `-a` flag). A single
 # pinned account crash-loops the daemon when that account is unregistered
@@ -151,7 +166,7 @@ for flag in ("--account","--operator","--prefix"):
 VENV_SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_45-signal-mcp-venv.sh.tmpl"
 
 @test "signal-mcp script fingerprints HEAD and restarts via the harness daemon" {
-  run _render_tmpl -- "$VENV_SCRIPT"
+  run _render_tmpl_linux -- "$VENV_SCRIPT"
   [ "$status" -eq 0 ]
   # Fingerprint across applies — restart exactly once per upstream change.
   [[ "$output" == *'.signal-mcp-head'* ]]
@@ -159,7 +174,7 @@ VENV_SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_45-signal-mcp-venv.sh.tmpl"
 }
 
 @test "signal-mcp restart targets only RUNNING harnesses matched by name" {
-  run _render_tmpl -- "$VENV_SCRIPT"
+  run _render_tmpl_linux -- "$VENV_SCRIPT"
   [ "$status" -eq 0 ]
   # Names are create_-seeded and differ per box (crush-signal vs
   # crush-signal-channel) — must match by substring, never a hardcoded name.
@@ -169,7 +184,7 @@ VENV_SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_45-signal-mcp-venv.sh.tmpl"
 }
 
 @test "signal-mcp first run records the fingerprint without restarting" {
-  run _render_tmpl -- "$VENV_SCRIPT"
+  run _render_tmpl_linux -- "$VENV_SCRIPT"
   [ "$status" -eq 0 ]
   # No baseline to compare against — bouncing a possibly-mid-conversation
   # agent for no code change is worse than waiting one cycle.
