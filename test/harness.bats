@@ -136,16 +136,32 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
   done
 }
 
-@test "harness: the signal MCP requires the cc prefix on Joe's own number" {
+@test "harness: the signal MCP prefix defaults to empty on Joe's own number" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  # The harness's --channels signal is only useful if the MCP is in channel mode;
-  # --prefix cc is what makes signal-mcp DROP unprefixed inbound messages.
-  run _render "$CRUSH_JSON"
+  # The signal MCP defaults to NO prefix, so a dedicated signal-channel bot
+  # receives every trusted-sender message unconditionally. General-purpose
+  # harnesses opt back into a prefix via SIGNAL_MCP_PREFIX in their env_file
+  # (see dot_config/harness/crush-signal.env.tmpl).
+  run env -u SIGNAL_MCP_PREFIX bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
   [ "$status" -eq 0 ]
   [[ "$output" == *'"--channel"'* ]]
   [[ "$output" == *'"--prefix"'* ]]
-  [[ "$output" == *'"cc"'* ]]
+  [[ "$output" != *'"cc"'* ]]
   [[ "$output" == *'"+12062257886"'* ]]
+}
+
+@test "harness: SIGNAL_MCP_PREFIX opts a harness back into the cc prefix" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  run env SIGNAL_MCP_PREFIX=cc bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"--prefix"'* ]]
+  [[ "$output" == *'"cc"'* ]]
+}
+
+@test "harness: crush-signal's env file carries the cc opt-in" {
+  # The opt-in must live in the env_file the harness daemon loads, or the
+  # general-purpose agent silently starts answering every Signal message.
+  grep -q '^SIGNAL_MCP_PREFIX=cc$' "$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
 }
 
 @test "harness: the channel-enabled MCP server is actually named 'signal'" {
