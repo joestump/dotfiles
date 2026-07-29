@@ -13,11 +13,11 @@ jobs:
         # vault-approle-blast-radius.bats; python3 backs the crush-providers
         # JSON validation in the bats job.
         run: |
-          sudo apt-get update && sudo apt-get install -y bats zsh jq python3
+          sudo apt-get update && sudo apt-get install -y bats zsh jq python3 make
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: BATS suite
-        run: bats --print-output-on-failure test/
+        run: make test
 
   lint:
     runs-on: ubuntu-latest

@@ -2,6 +2,7 @@
 README.md
 Architecture.md
 CLAUDE.md
+Makefile
 docs/
 examples/
 scripts/
