@@ -44,6 +44,15 @@ _render() {
   [[ "$output" == *"claude-marketplaces/claude-personal"* ]]
 }
 
+@test "chezmoiexternal: src/ansible is NOT a git-repo external" {
+  # Agents develop in ~/src/ansible (work branches, fork remotes). A git-repo
+  # external ff-only pulls it on every apply and ABORTS the whole apply the
+  # moment the checkout sits on a branch with no upstream. The clone is owned
+  # by run_after_46-install-ansible.sh instead — do not re-add it here.
+  run grep -E '^\["src/ansible"\]' "$EXTERNAL"
+  [ "$status" -ne 0 ]
+}
+
 @test "chezmoiexternal: rendered output is valid TOML when the external is present" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
