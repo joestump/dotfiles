@@ -16,6 +16,6 @@ bats
 figlet             # ASCII wordmark for the StumpCloud MOTD
 qrencode           # terminal QR for `signal-link` (link a new Signal device)
 tmux               # optional backend= for harness-supervised agents (harness.toml)
-openjdk-21-jre-headless  # JRE for signal-cli (the Signal MCP daemon backend)
+openjdk-25-jre-headless  # JRE for signal-cli (the Signal MCP daemon backend) — signal-cli 0.14.5 requires Java 25 (class file 69); Java 21 throws UnsupportedClassVersionError
 python3-pygments   # provides `pygmentize` — backend for the colorize plugin
 golang-go        # Go toolchain — enables go-tools.txt
