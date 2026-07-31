@@ -73,6 +73,12 @@ jobs:
           # PR branch so `address` mode can commit + push back to it.
           ref: ${{ github.event.pull_request.head.ref || github.head_ref }}
           fetch-depth: 0
+          # actions/checkout refuses to fetch a fork's ref under pull_request_target
+          # by default (the exact "pwn request" guard this file's `on:` comment
+          # describes). Safe to opt in here ONLY because the job's `if:` above has
+          # already gated on the PR author being joestump/joestump-agent before this
+          # step runs — an untrusted author never reaches this checkout at all.
+          allow-unsafe-pr-checkout: true
 
       - name: AI bot
         # Full URL is required on Gitea: a bare `owner/repo` resolves against
