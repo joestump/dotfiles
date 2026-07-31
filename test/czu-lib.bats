@@ -1,11 +1,12 @@
 #!/usr/bin/env bats
-# Tests for dot_config/dotfiles/czu-lib.sh — the branch-sync helper behind `czu`.
-# The box runs from a fork and may sit on any branch, so czu_sync_branch must:
-#   - fast-forward the current branch from origin when the fork has it,
-#   - do so even when the branch has NO upstream tracking (the regression that
-#     made `czu` die with "no tracking information"),
-#   - skip cleanly (not fail) when the branch isn't on the fork yet,
-#   - fail on a detached HEAD.
+# Tests for dot_config/dotfiles/czu-lib.sh — the sync helpers behind `czu`.
+#
+# Two checkouts, two roles: czu renders $HOME from the PRODUCTION clone
+# (chezmoi's default source dir), which czu_sync_prod must keep on clean
+# upstream main — creating it when missing, healing a parked/detached HEAD,
+# degrading to "apply what we have" when offline, and refusing (with a
+# distinct token) when someone edited or committed to production directly.
+# The workbench (~/src/dotfiles) is deliberately invisible to these helpers.
 load test_helper
 
 setup() {
@@ -14,24 +15,29 @@ setup() {
          GIT_COMMITTER_NAME=czu GIT_COMMITTER_EMAIL=czu@test
 
   export LIBFILE="$REPO_ROOT/dot_config/dotfiles/czu-lib.sh"
-  export REMOTE="$BATS_TEST_TMPDIR/remote.git"   # stands in for the fork (origin)
-  export WORK="$BATS_TEST_TMPDIR/work"           # the box's checkout
+  export REMOTE="$BATS_TEST_TMPDIR/remote.git"   # stands in for upstream (origin)
+  export PROD="$BATS_TEST_TMPDIR/prod"           # the production clone
 
   git init --quiet --bare -b main "$REMOTE"
-  git clone --quiet "$REMOTE" "$WORK"
-  git -C "$WORK" commit --quiet --allow-empty -m init
-  git -C "$WORK" push --quiet -u origin main
+  local seed="$BATS_TEST_TMPDIR/seed"
+  git clone --quiet "$REMOTE" "$seed"
+  git -C "$seed" commit --quiet --allow-empty -m init
+  git -C "$seed" push --quiet -u origin main
+  rm -rf "$seed"
 }
 
-# Advance origin/<branch> by one commit via a throwaway clone.
+# Advance origin/main by one commit via a throwaway clone.
 advance_origin() {
-  local branch="$1" scratch="$BATS_TEST_TMPDIR/scratch"
+  local scratch="$BATS_TEST_TMPDIR/scratch"
   rm -rf "$scratch"
   git clone --quiet "$REMOTE" "$scratch"
-  git -C "$scratch" checkout --quiet "$branch"
-  git -C "$scratch" commit --quiet --allow-empty -m "advance $branch"
-  git -C "$scratch" push --quiet origin "$branch"
+  git -C "$scratch" commit --quiet --allow-empty -m "advance main"
+  git -C "$scratch" push --quiet origin main
   rm -rf "$scratch"
+}
+
+clone_prod() {
+  git clone --quiet "$REMOTE" "$PROD"
 }
 
 @test "czu-lib.sh parses under sh -n and bash -n" {
@@ -39,206 +45,135 @@ advance_origin() {
   run bash -n "$LIBFILE"; [ "$status" -eq 0 ]
 }
 
-@test "fast-forwards the current branch from the fork" {
-  advance_origin main
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
+# ---------------------------------------------------------------------------
+# czu_sync_prod — creation
+# ---------------------------------------------------------------------------
+
+@test "sync: clones production fresh when the directory is missing" {
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
   [ "$status" -eq 0 ]
-  [ "$output" = "pulled" ]
-  [ "$(git -C "$WORK" rev-list --count HEAD)" -eq 2 ]
+  [ "$output" = "cloned" ]
+  [ "$(git -C "$PROD" symbolic-ref --short HEAD)" = "main" ]
 }
 
-@test "pulls even when the branch has no upstream tracking (the czu regression)" {
-  # Put a two-commit branch on the fork, then check out a LOCAL branch of the
-  # same name that is behind and has NO upstream configured.
-  git -C "$WORK" checkout --quiet -b feature
-  git -C "$WORK" commit --quiet --allow-empty -m base
-  git -C "$WORK" push --quiet -u origin feature
-  advance_origin feature                       # fork is now ahead by one
-  git -C "$WORK" checkout --quiet main
-  git -C "$WORK" branch --quiet -D feature
-  git -C "$WORK" fetch --quiet origin
-  git -C "$WORK" checkout --quiet -b feature --no-track "origin/feature~1"
-
-  # Precondition: the local branch genuinely has no upstream.
-  run git -C "$WORK" rev-parse --abbrev-ref 'feature@{upstream}'
-  [ "$status" -ne 0 ]
-
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "pulled" ]
-  # ...and it repaired the tracking as a side effect.
-  run git -C "$WORK" rev-parse --abbrev-ref 'feature@{upstream}'
-  [ "$status" -eq 0 ]
-  [ "$output" = "origin/feature" ]
-}
-
-@test "skips cleanly when the branch is not on the fork yet" {
-  git -C "$WORK" checkout --quiet -b wip/local-only
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "skip-local-branch" ]
-}
-
-@test "already up to date is a successful pull" {
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "pulled" ]
-}
-
-@test "auto-stashes a dirty tree so an unrelated ff-pull still succeeds" {
-  # Seed a tracked file and push it so local == origin (no divergence).
-  echo "base" > "$WORK/README.local"
-  git -C "$WORK" add -A && git -C "$WORK" commit --quiet -m "seed README.local"
-  git -C "$WORK" push --quiet origin main
-  advance_origin main                          # fork moves ahead (empty commit, unrelated)
-  echo "more wip" >> "$WORK/README.local"      # local uncommitted (dirty) edit
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "pulled" ]
-  # Advanced to the new commit AND the local edit survived on top.
-  [ "$(git -C "$WORK" rev-list --count HEAD)" -eq 3 ]
-  run grep -q "more wip" "$WORK/README.local"
-  [ "$status" -eq 0 ]
-}
-
-@test "keeps local edits in a stash (reports stash-conflict) when they collide with the pull" {
-  # Both sides change the SAME file on the SAME lines -> pop conflicts.
-  echo "base" > "$WORK/collide.txt"
-  git -C "$WORK" add -A && git -C "$WORK" commit --quiet -m "seed collide.txt"
-  git -C "$WORK" push --quiet origin main
-  # Fork advances collide.txt...
-  local scratch="$BATS_TEST_TMPDIR/scratch"; rm -rf "$scratch"
-  git clone --quiet "$REMOTE" "$scratch"
-  echo "theirs" > "$scratch/collide.txt"
-  git -C "$scratch" commit --quiet -am "fork edits collide.txt"
-  git -C "$scratch" push --quiet origin main
-  rm -rf "$scratch"
-  # ...and the box has a conflicting uncommitted edit to the same file.
-  echo "mine" > "$WORK/collide.txt"
-
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
+@test "sync: missing directory and no URL is clone-failed, not a crash" {
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" ""'
   [ "$status" -eq 1 ]
-  [ "$output" = "stash-conflict" ]
-  # The pull still landed (box advanced) and the edit is preserved in the stash.
-  run git -C "$WORK" stash list
-  [ -n "$output" ]
+  [ "$output" = "clone-failed" ]
 }
 
-@test "fast-forwards while preserving non-conflicting local edits" {
-  printf 'base\n' >"$WORK/local.txt"
-  git -C "$WORK" add local.txt
-  git -C "$WORK" commit --quiet -m "add local file"
-  git -C "$WORK" push --quiet origin main
-  printf 'local edit\n' >"$WORK/local.txt"
-  advance_origin main
-
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "pulled" ]
-  [ "$(cat "$WORK/local.txt")" = "local edit" ]
-  [ "$(git -C "$WORK" status --short -- local.txt)" = " M local.txt" ]
-}
-
-@test "fails on a detached HEAD" {
-  git -C "$WORK" checkout --quiet --detach
-  run bash -c '. "$LIBFILE"; czu_sync_branch "$WORK"'
+@test "sync: missing directory and an unreachable URL is clone-failed" {
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$BATS_TEST_TMPDIR/nope.git"'
   [ "$status" -eq 1 ]
-  [ "$output" = "detached" ]
+  [ "$output" = "clone-failed" ]
 }
 
-# --- czu_branch_drift ---------------------------------------------------------
-# Advisory check that runs between sync and apply. It exists because czu applies
-# whatever branch is checked out, and czu_sync_branch reports success both when a
-# feature branch isn't on the fork yet and when it fast-forwards from its own
-# stale counterpart — neither says anything about main. A box parked on a feature
-# branch therefore rendered $HOME from a tree 43 commits behind main, silently,
-# until the branch was merged+rewritten upstream and czu wedged on `nonff`.
-# It must NEVER fail the run: in-flight feature-branch work still has to apply.
+# ---------------------------------------------------------------------------
+# czu_sync_prod — the happy path
+# ---------------------------------------------------------------------------
 
-@test "drift: reports current when on main and level with origin/main" {
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+@test "sync: fast-forwards a stale production clone onto origin/main" {
+  clone_prod
+  advance_origin
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "synced" ]
+  [ "$(git -C "$PROD" rev-parse HEAD)" = "$(git -C "$PROD" rev-parse origin/main)" ]
+}
+
+@test "sync: a current clone reads current, not synced" {
+  clone_prod
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
   [ "$status" -eq 0 ]
   [ "$output" = "current" ]
 }
 
-@test "drift: reports how far main is behind origin/main" {
-  advance_origin main
-  advance_origin main
-  git -C "$WORK" fetch --quiet origin
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+# ---------------------------------------------------------------------------
+# czu_sync_prod — self-healing drift (clean tree, wrong ref)
+# ---------------------------------------------------------------------------
+
+@test "sync: switches a parked (clean) production clone back to main and syncs" {
+  clone_prod
+  git -C "$PROD" switch --quiet -c parked
+  advance_origin
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
   [ "$status" -eq 0 ]
-  [ "$output" = "behind:2" ]
+  [ "$output" = "synced" ]
+  [ "$(git -C "$PROD" symbolic-ref --short HEAD)" = "main" ]
 }
 
-@test "drift: reports how far main is ahead of origin/main (the silent local-divergence case)" {
-  # The recovery-session shape from #109: local main got commits origin/main
-  # doesn't have (e.g. a fork merge), and nothing was pushed. This MUST NOT read
-  # as "current" — it renders a tree no other machine has and wedges on nonff.
-  git -C "$WORK" commit --quiet --allow-empty -m "local-only 1"
-  git -C "$WORK" commit --quiet --allow-empty -m "local-only 2"
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
+@test "sync: recovers a detached HEAD back onto main" {
+  clone_prod
+  git -C "$PROD" checkout --quiet --detach
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
   [ "$status" -eq 0 ]
-  [ "$output" = "ahead:2" ]
+  [ "$output" = "current" ]
+  [ "$(git -C "$PROD" symbolic-ref --short HEAD)" = "main" ]
 }
 
-@test "drift: reports diverged when main is both behind and ahead of origin/main" {
-  # Divergence in both directions — the state that hard-wedges with nonff on the
-  # next upstream commit. Must surface as its own token so the WARN names both
-  # gaps and tells the operator to rebase or reset.
-  git -C "$WORK" commit --quiet --allow-empty -m "local-only"
-  advance_origin main
-  advance_origin main
-  git -C "$WORK" fetch --quiet origin
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "diverged:2:1" ]
+# ---------------------------------------------------------------------------
+# czu_sync_prod — refusals (production was edited; never self-heal these)
+# ---------------------------------------------------------------------------
+
+@test "sync: an untracked file in production is dirty, and survives untouched" {
+  clone_prod
+  echo stray > "$PROD/stray.txt"
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "dirty" ]
+  [ -f "$PROD/stray.txt" ]
 }
 
-@test "drift: names the branch and the gap when parked off main (the 43-commit case)" {
-  git -C "$WORK" checkout --quiet -b feat/parked
-  advance_origin main
-  advance_origin main
-  advance_origin main
-  git -C "$WORK" fetch --quiet origin
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "off-main:feat/parked:3" ]
+@test "sync: a staged file in production is dirty" {
+  clone_prod
+  echo edited > "$PROD/edited.txt"
+  git -C "$PROD" add edited.txt
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "dirty" ]
 }
 
-@test "drift: a feature branch level with main is not warned about" {
-  git -C "$WORK" checkout --quiet -b feat/fresh
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "off-main:feat/fresh:0" ]
+@test "sync: dirty wins over parked — never switch branches around local edits" {
+  clone_prod
+  git -C "$PROD" switch --quiet -c parked
+  echo stray > "$PROD/stray.txt"
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "dirty" ]
+  [ "$(git -C "$PROD" symbolic-ref --short HEAD)" = "parked" ]
 }
 
-@test "drift: reports detached HEAD without failing" {
-  git -C "$WORK" checkout --quiet --detach
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "detached" ]
+@test "sync: local commits on production main are nonff, and are NOT discarded" {
+  clone_prod
+  git -C "$PROD" commit --quiet --allow-empty -m "committed in production"
+  advance_origin
+  local_head="$(git -C "$PROD" rev-parse HEAD)"
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "nonff" ]
+  [ "$(git -C "$PROD" rev-parse HEAD)" = "$local_head" ]
 }
 
-@test "drift: a missing origin/main reads as unknown, never as current" {
-  git -C "$WORK" remote remove origin
-  git -C "$WORK" update-ref -d refs/remotes/origin/main
-  run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
-  [ "$status" -eq 0 ]
-  [ "$output" = "unknown" ]
+@test "sync: unswitchable checkout is wedged" {
+  clone_prod
+  git -C "$PROD" checkout --quiet --detach
+  git -C "$PROD" branch --quiet -D main
+  git -C "$PROD" remote remove origin   # no DWIM source for `git switch main`
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "wedged" ]
 }
 
-@test "drift: is advisory — it never returns non-zero, on any repo state" {
-  # The whole point is that it cannot wedge czu the way czu_sync_branch can.
-  for state in main detach nobranch; do
-    case "$state" in
-      detach)   git -C "$WORK" checkout --quiet --detach ;;
-      nobranch) git -C "$WORK" checkout --quiet -b feat/x ;;
-    esac
-    run bash -c '. "$LIBFILE"; czu_branch_drift "$WORK"'
-    [ "$status" -eq 0 ]
-  done
-  run bash -c '. "$LIBFILE"; czu_branch_drift "/nonexistent/path"'
+# ---------------------------------------------------------------------------
+# czu_sync_prod — offline degradation
+# ---------------------------------------------------------------------------
+
+@test "sync: unreachable origin is offline (rc 0) — czu still applies" {
+  clone_prod
+  git -C "$PROD" remote set-url origin "$BATS_TEST_TMPDIR/gone.git"
+  run bash -c '. "$LIBFILE"; czu_sync_prod "$PROD" "$REMOTE"'
   [ "$status" -eq 0 ]
+  [ "$output" = "offline" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -246,8 +181,8 @@ advance_origin() {
 # also writes (Crush rewrites its own crush.json, tripping chezmoi's
 # changed-since-last-write prompt on every apply thereafter). All chezmoi
 # interaction is stubbed; these tests pin the verify-before-force order, the
-# scoping of the forced apply to exactly the named target, and the one-token-
-# per-target output contract.
+# explicit --source (the production clone), the scoping of the forced apply
+# to exactly the named target, and the one-token-per-target output contract.
 # ---------------------------------------------------------------------------
 
 # Stub chezmoi: logs every invocation, then branches on subcommand and target
@@ -266,30 +201,31 @@ exit 0'
 
 @test "reassert: a clean target reads current and is never force-applied" {
   stub_chezmoi
-  run bash -c '. "$LIBFILE"; czu_reassert_targets "$HOME/clean/crush.json"'
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$PROD" "$HOME/clean/crush.json"'
   [ "$status" -eq 0 ]
   [ "$output" = "current:$HOME/clean/crush.json" ]
   ! grep -q '^apply' "$STUB_BIN/chezmoi.calls"
 }
 
-@test "reassert: a dirty target is force-applied, scoped to that target only" {
+@test "reassert: a dirty target is force-applied from the production source, scoped to that target" {
   stub_chezmoi
-  run bash -c '. "$LIBFILE"; czu_reassert_targets "$HOME/dirty/crush.json"'
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$PROD" "$HOME/dirty/crush.json"'
   [ "$status" -eq 0 ]
   [ "$output" = "reasserted:$HOME/dirty/crush.json" ]
-  grep -qF -- "apply --force -- $HOME/dirty/crush.json" "$STUB_BIN/chezmoi.calls"
+  grep -qF -- "apply --source $PROD --force -- $HOME/dirty/crush.json" "$STUB_BIN/chezmoi.calls"
+  grep -qF -- "verify --source $PROD -- $HOME/dirty/crush.json" "$STUB_BIN/chezmoi.calls"
 }
 
 @test "reassert: a failed forced apply reads failed and returns 1" {
   stub_chezmoi
-  run bash -c '. "$LIBFILE"; czu_reassert_targets "$HOME/broken/crush.json"'
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$PROD" "$HOME/broken/crush.json"'
   [ "$status" -eq 1 ]
   [ "$output" = "failed:$HOME/broken/crush.json" ]
 }
 
 @test "reassert: emits one token per target and keeps going past a failure" {
   stub_chezmoi
-  run bash -c '. "$LIBFILE"; czu_reassert_targets \
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$PROD" \
     "$HOME/clean/a.json" "$HOME/broken/b.json" "$HOME/dirty/c.json"'
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "current:$HOME/clean/a.json" ]
