@@ -144,6 +144,27 @@ for flag in ("--account","--operator","--prefix"):
   ! grep -F -- '"--trusted-recipient"' <<<"$output" >/dev/null
 }
 
+@test "crush signal block wires channel_reply (the fork's reply fallback)" {
+  # sendChannelReply in the crush fork is a silent no-op when channel_reply is
+  # absent — there is no built-in default and no env fallback, so a render
+  # without this block drops every channel turn whose model didn't call a send
+  # tool itself. The template shipped without it for weeks; the only thing
+  # keeping the Signal bot replying was that the stale on-disk config still
+  # carried the block, which is why czu's overwrite prompt could never safely
+  # be answered "yes". Assert parsed structure, not text, so formatting is free.
+  run _render_tmpl -- "$CRUSH_TMPL"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+reply=d["mcp"]["signal"]["channel_reply"]
+assert reply["user"]["tool"] == "send_message_to_user", reply
+assert reply["user"]["target_param"] == "user_id", reply
+assert reply["group"]["tool"] == "send_message_to_group", reply
+assert reply["group"]["target_param"] == "group_id", reply
+'
+}
+
 @test "claude-code merge script renders identity-free (runtime env resolves it)" {
   run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 SIGNAL_MCP_OPERATOR=+15550002222 -- "$CODE_MERGE"
   [ "$status" -eq 0 ]

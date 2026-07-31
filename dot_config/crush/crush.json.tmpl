@@ -181,6 +181,15 @@
         "stdio",
         "--channel"
       ],
+{{- /* channel_reply is LOAD-BEARING for the crush-signal harness: the fork's
+       sendChannelReply is a silent no-op when it is absent (no built-in
+       default), so without it a channel turn whose model never calls a send
+       tool itself simply drops the reply. Unlike identity, there is no env
+       fallback — this wiring only exists in config. */}}
+      "channel_reply": {
+        "user": { "tool": "send_message_to_user", "target_param": "user_id" },
+        "group": { "tool": "send_message_to_group", "target_param": "group_id" }
+      },
       "timeout": 60,
       "disabled": false
     },
