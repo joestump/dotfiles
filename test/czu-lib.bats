@@ -240,3 +240,59 @@ advance_origin() {
   run bash -c '. "$LIBFILE"; czu_branch_drift "/nonexistent/path"'
   [ "$status" -eq 0 ]
 }
+
+# ---------------------------------------------------------------------------
+# czu_reassert_targets — scoped `chezmoi apply --force` for targets an app
+# also writes (Crush rewrites its own crush.json, tripping chezmoi's
+# changed-since-last-write prompt on every apply thereafter). All chezmoi
+# interaction is stubbed; these tests pin the verify-before-force order, the
+# scoping of the forced apply to exactly the named target, and the one-token-
+# per-target output contract.
+# ---------------------------------------------------------------------------
+
+# Stub chezmoi: logs every invocation, then branches on subcommand and target
+# basename — a target under */clean/* verifies clean, anything else dirty; an
+# apply of a target under */broken/* fails.
+stub_chezmoi() {
+  make_stub chezmoi 'echo "$*" >> "$STUB_BIN/chezmoi.calls"
+case "$1:${!#}" in
+  verify:*/clean/*) exit 0 ;;
+  verify:*)         exit 1 ;;
+  apply:*/broken/*) exit 1 ;;
+  apply:*)          exit 0 ;;
+esac
+exit 0'
+}
+
+@test "reassert: a clean target reads current and is never force-applied" {
+  stub_chezmoi
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$HOME/clean/crush.json"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "current:$HOME/clean/crush.json" ]
+  ! grep -q '^apply' "$STUB_BIN/chezmoi.calls"
+}
+
+@test "reassert: a dirty target is force-applied, scoped to that target only" {
+  stub_chezmoi
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$HOME/dirty/crush.json"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "reasserted:$HOME/dirty/crush.json" ]
+  grep -qF -- "apply --force -- $HOME/dirty/crush.json" "$STUB_BIN/chezmoi.calls"
+}
+
+@test "reassert: a failed forced apply reads failed and returns 1" {
+  stub_chezmoi
+  run bash -c '. "$LIBFILE"; czu_reassert_targets "$HOME/broken/crush.json"'
+  [ "$status" -eq 1 ]
+  [ "$output" = "failed:$HOME/broken/crush.json" ]
+}
+
+@test "reassert: emits one token per target and keeps going past a failure" {
+  stub_chezmoi
+  run bash -c '. "$LIBFILE"; czu_reassert_targets \
+    "$HOME/clean/a.json" "$HOME/broken/b.json" "$HOME/dirty/c.json"'
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "current:$HOME/clean/a.json" ]
+  [ "${lines[1]}" = "failed:$HOME/broken/b.json" ]
+  [ "${lines[2]}" = "reasserted:$HOME/dirty/c.json" ]
+}
