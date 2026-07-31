@@ -95,10 +95,21 @@ czu_sync_branch() {
 #
 # Deliberately ADVISORY, never fatal: it always returns 0. In-flight feature-branch
 # work is legitimate and must still apply. The goal is only that you cannot drift
-# dozens of commits without being told.
+# dozens of commits without being told — in EITHER direction. A box whose local
+# main is AHEAD of origin/main (e.g. a recovery session merged a fork into it
+# without pushing) renders a tree no other machine has, and hard-wedges czu with
+# `nonff` the moment upstream main moves; that was invisible when only the
+# behind count was reported.
 #
 # Exactly one status token on stdout, so callers and tests can branch on it:
-#   current | behind:<n> | off-main:<branch>:<n> | detached | unknown
+#   current | behind:<n> | ahead:<n> | diverged:<behind>:<ahead>
+#   | off-main:<branch>:<n> | detached | unknown
+#
+# `behind` and `ahead` are both reported because divergence in EITHER direction
+# is a hazard: behind renders a stale tree; ahead renders a tree no other machine
+# has — and a local main that got merged into (e.g. a recovery session merging a
+# fork) will hard-wedge czu with `nonff` the moment upstream main moves. The
+# token stays ADVISORY (rc 0) so in-flight work still applies.
 czu_branch_drift() {
   _czu_dir=$1
 
@@ -116,12 +127,22 @@ czu_branch_drift() {
 
   _czu_behind=$(git -C "$_czu_dir" rev-list --count "HEAD..origin/main" 2>/dev/null) || _czu_behind=""
   [ -n "$_czu_behind" ] || { echo unknown; return 0; }
+  _czu_ahead=$(git -C "$_czu_dir" rev-list --count "origin/main..HEAD" 2>/dev/null) || _czu_ahead=""
+  [ -n "$_czu_ahead" ] || { echo unknown; return 0; }
 
   if [ "$_czu_dbr" != "main" ]; then
     echo "off-main:${_czu_dbr}:${_czu_behind}"
     return 0
   fi
 
-  [ "$_czu_behind" -gt 0 ] && echo "behind:${_czu_behind}" || echo current
+  if [ "$_czu_behind" -gt 0 ] && [ "$_czu_ahead" -gt 0 ]; then
+    echo "diverged:${_czu_behind}:${_czu_ahead}"
+  elif [ "$_czu_behind" -gt 0 ]; then
+    echo "behind:${_czu_behind}"
+  elif [ "$_czu_ahead" -gt 0 ]; then
+    echo "ahead:${_czu_ahead}"
+  else
+    echo current
+  fi
   return 0
 }

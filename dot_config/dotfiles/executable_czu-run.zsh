@@ -105,6 +105,10 @@ case "$czu_drift" in
     item ok "dotfiles — on main, current" ;;
   behind:*)
     warn "dotfiles — main is ${czu_drift_parts[2]} commits behind origin/main; applying anyway" ;;
+  ahead:*)
+    warn "dotfiles — main is ${czu_drift_parts[2]} commits AHEAD of origin/main (unpushed local commits). Applying a tree no other machine has; push or reset to origin/main once this is resolved." ;;
+  diverged:*)
+    warn "dotfiles — main has DIVERGED from origin/main: ${czu_drift_parts[2]} behind, ${czu_drift_parts[3]} ahead. This will hard-wedge with nonff on the next upstream commit; rebase or reset to origin/main." ;;
   off-main:*)
     if (( ${czu_drift_parts[3]:-0} > 0 )); then
       warn "dotfiles — applying from branch '${czu_drift_parts[2]}', ${czu_drift_parts[3]} commits BEHIND origin/main. Your \$HOME is being rendered from a stale tree; switch to main once this work is merged."
