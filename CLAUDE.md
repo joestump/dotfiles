@@ -1,6 +1,8 @@
 # Working on this repo (Claude, read this first)
 
-This is Joe's chezmoi-managed dotfiles repo (source of truth: `~/src/dotfiles`, remote: https://gitea.stump.rocks/joestump/dotfiles). It is a **production service** — every StumpCloud node, every ephemeral SSH bootstrap, and every Claude Code session on Joe's machines runs on what lands here. Breakage here has OMG scope (see `~/.claude/CLAUDE.md` § "OMGs").
+This is Joe's chezmoi-managed dotfiles repo (remote: https://gitea.stump.rocks/joestump/dotfiles). It is a **production service** — every StumpCloud node, every ephemeral SSH bootstrap, and every Claude Code session on Joe's machines runs on what lands here. Breakage here has OMG scope (see `~/.claude/CLAUDE.md` § "OMGs").
+
+**Two checkouts, two roles.** The WORKBENCH is `~/src/dotfiles` — where you are now, where all editing happens; branches and dirty trees are fine here because chezmoi never reads it. PRODUCTION is chezmoi's default source dir (`~/.local/share/chezmoi`), which `czu` keeps on clean upstream `main` — nothing and nobody edits it, and czu refuses to sync while it is dirty. Work reaches machines **only by merging to `main` upstream**; committing here without a merged PR changes nothing anywhere.
 
 Before you edit anything, load the `/chezmoi` skill — it ships from the private `claude-personal` marketplace (source: `~/Claude/skills/chezmoi/SKILL.md`), so it is available in Claude Code, Claude Desktop and Crush, in any directory, not just this repo — it encodes the source-vs-target rules, the run-script prefixes, the ui-lib.sh + gum theme, the externals model, and the Vault Agent secrets flow. Ignoring those conventions will silently break other machines on the next `chezmoi apply`.
 
@@ -15,7 +17,7 @@ Before you edit anything, load the `/chezmoi` skill — it ships from the privat
 
 ## Non-obvious rules
 
-- **Never edit `~/.<file>` directly** if it's chezmoi-managed. Edit the source under `~/src/dotfiles/` (or use `chezmoi edit <target>`), then `chezmoi apply`. The next apply on any other machine will clobber a rendered-file edit.
+- **Never edit `~/.<file>` directly** if it's chezmoi-managed — and never use `chezmoi edit` (it opens the PRODUCTION clone, which is reset to upstream main). Edit the workbench (`~/src/dotfiles`), and to try the change locally before it merges: `chezmoi apply --source ~/src/dotfiles <target>` — czu reverts it to merged main at the next sync, which is the point.
 - **Never re-run the OMZ installer or touch `~/.oh-my-zsh/` outside `custom/`.** OMZ self-updates; we only own `custom/*`. See `.chezmoiignore`.
 - **Secrets never live in the repo.** Vault Agent renders `~/.config/vault/secrets-*.env` from OpenBao on a schedule; `custom/00-secrets.zsh` sources them. If you catch a `.env` file or a hardcoded token about to be committed, stop — the gitleaks pre-commit hook (`.githooks/pre-commit`) will block it anyway.
 - **Match the visible style.** All apply-time output flows through ui-lib.sh (`heading "📦 …"`, `item ok "…"`, `step "title" -- cmd`). New scripts must too — a raw `echo` in the middle of czu output is a bug. Palette: pink 213, mauve 177, sky 117, green 150 (ok), red 210 (bad), yellow 223 (warn), dim 244.

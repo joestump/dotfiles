@@ -15,7 +15,7 @@ non-secret config, and secrets.
 
 | Concern | Tool | Notes |
 | --- | --- | --- |
-| Dotfile management | chezmoi | source dir `~/src/dotfiles` = the git repo |
+| Dotfile management | chezmoi | two checkouts: PRODUCTION = chezmoi's default source dir (`~/.local/share/chezmoi`, clean upstream `main`, enforced by czu); WORKBENCH = `~/src/dotfiles` (development; chezmoi never reads it) |
 | Backing remote | Gitea | `https://gitea.stump.rocks/joestump/dotfiles` (private), HTTPS + osxkeychain token |
 | Shell framework | Oh My Zsh | pre-installed at `~/.oh-my-zsh`; **never** re-installed or overwritten |
 | Per-project config | direnv | `.envrc` files; non-secret only |
@@ -97,14 +97,14 @@ automatically.)
 **Add a helper:** drop a `*.zsh` in `~/.oh-my-zsh/custom/`, `chezmoi add` it,
 commit, push.
 
-**Apply elsewhere:** `chezmoi init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git`,
-then `chezmoi update` to pull + apply.
+**Apply elsewhere:** `chezmoi init --apply https://gitea.stump.rocks/joestump/dotfiles.git`
+(clones production into chezmoi's default source dir), then `czu` to sync + apply.
 
 ## Portability & "my own Oh My Zsh ecosystem"
 
 Three chezmoi features make this fully portable to any machine with Gitea access:
 
-1. **`chezmoi init --source ~/src/dotfiles --apply <repo>`** — one command clones + applies everything.
+1. **`chezmoi init --apply <repo>`** — one command clones production + applies everything.
 2. **`run_once_` scripts** — `run_once_before_10-install-prereqs.sh` installs
    Homebrew, the CLI tools, and Oh My Zsh (with `KEEP_ZSHRC=yes` so it never
    clobbers the managed `.zshrc`); `run_once_after_20-configure-git-hooks.sh`
