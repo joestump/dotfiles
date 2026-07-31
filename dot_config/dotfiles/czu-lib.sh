@@ -146,3 +146,43 @@ czu_branch_drift() {
   fi
   return 0
 }
+
+# czu_reassert_targets TARGET...
+# Scoped `chezmoi apply --force` for targets that an APPLICATION also writes.
+#
+# chezmoi tracks the state it last wrote per target; when an app rewrites one
+# of these files in place (Crush rewrites ~/.config/crush/crush.json during
+# config migrations and TUI actions), every subsequent apply trips the
+# changed-since-last-write guard. On a TTY that is an interactive prompt on
+# EVERY czu; under the scheduled (no-TTY) timer the file is silently skipped
+# instead — either way the render stops landing, forever, because answering
+# the prompt once doesn't stop the app writing again.
+#
+# For a target listed here the RENDER is the whole truth (runtime state
+# belongs in the app's own data config, e.g. ~/.local/share/crush-signal/
+# crush.json), so the resolution is always "overwrite": verify the target
+# first, and only when it differs force-apply just that target, before the
+# main apply runs. The main apply then finds it clean and never needs to ask.
+#
+# One status token per target on stdout so callers and tests can branch:
+#   current:<target>     already matches the render; nothing written
+#   reasserted:<target>  differed (app rewrite or pending render change);
+#                        overwritten with the render
+#   failed:<target>      forced apply failed (also: target not managed);
+#                        the main apply will surface the real error
+# Returns 1 if any target failed, 0 otherwise. Callers should treat failure
+# as advisory — the main apply is the authoritative error path.
+czu_reassert_targets() {
+  _czu_rrc=0
+  for _czu_target in "$@"; do
+    if chezmoi verify -- "$_czu_target" >/dev/null 2>&1; then
+      echo "current:${_czu_target}"
+    elif chezmoi apply --force -- "$_czu_target" >/dev/null 2>&1; then
+      echo "reasserted:${_czu_target}"
+    else
+      echo "failed:${_czu_target}"
+      _czu_rrc=1
+    fi
+  done
+  return $_czu_rrc
+}

@@ -128,6 +128,24 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # crush.json WITHOUT the openai provider, then the next interactive apply puts
 # it back — the file ping-pongs every 6h and czu always looks dirty.
 [ -r "$HOME/.oh-my-zsh/custom/env.zsh" ] && . "$HOME/.oh-my-zsh/custom/env.zsh"
+
+# Reassert app-rewritten declarative targets BEFORE the main apply. Crush
+# rewrites its own ~/.config/crush/crush.json (config migrations, TUI
+# actions), which trips chezmoi's changed-since-last-write guard from then
+# on: an interactive czu PROMPTS on every run, and the scheduled (no-TTY)
+# apply silently skips the file — either way the render stops landing. The
+# targets listed here are fully declarative (runtime state lives in the app's
+# own data config), so czu_reassert_targets overwrites them scoped and
+# unprompted; the main apply below then finds them clean. Failure here is
+# advisory — the main apply is the authoritative error path.
+czu_reassert_out="$(czu_reassert_targets "$HOME/.config/crush/crush.json")"
+for czu_reassert_line in ${(f)czu_reassert_out}; do
+  case "$czu_reassert_line" in
+    reasserted:*) item dim "${czu_reassert_line#reasserted:$HOME/} — an app had rewritten it; render reasserted" ;;
+    failed:*)     warn "could not reassert ${czu_reassert_line#failed:} — the main apply will report why" ;;
+  esac
+done
+
 chezmoi apply "$@" \
   || fail "chezmoi apply failed — see ~/.cache/chezmoi-apply.log"
 
