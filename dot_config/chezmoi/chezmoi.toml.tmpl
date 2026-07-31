@@ -1,15 +1,23 @@
 # chezmoi's own config. Managed by chezmoi (source: this file) — edit here, never
 # the rendered ~/.config/chezmoi/chezmoi.toml.
 
-# The source tree is a NORMAL checkout under ~/src, edited like every other repo,
-# rather than chezmoi's default private ~/.local/share/chezmoi. One checkout, one
-# branch, no drift between "the repo I edit" and "the repo that renders". The old
-# location used to be a second clone that could silently sit on a different branch
-# — meaning `chezmoi apply` rendered a tree nobody was looking at.
+# NO sourceDir — deliberately. chezmoi renders from its DEFAULT source location
+# (~/.local/share/chezmoi): the PRODUCTION clone, which czu keeps on clean
+# upstream main and which nothing else ever edits. Development happens in a
+# separate ordinary checkout at ~/src/dotfiles (branches, dirt, worktrees — all
+# fine there) that chezmoi never reads; work reaches machines only by merging to
+# main upstream. Two checkouts, two roles, enforced by czu.
 #
-# Anything reading this path at runtime should ask `chezmoi source-path` (shell) or
-# use {{ "{{ .chezmoi.sourceDir }}" }} (templates) rather than hardcoding it again.
-sourceDir = {{ printf "%s/src/dotfiles" .chezmoi.homeDir | quote }}
+# History, because both failure modes have burned us: a single shared checkout
+# (the previous model) entangled workbench and production — parked feature
+# branches rendered into $HOME, unmerged commits ran in production, and czu grew
+# stash/branch machinery that failed constantly. Before that, a two-clone setup
+# ALSO failed — but only because neither clone had an enforced role, so the
+# applied one silently rotted on a stale branch. The fix is not one checkout; it
+# is czu_sync_prod refusing to render anything but clean upstream main.
+#
+# Anything reading the render path at runtime should ask `chezmoi source-path`
+# (shell) or use {{ "{{ .chezmoi.sourceDir }}" }} (templates), never hardcode it.
 
 [git]
     # Deliberately OFF. With these on, chezmoi committed and pushed on its own

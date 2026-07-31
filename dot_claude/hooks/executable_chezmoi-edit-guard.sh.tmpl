@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # PostToolUse (Edit|Write|MultiEdit) guard.
 #
-# When an agent edits a file inside the chezmoi SOURCE tree, inject a reminder to
-# finish the dotfiles loop (chezmoi apply -> commit -> push) and drop a per-session
-# marker so the Stop guard (chezmoi-commit-guard.sh) knows this session touched it.
+# When an agent edits a file inside the dotfiles WORKBENCH (~/src/dotfiles),
+# inject a reminder to finish the dotfiles loop (commit -> push -> PR) and drop
+# a per-session marker so the Stop guard (chezmoi-commit-guard.sh) knows this
+# session touched it. Editing the PRODUCTION clone (chezmoi's default source
+# dir, which czu keeps on clean upstream main) gets a hard warning instead:
+# nothing is ever edited there, and czu will refuse to sync until the edit is
+# gone. Both paths are baked via homeDir, NOT {{ "{{ .chezmoi.sourceDir }}" }} —
+# mid-migration that variable can still point at the old shared checkout.
 #
 # Managed by chezmoi: dot_claude/hooks/executable_chezmoi-edit-guard.sh
 set -euo pipefail
 
-CHEZMOI_SRC={{ .chezmoi.sourceDir | quote }}
+WORKBENCH={{ printf "%s/src/dotfiles" .chezmoi.homeDir | quote }}
+PROD={{ printf "%s/.local/share/chezmoi" .chezmoi.homeDir | quote }}
 
 # Never wedge the user: if jq is missing, silently no-op.
 command -v jq >/dev/null 2>&1 || exit 0
@@ -25,15 +31,20 @@ case "$fp" in
 esac
 
 case "$abs" in
-  "$CHEZMOI_SRC"/*)
+  "$PROD"/*)
+    rel="${abs#"$PROD"/}"
+    msg="STOP: you just edited ${rel} in the PRODUCTION chezmoi clone (${PROD}). Nothing is ever edited there — czu resets it to upstream main and will refuse to sync while it is dirty. Move this change into the workbench (${WORKBENCH}), then discard it here: git -C ${PROD} checkout -- . && git -C ${PROD} clean -fd"
+    jq -cn --arg m "$msg" '{hookSpecificOutput:{hookEventName:"PostToolUse", additionalContext:$m}}'
+    ;;
+  "$WORKBENCH"/*)
     sid="$(printf '%s' "$input" | jq -r '.session_id // "nosession"' 2>/dev/null || echo nosession)"
     sid="$(printf '%s' "$sid" | tr -cd 'a-zA-Z0-9_-')"
     marker_dir="${TMPDIR:-/tmp}/claude-chezmoi-guard"
     mkdir -p "$marker_dir"
     : > "$marker_dir/$sid"
 
-    rel="${abs#"$CHEZMOI_SRC"/}"
-    msg="You just edited a chezmoi SOURCE file (${rel}). Before you end this turn you MUST finish the dotfiles loop, or the repo lands on a dirty branch and the rendered file drifts: (1) run \`chezmoi apply\`, (2) commit in ${CHEZMOI_SRC}, (3) push. This is required by Joe's dotfiles workflow."
+    rel="${abs#"$WORKBENCH"/}"
+    msg="You just edited a dotfiles WORKBENCH file (${rel}). Before you end this turn you MUST finish the dotfiles loop, or the change strands on a dirty tree and never reaches any machine: (1) commit in ${WORKBENCH}, (2) push the branch and open a PR — machines only render what merges to upstream main. To try the change locally first: chezmoi apply --source ${WORKBENCH} <target> (czu reverts it at the next sync). This is required by Joe's dotfiles workflow."
     jq -cn --arg m "$msg" '{hookSpecificOutput:{hookEventName:"PostToolUse", additionalContext:$m}}'
     ;;
   *)

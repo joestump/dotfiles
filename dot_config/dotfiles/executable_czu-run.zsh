@@ -73,50 +73,40 @@ have gum && [[ -t 1 ]] && gum style --foreground 213 --bold "⟳ czu · updating
 heading "📥 Sync"
 . "$HOME/.config/dotfiles/czu-lib.sh" 2>/dev/null \
   || fail "czu-lib.sh missing — run 'chezmoi apply' to reinstall it"
-CZU_SRC="$(chezmoi source-path 2>/dev/null || print -r -- "$HOME/src/dotfiles")"
-czu_out="$(czu_sync_branch "$CZU_SRC" 2>&1)"; czu_rc=$?
-case "$czu_out" in
-  pulled)            item ok  "dotfiles — synced from fork" ;;
-  skip-local-branch) item dim "dotfiles — branch not on fork yet; nothing to pull" ;;
-  stash-conflict)
-    fail "git sync: your local edits in $CZU_SRC conflict with what was pulled. The pull SUCCEEDED and your edits are safe in a git stash — run 'git -C $CZU_SRC stash pop' and resolve, or 'git -C $CZU_SRC stash drop' to discard them, then re-run czu." ;;
-esac
-if (( czu_rc != 0 )) && [[ "$czu_out" == nonff ]]; then
-  # By far the most common cause: this box is parked on a feature branch that was
-  # merged upstream through a fork PR, so origin's copy was rewritten and the two
-  # histories diverged. Nothing is wrong with the local tree — it is just finished
-  # work. Say that, instead of "check for local edits/conflicts", which sends you
-  # hunting for a dirty file that isn't there.
-  _czu_br="$(git -C "$CZU_SRC" symbolic-ref --quiet --short HEAD 2>/dev/null || print -r -- '?')"
-  fail "git sync: '$_czu_br' has diverged from origin/$_czu_br and cannot fast-forward, so NOTHING WAS APPLIED. If that branch is already merged, 'git -C $CZU_SRC checkout main && git -C $CZU_SRC pull --ff-only' and re-run czu. Otherwise rebase it onto origin/main."
-fi
-(( czu_rc == 0 )) \
-  || fail "git sync failed ($czu_out) — check for local edits/conflicts in $CZU_SRC"
+(( ${+functions[czu_sync_prod]} )) \
+  || fail "czu-lib.sh is stale (no czu_sync_prod) — run 'chezmoi apply' to update it"
 
-# Advisory only — czu still applies. czu_sync_branch reports success both when a
-# feature branch has nothing to pull and when it fast-forwards from its own stale
-# counterpart, so neither outcome says anything about how far the tree has fallen
-# behind main. Without this, a box parked on a feature branch renders $HOME from
-# that branch forever, silently. See czu_branch_drift in czu-lib.sh.
-czu_drift="$(czu_branch_drift "$CZU_SRC" 2>/dev/null)"
-czu_drift_parts=(${(s.:.)czu_drift})
-case "$czu_drift" in
-  current)
-    item ok "dotfiles — on main, current" ;;
-  behind:*)
-    warn "dotfiles — main is ${czu_drift_parts[2]} commits behind origin/main; applying anyway" ;;
-  ahead:*)
-    warn "dotfiles — main is ${czu_drift_parts[2]} commits AHEAD of origin/main (unpushed local commits). Applying a tree no other machine has; push or reset to origin/main once this is resolved." ;;
-  diverged:*)
-    warn "dotfiles — main has DIVERGED from origin/main: ${czu_drift_parts[2]} behind, ${czu_drift_parts[3]} ahead. This will hard-wedge with nonff on the next upstream commit; rebase or reset to origin/main." ;;
-  off-main:*)
-    if (( ${czu_drift_parts[3]:-0} > 0 )); then
-      warn "dotfiles — applying from branch '${czu_drift_parts[2]}', ${czu_drift_parts[3]} commits BEHIND origin/main. Your \$HOME is being rendered from a stale tree; switch to main once this work is merged."
-    else
-      item dim "dotfiles — on branch '${czu_drift_parts[2]}' (level with origin/main)"
-    fi ;;
-  detached)
-    warn "dotfiles — detached HEAD; applying from an unnamed commit" ;;
+# Two checkouts, two roles (see czu-lib.sh): czu renders $HOME from the
+# PRODUCTION clone — chezmoi's default source dir — which czu_sync_prod keeps
+# on clean upstream main. The workbench at ~/src/dotfiles is where development
+# happens and czu deliberately never touches it; work reaches this box only by
+# merging upstream. --source is passed explicitly everywhere below, so this
+# flow also SELF-MIGRATES a box whose rendered chezmoi.toml still points at
+# the old shared checkout: the first apply from production rewrites that
+# config, and every later chezmoi command agrees by default.
+CZU_PROD="${XDG_DATA_HOME:-$HOME/.local/share}/chezmoi"
+CZU_DEV="$HOME/src/dotfiles"
+
+# URL for a first-time clone, read from the workbench's origin remote if one
+# exists (identity-free — no owner hardcoded here). Boxes bootstrapped by
+# czinit already cloned production directly and never hit this path.
+czu_url=""
+[[ -d "$CZU_DEV/.git" ]] && czu_url="$(git -C "$CZU_DEV" remote get-url origin 2>/dev/null)"
+
+czu_out="$(czu_sync_prod "$CZU_PROD" "$czu_url" 2>&1)"
+case "$czu_out" in
+  cloned)  item ok  "dotfiles — production clone created at ${CZU_PROD/#$HOME/~}" ;;
+  synced)  item ok  "dotfiles — synced to origin/main" ;;
+  current) item ok  "dotfiles — current with origin/main" ;;
+  offline) warn "dotfiles — no network; applying last-synced main" ;;
+  dirty)
+    fail "production clone at $CZU_PROD has uncommitted edits. Production is never edited directly — move the change to the workbench ($CZU_DEV), then discard it here (git -C $CZU_PROD checkout -- . ; git -C $CZU_PROD clean -fd) and re-run czu." ;;
+  wedged)
+    fail "production clone at $CZU_PROD is not on main and could not switch back. It is disposable: inspect with 'git -C $CZU_PROD status', then 'git -C $CZU_PROD switch -f main' — or delete the directory and re-run czu to re-clone." ;;
+  nonff)
+    fail "production clone has commits origin/main lacks — someone committed in production (work belongs in $CZU_DEV) or upstream main was rewritten. If those commits matter, move them to the workbench FIRST; then 'git -C $CZU_PROD reset --hard origin/main' and re-run czu." ;;
+  clone-failed)
+    fail "no production clone at $CZU_PROD and could not create one${czu_url:+ from $czu_url}. Clone the dotfiles repo there manually and re-run czu." ;;
 esac
 
 # Source the vault-rendered env so env-conditional templates (e.g. crush.json
@@ -138,7 +128,7 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # own data config), so czu_reassert_targets overwrites them scoped and
 # unprompted; the main apply below then finds them clean. Failure here is
 # advisory — the main apply is the authoritative error path.
-czu_reassert_out="$(czu_reassert_targets "$HOME/.config/crush/crush.json")"
+czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" "$HOME/.config/crush/crush.json")"
 for czu_reassert_line in ${(f)czu_reassert_out}; do
   case "$czu_reassert_line" in
     reasserted:*) item dim "${czu_reassert_line#reasserted:$HOME/} — an app had rewritten it; render reasserted" ;;
@@ -146,7 +136,7 @@ for czu_reassert_line in ${(f)czu_reassert_out}; do
   esac
 done
 
-chezmoi apply "$@" \
+chezmoi apply --source "$CZU_PROD" "$@" \
   || fail "chezmoi apply failed — see ~/.cache/chezmoi-apply.log"
 
 heading "🔐 Secrets"
