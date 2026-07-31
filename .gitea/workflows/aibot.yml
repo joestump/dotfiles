@@ -5,7 +5,23 @@
 name: aibot
 
 on:
-  pull_request:
+  # pull_request_target, NOT pull_request: PRs from joestump-agent/dotfiles are a
+  # FORK in Gitea's eyes, and Gitea (like GitHub) withholds repo secrets from
+  # pull_request-triggered workflows on forks — the AIBOT_ZAI_* secrets always
+  # rendered empty on agent PRs. It silently never surfaced before because every
+  # prior fork-PR run happened to hit a `synchronize` event, which entrypoint.sh
+  # skips before it ever reads a secret; the first `opened` event on a fork PR
+  # (#113) exposed it as a hard failure on the required check.
+  # pull_request_target runs with the BASE repo's secrets/token regardless of
+  # where the head branch lives, so the checkout step below (which already
+  # explicitly fetches the PR's head repo+ref for fork PRs) now gets a bot that
+  # can actually authenticate. The trade-off: this also means the checked-out
+  # code runs WITH those secrets, so the trusted-author check in the `if:` below
+  # is load-bearing, not decorative — it's what keeps a stranger's drive-by fork
+  # PR from harvesting AIBOT_GITEA_TOKEN / AIBOT_ZAI_API_TOKEN via a malicious
+  # crush.json/.mcp.json MCP server definition. Do not widen that allowlist
+  # without re-thinking this comment.
+  pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]   # automatic code review
   issue_comment:
     types: [created]            # PR conversation comments → review / merge
@@ -23,20 +39,26 @@ jobs:
   aibot:
     runs-on: ubuntu-latest
     # Cheap gate: auto-review on non-draft PR events, else only when the actor is
-    # the PR's own author. (entrypoint.sh loop-guards the bot's own pushes.)
+    # the PR's own author. (entrypoint.sh loop-guards the bot's own pushes.) The
+    # trusted-author check is required because this job now runs with secrets
+    # against whatever the PR's head branch contains (see the `on:` comment).
     if: >
-      (github.event_name == 'pull_request'
-        && github.event.pull_request.draft == false)
-      ||
-      (github.event_name == 'issue_comment'
-        && github.event.issue.pull_request != null
-        && github.event.comment.user.login == github.event.issue.user.login)
-      ||
-      (github.event_name == 'pull_request_review_comment'
-        && github.event.sender.login == github.event.pull_request.user.login)
-      ||
-      (github.event_name == 'pull_request_review'
-        && github.event.sender.login == github.event.pull_request.user.login)
+      contains(fromJSON('["joestump", "joestump-agent"]'),
+        github.event_name == 'issue_comment' && github.event.issue.user.login || github.event.pull_request.user.login)
+      && (
+        (github.event_name == 'pull_request_target'
+          && github.event.pull_request.draft == false)
+        ||
+        (github.event_name == 'issue_comment'
+          && github.event.issue.pull_request != null
+          && github.event.comment.user.login == github.event.issue.user.login)
+        ||
+        (github.event_name == 'pull_request_review_comment'
+          && github.event.sender.login == github.event.pull_request.user.login)
+        ||
+        (github.event_name == 'pull_request_review'
+          && github.event.sender.login == github.event.pull_request.user.login)
+      )
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4
