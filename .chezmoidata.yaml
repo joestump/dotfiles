@@ -296,6 +296,19 @@ ssh:
       ControlPath: "~/.ssh/cm-%C"
       ControlPersist: "10m"
 
+# Family / personal contacts. Non-secret phone numbers for people the agent
+# needs to reach (Signal, iMessage, etc.). Referenced as
+# {{ .contacts.chelsea.phone }}, {{ .contacts.jon.phone }}, etc.
+contacts:
+  chelsea:
+    name: "Chelsea Stump"
+    relation: "wife"
+    phone: "+15419137301"
+  jon:
+    name: "Jon Stump"
+    relation: "brother"
+    phone: "+17347090582"
+
 # Claude Code permission posture, merged into ~/.claude/settings.json by
 # .chezmoiscripts/run_onchange_after_48-claude-settings-merge.sh. These are the
 # SHARED DEFAULTS = interactive/attended (Claude asks before acting) — the right
