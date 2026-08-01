@@ -249,13 +249,15 @@
       },
       "timeout": 120,
       "disabled": false
-    },
+    }
+{{ if eq .chezmoi.os "darwin" }},
     "msgbrowse": {
       "type": "http",
       "url": "{{ .msgbrowseMcpEndpoint }}",
       "timeout": 120,
       "disabled": false
     }
+{{ end }}
   },
   "options": {
     "disable_default_providers": true,
