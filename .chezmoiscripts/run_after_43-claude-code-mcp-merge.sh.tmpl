@@ -19,16 +19,27 @@ CJ="$HOME/.claude.json"
 heading "🔗 Claude Code MCP"
 [ -f "$CJ" ] || { item dim "no ~/.claude.json — skipping"; exit 0; }
 
-# github + karakeep + outline tokens are baked here at apply time (from OpenBao).
-# github is the REMOTE hosted GitHub MCP (api.githubcopilot.com) — native http with
-# a PAT Bearer, exactly like outline: no Docker, no local runtime. karakeep is the
-# npm @karakeep/mcp via npx (no Docker). gitea needs NO token in the config: it
-# inherits GITEA_ACCESS_TOKEN from the launching shell (env.zsh) — nothing
-# gitea-related lands in ~/.claude.json beyond GITEA_HOST.
+# github + karakeep + outline + gitea tokens are baked here at apply time (from
+# OpenBao). github is the REMOTE hosted GitHub MCP (api.githubcopilot.com) — native
+# http with a PAT Bearer, exactly like outline: no Docker, no local runtime.
+# karakeep is the npm @karakeep/mcp via npx (no Docker).
+#
+# gitea used to be the exception: the config carried only GITEA_HOST and the server
+# was expected to inherit GITEA_ACCESS_TOKEN from the launching shell (env.zsh).
+# That assumption only holds when a human starts `claude` from an INTERACTIVE zsh —
+# oh-my-zsh custom files are not loaded by a login-less shell, so any headless or
+# daemon-launched session (the joestump-agent runner, systemd --user, cron, a
+# desktop launcher) started gitea-mcp with no token at all. The failure was silent
+# and late: gitea-mcp answers reads on public repos unauthenticated, so issues, PRs
+# and Actions all worked and only the first WRITE failed, with "token is required".
+# Bake it like the others — a subprocess that gets its token from the config works
+# no matter who launched it.
+#
 # Fallbacks read the prior value from its current home (github → Bearer header;
 # ltrimstr is a no-op on a bare token, so a pre-migration env value also passes).
 GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '(.mcpServers.github.headers.Authorization // .mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // "") | ltrimstr("Bearer ")' "$CJ")")"
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$CJ")")"
+GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.gitea.env.GITEA_ACCESS_TOKEN // ""'      "$CJ")")"
 # outline is native http (not a subprocess), so it can't inherit the shell env, and
 # Claude Code doesn't expand ${VAR} in http headers — so bake the Bearer token at
 # apply time from the Vault-Agent-rendered secrets (like github/karakeep). The token
@@ -74,10 +85,15 @@ SIG_PATH="{{ .chezmoi.homeDir }}/.local/bin:/usr/bin:/bin:/usr/local/bin"
 SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
 
 desired="$(mcp_base | jq \
-  --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" --arg sb "$SB" --arg cn "$CN" \
+  --arg gh "$GH" --arg kk "$KK" --arg ot "$OT" --arg gt "$GT" --arg sb "$SB" --arg cn "$CN" \
   --arg sburl "$SB_URL" --arg cnurl "$CN_URL" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
     (if $kk != "" then .karakeep.env.KARAKEEP_API_KEY = $kk else . end)
+  # gitea: stdio subprocess reading GITEA_ACCESS_TOKEN from its own env, so it no
+  # longer depends on the launching shell having sourced env.zsh. Guarded on
+  # non-empty for the same reason as github below — a fresh machine before
+  # `vault-oidc-login` must not get an empty token baked in.
+  | (if $gt != "" then .gitea.env.GITEA_ACCESS_TOKEN = $gt else . end)
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
   # github: REMOTE hosted MCP — native http + PAT Bearer (no Docker / local runtime).
   # Only set when the token resolved non-empty so a fresh machine does not get a
