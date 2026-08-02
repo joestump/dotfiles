@@ -59,14 +59,12 @@ CN="$(mcp_secret cairn CAIRN_API_TOKEN "$(jq -r '(.mcpServers.cairn.headers.Auth
 
 # Both base URLs are pushed in from OpenBao (secrets-static.env), same as the
 # tokens — NOT hardcoded here. Crush already reaches both servers through these
-# very vars ($CAIRN_BASE_URL, $SWITCHBOARD_BASE_URL); it expands them at runtime,
+# very vars ($CAIRN_BASE_URL, $SWITCHBOARD_CRUSH_URL); it expands them at runtime,
 # whereas Claude Code doesn't expand ${VAR} in an http url, so bake them at apply
 # time. Fallback recovers the URL already in the live config, so a transient miss
-# leaves a working entry alone. The switchboard path segment is per-client and
-# minted by switchboard, so it stays in chezmoidata.
-SB_URL="$(mcp_env SWITCHBOARD_BASE_URL "")"
-SB_URL="${SB_URL:+${SB_URL}{{ .switchboardMcpPath }}}"
-SB_URL="${SB_URL:-$(jq -r '.mcpServers.switchboard.url // ""' "$CJ")}"
+# leaves a working entry alone. SWITCHBOARD_CLAUDE_CODE_URL is the per-client full
+# MCP URL from OpenBao, matching SWITCHBOARD_CLAUDE_CODE_API_KEY.
+SB_URL="$(mcp_env SWITCHBOARD_CLAUDE_CODE_URL "$(jq -r '.mcpServers.switchboard.url // ""' "$CJ")")"
 CN_URL="$(mcp_env CAIRN_BASE_URL "")"
 CN_URL="${CN_URL:+${CN_URL}/mcp}"
 CN_URL="${CN_URL:-$(jq -r '.mcpServers.cairn.url // ""' "$CJ")}"
