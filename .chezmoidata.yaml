@@ -72,6 +72,12 @@ litellmUrl: "https://litellm.stump.rocks/v1"
 # (secret/users/<you>/switchboard → SWITCHBOARD_CLAUDE_CODE_API_KEY), NOT here.
 switchboardMcpPath: "/mcp/joestump-claude-code-f47b11a4"
 
+# Switchboard's per-client path segment for Crush, same model as above.
+# Crush expands $SWITCHBOARD_BASE_URL at runtime, so only the path segment
+# is baked here. The Bearer comes from OpenBao too
+# (secret/users/<you>/switchboard → SWITCHBOARD_CRUSH_API_KEY).
+switchboardCrushMcpPath: "/mcp/joestump-crush-705ec7dc"
+
 # NOTE: cairn needs no entry here — both halves of its MCP definition come from
 # OpenBao ($CAIRN_BASE_URL + CAIRN_API_TOKEN in secrets-static.env), exactly as
 # Crush already reaches it. See run_after_43/44-claude-*-mcp-merge.
