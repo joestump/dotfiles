@@ -193,6 +193,12 @@
         "stdio",
         "--channel"
       ],
+      "env": {
+        "SIGNAL_MCP_OPERATOR": "$SIGNAL_MCP_OPERATOR",
+        "SIGNAL_MCP_ACCOUNT": "$SIGNAL_MCP_ACCOUNT",
+        "SIGNAL_MCP_PREFIX": "$SIGNAL_MCP_PREFIX",
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      },
 {{- /* channel_reply is LOAD-BEARING for the crush-signal harness: the fork's
        sendChannelReply is a silent no-op when it is absent (no built-in
        default), so without it a channel turn whose model never calls a send
