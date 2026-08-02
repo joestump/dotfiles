@@ -249,7 +249,7 @@
     },
     "switchboard": {
       "type": "http",
-      "url": "$SWITCHBOARD_BASE_URL",
+      "url": "$SWITCHBOARD_BASE_URL{{ .switchboardCrushMcpPath }}",
       "headers": {
         "Authorization": "Bearer $SWITCHBOARD_CRUSH_API_KEY"
       },
