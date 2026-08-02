@@ -281,7 +281,7 @@ However, **the agent MUST notify Joe every time it interacts with Chelsea or Jon
 - **When work completes**: send Joe a summary of what was done and the outcome.
 - If a request is ambiguous, high-risk, or outside the agent's normal scope, check with Joe before acting.
 
-These notifications go to Joe over Signal (the operator's number, `+12062257886`). Use `send` or `send_message_to_user` with `+12062257886`.
+These notifications go to Joe over Signal (the operator's number, `{{ .contacts.joe.phone }}`). Use `send` or `send_message_to_user` with `{{ .contacts.joe.phone }}`.
 
 When Joe says "text Chelsea", "send my wife", "message Jon", etc., use these numbers with `send_message_to_user`. No contact-lookup round-trip needed.
 

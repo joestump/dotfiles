@@ -288,10 +288,16 @@ ssh:
       ControlPath: "~/.ssh/cm-%C"
       ControlPersist: "10m"
 
-# Family / personal contacts. Non-secret phone numbers for people the agent
-# needs to reach (Signal, iMessage, etc.). Referenced as
-# {{ .contacts.chelsea.phone }}, {{ .contacts.jon.phone }}, etc.
+# Family / personal contacts, including the operator himself. Non-secret phone
+# numbers for people the agent needs to reach (Signal, iMessage, etc.).
+# Referenced as {{ .contacts.chelsea.phone }}, {{ .contacts.joe.phone }}, etc.
+# — every number in the agent rules templates from here; none is hardcoded
+# (test/agents-composition.bats pins that).
 contacts:
+  joe:
+    name: "Joe Stump"
+    relation: "operator"
+    phone: "+12062257886"
   chelsea:
     name: "Chelsea Stump"
     relation: "wife"

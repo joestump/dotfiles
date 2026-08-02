@@ -71,6 +71,20 @@ _render_tmpl_linux() {
     bash -c 'chezmoi execute-template --source "$0" --override-data '\''{"chezmoi":{"os":"linux"}}'\'' < "$1"' "$REPO_ROOT" "$tmpl"
 }
 
+# Same as _render_tmpl, but forces the darwin branch — the counterpart of
+# _render_tmpl_linux, so per-OS gates can be asserted from either kind of host.
+_render_tmpl_darwin() {
+  local vars=()
+  while [ "$1" != "--" ]; do
+    vars+=("$1")
+    shift
+  done
+  shift  # consume --
+  local tmpl="$1"
+  env -i HOME="$HOME" PATH="$PATH" "${vars[@]}" \
+    bash -c 'chezmoi execute-template --source "$0" --override-data '\''{"chezmoi":{"os":"darwin"}}'\'' < "$1"' "$REPO_ROOT" "$tmpl"
+}
+
 # ---------------------------------------------------------------------------
 # signal-cli daemon: MUST run in MULTI-ACCOUNT mode (no `-a` flag). A single
 # pinned account crash-loops the daemon when that account is unregistered
@@ -130,6 +144,45 @@ for flag in ("--account","--operator","--prefix"):
   [ "$status" -eq 0 ]
   ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
   ! grep -F -- '"--prefix"' <<<"$output" >/dev/null
+}
+
+@test "crush signal env block carries no self-referential SIGNAL_MCP_* entries" {
+  # "SIGNAL_MCP_X": "$SIGNAL_MCP_X" is inert: crush expands $VAR from its OWN
+  # environment and appends the result to os.Environ() for the child, so a
+  # self-mapping reproduces plain inheritance when the var is set and pins an
+  # EMPTY (set-but-blank) value when it is not — strictly worse than letting
+  # signal-mcp see the var as unset. Identity rides the runtime env (see the
+  # identity-free tests above); this pins the #125 placebo from coming back.
+  run _render_tmpl -- "$CRUSH_TMPL"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+env=json.load(sys.stdin)["mcp"]["signal"].get("env",{})
+bad=[k for k in env if k.startswith("SIGNAL_MCP_")]
+assert not bad, bad
+'
+}
+
+@test "crush signal PATH override is darwin-only and linux keeps its inherited PATH" {
+  # Config env is appended AFTER os.Environ() and the last duplicate key wins,
+  # so a PATH entry REPLACES the child's PATH. The override exists for launchd's
+  # thin PATH on macOS; rendered on Linux it would silently swap a sane
+  # inherited PATH for a mac-shaped one missing ~/.local/bin.
+  run _render_tmpl_darwin -- "$CRUSH_TMPL"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+path=json.load(sys.stdin)["mcp"]["signal"]["env"]["PATH"]
+assert path.split(":")[0].endswith("/.local/bin"), path
+assert "/opt/homebrew/bin" in path.split(":"), path
+'
+  run _render_tmpl_linux -- "$CRUSH_TMPL"
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+sig=json.load(sys.stdin)["mcp"]["signal"]
+assert "env" not in sig, sig.get("env")
+'
 }
 
 @test "crush signal block NEVER renders --trusted-recipient flags (env-only)" {

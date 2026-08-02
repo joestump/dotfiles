@@ -86,6 +86,16 @@ assert \"env_file\" not in h, h
   [[ "$output" == *'"--channels", "signal"'* ]]
 }
 
+@test "harness: crush-signal opts into the switchboard channel too" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # Without this opt-in the switchboard MCP's tools still work but its doorbell
+  # notifications never reach the session — the queue fills silently. The
+  # opt-in is CLI-only in the fork (no config key), so it must ride args.
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"--channels", "switchboard"'* ]]
+}
+
 @test "harness: cmd is an absolute path (harness does not expandHome it)" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   run _render "$HARNESS_TOML"
@@ -164,7 +174,7 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
   grep -q '^SIGNAL_MCP_PREFIX=cc$' "$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
 }
 
-@test "harness: the channel-enabled MCP server is actually named 'signal'" {
+@test "harness: the channel-enabled MCP servers are actually named 'signal' and 'switchboard'" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   # crush matches --channels entries against MCP server names; a rename would
@@ -173,6 +183,7 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
 import json,sys
 mcp = json.load(sys.stdin)[\"mcp\"]
 assert \"signal\" in mcp, sorted(mcp)
+assert \"switchboard\" in mcp, sorted(mcp)
 '"
   [ "$status" -eq 0 ]
 }

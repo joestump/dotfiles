@@ -265,6 +265,23 @@ setup() {
   echo "$CLAUDE_OUT" | grep -qF "/switchboard"
 }
 
+@test "Family contacts (incl. the operator) render from .contacts into every target" {
+  local n
+  for n in "+12062257886" "+15419137301" "+17347090582"; do
+    echo "$CLAUDE_OUT" | grep -qF "$n" || { echo "missing from CLAUDE.md: $n"; return 1; }
+    echo "$CRUSH_OUT"  | grep -qF "$n" || { echo "missing from CRUSH.md: $n";  return 1; }
+    echo "$AGENTS_OUT" | grep -qF "$n" || { echo "missing from AGENTS.md: $n"; return 1; }
+  done
+}
+
+@test "no phone number is hardcoded in the agents templates (data is the source)" {
+  # .chezmoidata.yaml's contacts block is the single source of truth. PR #123
+  # templated Chelsea's and Jon's numbers but left the operator's inline twice;
+  # a literal number here is exactly the drift that splits when data changes.
+  run grep -rEn '\+[0-9]{8,}' "$REPO_ROOT/.chezmoitemplates/agents/"
+  [ "$status" -ne 0 ]
+}
+
 @test "the chezmoi skill is referenced before editing managed files" {
   echo "$CLAUDE_OUT" | grep -qF "Load the \`/chezmoi\` skill"
 }

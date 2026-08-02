@@ -51,7 +51,7 @@
 # the prefix is stripped before the text reaches the agent.
 [harness.crush-signal]
 cmd = "{{ .chezmoi.homeDir }}/.local/bin/crush"
-args = ["--yolo", "--channels", "signal"]
+args = ["--yolo", "--channels", "signal", "--channels", "switchboard"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
 description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel (cc prefix)"

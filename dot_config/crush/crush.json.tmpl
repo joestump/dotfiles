@@ -180,7 +180,17 @@
        OpenBao provisions per-user (secret/users/<whoami>/signal →
        secrets-static.env; the harness daemon loads the systemd flavor, login
        shells source it via 00-secrets.zsh). Rendering numbers here would bake
-       one identity's config into every box; see .chezmoidata.yaml. */ -}}
+       one identity's config into every box; see .chezmoidata.yaml.
+
+       Do NOT add self-referential env entries ("SIGNAL_MCP_X": "$SIGNAL_MCP_X")
+       either: crush expands $VAR from ITS OWN environment and appends the result
+       to os.Environ() for the child, so a self-mapping reproduces plain
+       inheritance when the var is set and pins an EMPTY value when it is not —
+       signal-mcp then sees the var set-but-empty instead of unset. It cannot fix
+       a thin-env launch; that is fixed at the source (the harness env_file /
+       czu-run.zsh sourcing secrets), not here. The gitea block above is not a
+       precedent: it REMAPS a name (GITEA_ACCESS_TOKEN ← $GITEA_TOKEN), which
+       does real work. */ -}}
     "signal": {
       "type": "stdio",
       "command": "uv",
@@ -193,12 +203,18 @@
         "stdio",
         "--channel"
       ],
+{{- if eq .chezmoi.os "darwin" }}
+{{- /* Config env is appended AFTER os.Environ() and the last duplicate key wins,
+       so this REPLACES the child's PATH — darwin-only on purpose. It exists for
+       launchd-spawned crush, whose thin system PATH lacks Homebrew and
+       ~/.local/bin, so uv could not resolve its runtime for the child. On Linux
+       the inherited PATH is already sane and this mac-shaped override would
+       silently clobber it (dropping ~/.local/bin, where this repo installs its
+       binaries). */}}
       "env": {
-        "SIGNAL_MCP_OPERATOR": "$SIGNAL_MCP_OPERATOR",
-        "SIGNAL_MCP_ACCOUNT": "$SIGNAL_MCP_ACCOUNT",
-        "SIGNAL_MCP_PREFIX": "$SIGNAL_MCP_PREFIX",
-        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        "PATH": "{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
       },
+{{- end }}
 {{- /* channel_reply is LOAD-BEARING for the crush-signal harness: the fork's
        sendChannelReply is a silent no-op when it is absent (no built-in
        default), so without it a channel turn whose model never calls a send

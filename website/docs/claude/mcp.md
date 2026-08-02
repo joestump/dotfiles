@@ -21,8 +21,10 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
   in `~/.config/dotfiles/mcp-merge-lib.sh`.
 - **Service base URLs come from OpenBao too** (`mcp_env`), not from the repo — so
   moving a service is one `vault kv put`, and Crush, Code and Desktop all follow.
-  Only a genuinely per-client path segment (switchboard's minted `/mcp/<client>`)
-  stays in `.chezmoidata.yaml`.
+  Switchboard's minted `/mcp/<client>` slug is a per-user credential-path, so it
+  rides OpenBao as well, as a full per-client URL (`SWITCHBOARD_CRUSH_URL` /
+  `SWITCHBOARD_CLAUDE_CODE_URL`) — committed data renders identically on every
+  box, which is exactly what a per-identity value must never do.
 
 ## The servers
 
@@ -35,7 +37,7 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 | `karakeep` | Karakeep bookmarks (`karakeep.stump.rocks`) | stdio | `npx @karakeep/mcp` | both |
 | `outline` | Outline wiki (`outline.stump.rocks`) | `http` (Code) · `mcp-remote` (Desktop) | native / `npx mcp-remote` | both |
 | `signal` | Signal send/receive/react | stdio | `uv run` → signal-cli daemon | both · [setup →](./signal) |
-| `switchboard` | Durable webhook→todo queue (`$SWITCHBOARD_BASE_URL`) | `http` | native | **Code only** |
+| `switchboard` | Durable webhook→todo queue (`$SWITCHBOARD_CLAUDE_CODE_URL`) | `http` | native | **Code only** |
 
 ### Where each token comes from
 
@@ -53,7 +55,7 @@ the KV path, then `:`, then the field (env-var) name. e.g.
 | `gitea` | `GITEA_TOKEN` | **Not in the config** — gitea-mcp inherits it from the login shell (`env.zsh`, from `secret/users/<you>/gitea:GITEA_TOKEN`) |
 | `outline` | `Authorization: Bearer …` | `secret/users/<you>/outline:OUTLINE_API_TOKEN`, via the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
 | `cairn` | `Authorization: Bearer …` | `secret/users/<you>/cairn:CAIRN_API_TOKEN`, baked as a static header — same reason as outline. The **endpoint** comes from OpenBao too (`CAIRN_BASE_URL`) |
-| `switchboard` | `Authorization: Bearer …` | `secret/users/<you>/switchboard:SWITCHBOARD_CLAUDE_CODE_API_KEY`, baked as a static header. Host from `SWITCHBOARD_BASE_URL`; the minted per-client path is `switchboardMcpPath` in `.chezmoidata.yaml` |
+| `switchboard` | `Authorization: Bearer …` | `secret/users/<you>/switchboard:SWITCHBOARD_CLAUDE_CODE_API_KEY`, baked as a static header. The endpoint is the per-client `SWITCHBOARD_CLAUDE_CODE_URL` from the same bag (full URL incl. the minted `/mcp/<client>` slug) |
 
 Rotating any of these is just `vault kv put …` then `chezmoi apply` (the merge
 re-reads OpenBao every run).

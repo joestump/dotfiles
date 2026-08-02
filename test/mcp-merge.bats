@@ -55,13 +55,40 @@ _home_with() {
 }
 
 @test "neither cairn nor switchboard hardcodes a host in the merge scripts" {
-  # Both halves come from OpenBao; only switchboard's per-client PATH is in
-  # chezmoidata. A hostname reappearing here is the regression this guards.
+  # Every half comes from OpenBao — hosts and switchboard's per-client URLs
+  # alike. A hostname reappearing here is the regression this guards.
   run grep -nE 'https?://[^ ]*(cairn|switchboard)' \
     "$REPO_ROOT/.chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl" \
     "$REPO_ROOT/.chezmoiscripts/run_after_44-claude-desktop-mcp-merge.sh.tmpl" \
     "$REPO_ROOT/.chezmoidata.yaml"
   [ "$status" -eq 1 ]   # grep exits 1 = no matches
+}
+
+@test "switchboard MCP URLs are per-client env references end to end (no baked slug)" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # The /mcp/<slug> path segment is a credential-path minted per user+client.
+  # chezmoidata renders identically on every box and identity, so a slug
+  # committed there pairs one user's slug with another box's bearer — the
+  # #122→#127 ping-pong just flipped whose crush was broken. Both halves,
+  # host AND slug, must ride the per-user OpenBao bag:
+  #   crush        SWITCHBOARD_CRUSH_URL        (expanded by crush at runtime)
+  #   claude code  SWITCHBOARD_CLAUDE_CODE_URL  (baked by run_after_43)
+  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$REPO_ROOT/dot_config/crush/crush.json.tmpl' | python3 -c '
+import json,sys
+url = json.load(sys.stdin)[\"mcp\"][\"switchboard\"][\"url\"]
+assert url == \"\$SWITCHBOARD_CRUSH_URL\", url
+'"
+  [ "$status" -eq 0 ]
+  # No minted per-client slug may reappear in committed data or templates.
+  run grep -nE '/mcp/[a-z0-9-]+-(crush|claude-code)-[0-9a-f]+' \
+    "$REPO_ROOT/.chezmoidata.yaml" \
+    "$REPO_ROOT/dot_config/crush/crush.json.tmpl" \
+    "$REPO_ROOT/.chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl"
+  [ "$status" -eq 1 ]   # grep exits 1 = no matches
+  # The claude-code merge reads its per-client URL from the same OpenBao bag.
+  grep -q 'SWITCHBOARD_CLAUDE_CODE_URL' \
+    "$REPO_ROOT/.chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl"
 }
 
 @test "the lib no longer runs a vault query for secrets (code, not comments)" {
