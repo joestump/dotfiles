@@ -1,10 +1,18 @@
 # Managed by chezmoi — do not edit (~/.gitconfig is overwritten on every apply).
 #
-# Identity is derived from whoami using the $USER / $USER-agent convention:
-# every install pairs a human OS user with a <human>-agent bot user, so both
-# the commit name and email are fully deterministic from the login alone.
-# Override on a box whose OS login does not follow the convention by setting
+# The commit NAME and the acting ROLE are derived from whoami using the $USER /
+# $USER-agent convention: every install pairs a human OS user with a
+# <human>-agent bot user, so the login alone says which identity this box acts
+# as. Override on a box whose OS login does not follow the convention by setting
 # agentIdentity in ~/.config/chezmoi/chezmoi.toml [data].
+#
+# The EMAIL is NOT derived, on purpose, and for the human it is not even a
+# per-machine constant. A forge attributes a commit by matching the author email
+# to that ACCOUNT's registered addresses, so an invented address silently costs
+# every commit its avatar, profile link and contribution credit — and the human
+# has a different registered address on each forge. The addresses live in
+# .gitEmail in .chezmoidata.yaml (documented there); which one applies is
+# decided per-repository, below, from the remote URL.
 #
 # Git reads BOTH ~/.config/git/config (the XDG config that carries the Gitea
 # credential helper) and then ~/.gitconfig (this file), IN THAT ORDER. For a
@@ -13,9 +21,8 @@
 # empty value only resets what was read BEFORE it — so a helper declared here
 # can never be reset by the XDG config. See the [credential] note below.
 {{- $user := .agentIdentity | default .chezmoi.username -}}
-{{- $human := trimSuffix "-agent" $user -}}
 {{- $isAgent := hasSuffix "-agent" $user -}}
-{{- $email := printf "%s@stump.wtf" (ternary "agent" $human $isAgent) }}
+{{- $email := ternary .gitEmail.agent .gitEmail.gitea $isAgent }}
 
 [user]
 	name = {{ $user }}
@@ -51,3 +58,26 @@
 [credential "https://gist.github.com"]
 	helper =
 	helper = !{{ $gh }} auth git-credential
+{{ if not $isAgent }}
+# Per-forge identity. The human's registered address differs per forge, so the
+# right one is selected PER REPOSITORY from its remote URL rather than baked in
+# per machine — `hasconfig:remote.*.url` matches any configured remote (git
+# 2.36+). Gitea is the [user] default above, so it also covers a repo that has
+# no remote yet; only GitHub needs an override.
+#
+# All three URL spellings are listed because git does NO scheme normalisation
+# here and this box's GitHub remotes use all of them (HTTPS mostly, SSH where
+# the HTTPS push path is broken). Note the scp-style pattern is `:*/**`, not
+# `:**` — matching is wildmatch with WM_PATHNAME, where `**` only spans `/`
+# when it sits between slashes, so `git@github.com:**` silently matches NOTHING
+# and the repo quietly keeps the Gitea address. Verified against real remotes.
+#
+# The include lands LAST in the config read order, so it wins over [user] above.
+# An agent box renders none of this: one address everywhere.
+[includeIf "hasconfig:remote.*.url:https://github.com/**"]
+	path = {{ .chezmoi.homeDir }}/.config/git/identity-github
+[includeIf "hasconfig:remote.*.url:git@github.com:*/**"]
+	path = {{ .chezmoi.homeDir }}/.config/git/identity-github
+[includeIf "hasconfig:remote.*.url:ssh://git@github.com/**"]
+	path = {{ .chezmoi.homeDir }}/.config/git/identity-github
+{{- end }}

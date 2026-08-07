@@ -1,0 +1,14 @@
+# Managed by chezmoi — do not edit. Pulled in by the `includeIf
+# hasconfig:remote.*.url:...github.com...` blocks in ~/.gitconfig, so it applies
+# only inside a repository that actually has a GitHub remote.
+#
+# Why it exists: the human operator's registered address differs per forge
+# ({{ .gitEmail.gitea }} on Gitea, {{ .gitEmail.github }} on GitHub), and a forge
+# attributes a commit by matching the author email against that ACCOUNT's
+# registered addresses. Committing to a GitHub repo with the Gitea address
+# leaves the commit unattributed there, permanently — history is immutable.
+#
+# Only the email is overridden; the name is inherited from ~/.gitconfig, where
+# it is derived from whoami.
+[user]
+	email = {{ .gitEmail.github }}

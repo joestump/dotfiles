@@ -26,6 +26,26 @@ _render_as() {
     < "$GIT_TMPL"
 }
 
+# Render ~/.gitconfig + the GitHub include into a throwaway $HOME, create a repo
+# with the given remote URL, and report the user.email REAL GIT resolves there.
+# Asserting on git's own answer is the only way to catch an includeIf pattern
+# that silently matches nothing — `git@github.com:**` looked right and matched
+# NOTHING, because wildmatch only lets `**` span `/` between slashes.
+_email_for_remote() {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local username="$1" url="$2"
+  local sb="$BATS_TEST_TMPDIR/gitid-$$"
+  rm -rf "$sb"; mkdir -p "$sb/home/.config/git" "$sb/repo"
+  chezmoi execute-template --source "$REPO_ROOT" \
+    --override-data "{\"chezmoi\":{\"username\":\"$username\",\"homeDir\":\"$sb/home\"}}" \
+    < "$GIT_TMPL" > "$sb/home/.gitconfig"
+  chezmoi execute-template --source "$REPO_ROOT" \
+    < "$REPO_ROOT/dot_config/git/identity-github.tmpl" > "$sb/home/.config/git/identity-github"
+  git -C "$sb/repo" init -q
+  [ -n "$url" ] && git -C "$sb/repo" remote add origin "$url"
+  HOME="$sb/home" XDG_CONFIG_HOME="$sb/home/.config" git -C "$sb/repo" config user.email
+}
+
 # ────── source layout ──────
 
 @test "git-config: source is a dot_ template at repo root" {
@@ -33,10 +53,68 @@ _render_as() {
   basename "$GIT_TMPL" | grep -q '^dot_gitconfig\.tmpl$'
 }
 
-@test "git-config: template hardcodes no identity values" {
-  # No name/email may be baked in — everything derives from whoami.
-  run grep -Eic 'joestump|agent@stump|joe@stump' "$GIT_TMPL"
+@test "git-config: template hardcodes no identity value" {
+  # No address and no handle may be a literal here — the name derives from
+  # whoami, every email comes from .gitEmail in .chezmoidata.yaml.
+  run grep -Eic '@stump\.(wtf|rocks)|@joestump\.net|joestump' "$GIT_TMPL"
   [ "$output" -eq 0 ]
+  grep -q '\.chezmoi\.username' "$GIT_TMPL"
+  grep -q '\.gitEmail\.' "$GIT_TMPL"
+}
+
+@test "git-config: gitEmail declares all three forge addresses" {
+  run chezmoi execute-template --source "$REPO_ROOT" \
+    '{{ .gitEmail.agent }} {{ .gitEmail.gitea }} {{ .gitEmail.github }}'
+  [ "$status" -eq 0 ]
+  # Three distinct, real-looking addresses; the human's must not be an invented
+  # <login>@stump.wtf, which no forge would have registered.
+  local n
+  n="$(tr ' ' '\n' <<< "$output" | grep -cE '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]+$')"
+  [ "$n" -eq 3 ]
+  [ "$(tr ' ' '\n' <<< "$output" | sort -u | wc -l)" -eq 3 ]
+}
+
+# ────── rendered output: per-forge identity, as REAL GIT resolves it ──────
+
+@test "git-config: human commits to Gitea as the Gitea address" {
+  [ "$(_email_for_remote joestump https://gitea.stump.rocks/joestump/dotfiles.git)" \
+    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')" ]
+}
+
+@test "git-config: human commits to GitHub as the GitHub address (https remote)" {
+  [ "$(_email_for_remote joestump https://github.com/joestump/claude-ops.git)" \
+    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')" ]
+}
+
+@test "git-config: human commits to GitHub as the GitHub address (scp-style ssh remote)" {
+  # The case that caught the bad glob: `git@github.com:**` matches NOTHING, so
+  # every SSH-remote GitHub repo silently kept the Gitea address.
+  [ "$(_email_for_remote joestump git@github.com:joestump/claude-ops.git)" \
+    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')" ]
+}
+
+@test "git-config: human commits to GitHub as the GitHub address (ssh:// remote)" {
+  [ "$(_email_for_remote joestump ssh://git@github.com/joestump/claude-ops.git)" \
+    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')" ]
+}
+
+@test "git-config: a repo with no remote falls back to the Gitea address" {
+  [ "$(_email_for_remote joestump "")" \
+    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')" ]
+}
+
+@test "git-config: agent uses one address on every forge" {
+  local want
+  want="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.agent }}')"
+  [ "$(_email_for_remote joestump-agent https://gitea.stump.rocks/joestump/dotfiles.git)" = "$want" ]
+  [ "$(_email_for_remote joestump-agent https://github.com/joestump/claude-ops.git)" = "$want" ]
+  [ "$(_email_for_remote joestump-agent git@github.com:joestump/claude-ops.git)" = "$want" ]
+}
+
+@test "git-config: agent renders no per-forge include at all" {
+  run _render_as "joestump-agent"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"includeIf"* ]]
 }
 
 # ────── rendered output: identity derivation ──────
@@ -54,11 +132,14 @@ _render_as() {
   [[ "$output" == *"email = agent@stump.wtf"* ]]
 }
 
-@test "git-config: human user gets personal identity" {
+@test "git-config: human user gets the Gitea address as the base identity" {
+  local want
+  want="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')"
+  [ -n "$want" ]
   run _render_as "joestump"
   [ "$status" -eq 0 ]
   [[ "$output" == *"name = joestump"* ]]
-  [[ "$output" == *"email = joestump@stump.wtf"* ]]
+  [[ "$output" == *"email = $want"* ]]
 }
 
 @test "git-config: agent email strips suffix from any human name" {
@@ -70,11 +151,17 @@ _render_as() {
   [[ "$output" == *"email = agent@stump.wtf"* ]]
 }
 
-@test "git-config: human email uses the OS login as local-part" {
+@test "git-config: any non-agent login gets the same human email" {
+  # The email is an account-level fact, not a per-login derivation: one human,
+  # one registered address per forge, whatever the OS login happens to be. Only
+  # the NAME follows whoami.
+  local want
+  want="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')"
+  [ -n "$want" ]
   run _render_as "alice"
   [ "$status" -eq 0 ]
   [[ "$output" == *"name = alice"* ]]
-  [[ "$output" == *"email = alice@stump.wtf"* ]]
+  [[ "$output" == *"email = $want"* ]]
 }
 
 # ────── rendered output: global defaults ──────

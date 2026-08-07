@@ -47,6 +47,29 @@
 # ~/.config/crush/CRUSH.md and ~/.config/agents/AGENTS.md.
 agentIdentity: ""
 
+# THE ONE SET OF IDENTITY VALUES THAT CANNOT BE DERIVED — the git commit emails,
+# consumed by dot_gitconfig.tmpl. Everything else about the identity still comes
+# from whoami (the name, and which branch below applies); only these addresses
+# are stated, because there is no rule that maps a login to them.
+#
+# Getting one wrong is not cosmetic. A forge attributes a commit by matching the
+# author email against that ACCOUNT's registered addresses, so an invented
+# address (say <login>@stump.wtf) leaves every commit with no avatar, no profile
+# link and no contribution credit — permanently, since history is immutable.
+#
+# The human has a DIFFERENT registered address per forge, so the git identity is
+# selected by remote URL at runtime (includeIf hasconfig:remote.*.url), not by
+# machine. `gitea` is the default — it is the primary forge, and it is what a
+# repo with no remote yet gets. The agent has one address everywhere, so an
+# agent box takes `agent` unconditionally and no per-forge include is rendered.
+#
+# Forking this setup? Replace these with your own registered addresses, same as
+# githubUser below.
+gitEmail:
+  agent: "agent@stump.wtf"
+  gitea: "joe@stump.rocks"
+  github: "joe@joestump.net"
+
 # UPSTREAM REPO OWNER — the account whose repos the externals, claude-plugins
 # sources, and czinit clone from. This is NOT the acting identity (both
 # identities pull Joe's repos); for "who am I", use whoami + the env, above.
