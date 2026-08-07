@@ -1,6 +1,8 @@
 # Managed by chezmoi. This is the XDG global git config (~/.config/git/config),
-# read ALONGSIDE ~/.gitconfig (which is also chezmoi-managed and carries
-# identity + global defaults). On a key conflict ~/.gitconfig wins.
+# read BEFORE ~/.gitconfig (which is also chezmoi-managed and carries identity +
+# global defaults), so on a single-valued key ~/.gitconfig wins. The helper
+# reset below relies on that order: it can only clear helpers configured
+# EARLIER, which is why ~/.gitconfig must declare no generic credential helper.
 #
 # This file carries ONLY the host-scoped Gitea credential helper — supplies the
 # token (from OpenBao via the Vault Agent) on demand, so private clones need no

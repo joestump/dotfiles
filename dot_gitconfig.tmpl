@@ -6,9 +6,12 @@
 # Override on a box whose OS login does not follow the convention by setting
 # agentIdentity in ~/.config/chezmoi/chezmoi.toml [data].
 #
-# Git reads BOTH ~/.gitconfig (this file) and ~/.config/git/config (the XDG
-# config that carries the Gitea credential helper). On a key conflict
-# ~/.gitconfig wins, which is why identity lives here.
+# Git reads BOTH ~/.config/git/config (the XDG config that carries the Gitea
+# credential helper) and then ~/.gitconfig (this file), IN THAT ORDER. For a
+# single-valued key the last read wins, so identity lives here. But
+# credential.helper is MULTI-valued: values accumulate in read order and an
+# empty value only resets what was read BEFORE it — so a helper declared here
+# can never be reset by the XDG config. See the [credential] note below.
 {{- $user := .agentIdentity | default .chezmoi.username -}}
 {{- $human := trimSuffix "-agent" $user -}}
 {{- $isAgent := hasSuffix "-agent" $user -}}
@@ -27,13 +30,24 @@
 [push]
 	autoSetupRemote = true
 
-[credential]
-	helper = store
+# NO generic [credential] helper here — deliberately. ~/.config/git/config is
+# read BEFORE this file, so its `helper = ""` reset for gitea.stump.rocks cannot
+# clear a helper declared here: a generic helper would be APPENDED to the Gitea
+# chain, and git calls `approve` on every helper in the chain, persisting the
+# rotating OpenBao token to plaintext ~/.git-credentials forever. Bootstrap does
+# not need one either — czinit sets a temporary host-scoped `store` itself, and
+# credential-gitea.sh already falls back to the seeded ~/.git-credentials.
+#
+# gh's absolute path is resolved at render time: it is /opt/homebrew/bin/gh on
+# macOS and /usr/bin/gh on Debian/Ubuntu. Hardcoding either one breaks GitHub
+# HTTPS auth on the other. Same `lookPath | default` idiom as the vault-agent
+# and signal-daemon launchd plists.
+{{- $gh := lookPath "gh" | default "/usr/bin/gh" }}
 
 [credential "https://github.com"]
 	helper =
-	helper = !/usr/bin/gh auth git-credential
+	helper = !{{ $gh }} auth git-credential
 
 [credential "https://gist.github.com"]
 	helper =
-	helper = !/usr/bin/gh auth git-credential
+	helper = !{{ $gh }} auth git-credential

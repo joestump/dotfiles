@@ -128,7 +128,14 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # own data config), so czu_reassert_targets overwrites them scoped and
 # unprompted; the main apply below then finds them clean. Failure here is
 # advisory — the main apply is the authoritative error path.
-czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" "$HOME/.config/crush/crush.json")"
+#
+# ~/.gitconfig is the same class: `git config --global` writes it in place, and
+# plenty of things call that — czinit does during bootstrap, `gh auth setup-git`
+# does, and so does anyone typing it by hand. One such write and the render
+# stops landing on that box, silently on the scheduled run.
+czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" \
+  "$HOME/.config/crush/crush.json" \
+  "$HOME/.gitconfig")"
 for czu_reassert_line in ${(f)czu_reassert_out}; do
   case "$czu_reassert_line" in
     reasserted:*) item dim "${czu_reassert_line#reasserted:$HOME/} — an app had rewritten it; render reasserted" ;;
