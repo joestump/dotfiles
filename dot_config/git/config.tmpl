@@ -1,10 +1,10 @@
 # Managed by chezmoi. This is the XDG global git config (~/.config/git/config),
-# read ALONGSIDE ~/.gitconfig — your identity/aliases there are untouched; on a
-# key conflict ~/.gitconfig wins. Kept here so chezmoi never has to own your
-# personal ~/.gitconfig.
+# read ALONGSIDE ~/.gitconfig (which is also chezmoi-managed and carries
+# identity + global defaults). On a key conflict ~/.gitconfig wins.
 #
-# Host-scoped credential helper: supplies the Gitea token (from OpenBao via the
-# Vault Agent) on demand, so private clones need no token in the URL:
+# This file carries ONLY the host-scoped Gitea credential helper — supplies the
+# token (from OpenBao via the Vault Agent) on demand, so private clones need no
+# token in the URL:
 #
 #     git clone https://gitea.stump.rocks/{{ .githubUser }}/claude-personal.git
 #

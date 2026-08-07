@@ -1,0 +1,39 @@
+# Managed by chezmoi — do not edit (~/.gitconfig is overwritten on every apply).
+#
+# Identity is derived from whoami using the $USER / $USER-agent convention:
+# every install pairs a human OS user with a <human>-agent bot user, so both
+# the commit name and email are fully deterministic from the login alone.
+# Override on a box whose OS login does not follow the convention by setting
+# agentIdentity in ~/.config/chezmoi/chezmoi.toml [data].
+#
+# Git reads BOTH ~/.gitconfig (this file) and ~/.config/git/config (the XDG
+# config that carries the Gitea credential helper). On a key conflict
+# ~/.gitconfig wins, which is why identity lives here.
+{{- $user := .agentIdentity | default .chezmoi.username -}}
+{{- $human := trimSuffix "-agent" $user -}}
+{{- $isAgent := hasSuffix "-agent" $user -}}
+{{- $email := printf "%s@stump.wtf" (ternary "agent" $human $isAgent) }}
+
+[user]
+	name = {{ $user }}
+	email = {{ $email }}
+
+[init]
+	defaultBranch = main
+
+[pull]
+	rebase = true
+
+[push]
+	autoSetupRemote = true
+
+[credential]
+	helper = store
+
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
