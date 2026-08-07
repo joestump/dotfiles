@@ -1,8 +1,9 @@
 [Unit]
 Description=Harness agent supervisor (Go)
 Documentation=https://gitea.stump.rocks/stump.wtf/harness
-After=network-online.target
-Wants=network-online.target
+After=network-online.target vault-agent.service signal-daemon.service
+Wants=network-online.target signal-daemon.service
+Requires=vault-agent.service
 
 [Service]
 Type=simple
