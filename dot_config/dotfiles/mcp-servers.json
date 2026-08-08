@@ -1,5 +1,16 @@
 {
-  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. NO Docker: every server here is a plain stdio launcher (npx/go). Secret env values (karakeep token) are injected at apply time from OpenBao by the merge scripts. Three servers are NOT listed here because their shape differs per-app or per-OS and the merge scripts inject them: github + outline are remote HTTP (http for Code, npx mcp-remote bridge for Desktop) with a baked Bearer token; signal is a per-OS stdio launcher (uv path + repo dir differ macOS vs Linux) talking to the signal-cli daemon (tcp 127.0.0.1:7583). Edit here, then chezmoi apply.",
+  "_comment": "Shared, NON-SECRET MCP server definitions — single source of truth for both Claude Code (~/.claude.json) and Claude Desktop. NO Docker: every server here is a plain stdio launcher (npx/go/uvx). Secret env values (karakeep token) are injected at apply time from OpenBao by the merge scripts. Three servers are NOT listed here because their shape differs per-app or per-OS and the merge scripts inject them: github + outline are remote HTTP (http for Code, npx mcp-remote bridge for Desktop) with a baked Bearer token; signal is a per-OS stdio launcher (uv path + repo dir differ macOS vs Linux) talking to the signal-cli daemon (tcp 127.0.0.1:7583). Edit here, then chezmoi apply.",
+  "aws": {
+    "_comment": "AWS MCP Server (GA 2026). The SERVER is remote and managed by AWS; mcp-proxy-for-aws is the local stdio bridge that signs each request with SigV4, because the remote endpoint speaks IAM rather than OAuth. No token to store: it uses the standard boto credential chain. CAVEAT: that chain is only populated in an INTERACTIVE zsh — secrets-aws.env is sourced by 00-secrets.zsh (an OMZ custom file), and the non-interactive bags exclude the aws category. Claude Desktop and harness-launched agents therefore get NO credentials and fail on the first tool call; ~/.aws is not a fallback (the [default] key there is stale). See website/docs/claude/mcp.md and the tracking issue. Version pinned deliberately — an unpinned uvx resolves to whatever is newest at launch, which is a moving dependency in a config that is supposed to be reproducible. First run downloads ~75 packages; later runs are cached. Endpoint region (us-east-1) is the service's, and is independent of AWS_REGION, which is the region the tools operate ON.",
+    "command": "uvx",
+    "args": [
+      "mcp-proxy-for-aws==1.6.4",
+      "https://aws-mcp.us-east-1.api.aws/mcp",
+      "--metadata",
+      "AWS_REGION=us-west-2"
+    ],
+    "env": {}
+  },
   "chrome-devtools": {
     "command": "npx",
     "args": ["-y", "chrome-devtools-mcp@latest"],

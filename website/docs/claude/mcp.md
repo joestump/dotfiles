@@ -30,6 +30,7 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 
 | Server | What it is | Transport | Launched by | OS |
 | --- | --- | --- | --- | --- |
+| `aws` | AWS account access — the GA [AWS MCP Server](https://aws.amazon.com/blogs/aws/the-aws-mcp-server-is-now-generally-available/) | remote, via a local SigV4 stdio proxy | `uvx mcp-proxy-for-aws` | both |
 | `cairn` | Cairn artifacts/trajectories (`$CAIRN_BASE_URL`) | `http` (Code) · `mcp-remote` (Desktop) | native / `npx mcp-remote` | both |
 | `chrome-devtools` | Drive a local Chrome for DevTools/automation | stdio | `npx chrome-devtools-mcp` | both |
 | `gitea` | Self-hosted Gitea API (`gitea.stump.rocks`) | stdio | `go run …/gitea-mcp` | both |
@@ -42,7 +43,9 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 ### Where each token comes from
 
 Six servers need a credential; each is sourced differently so **nothing secret is
-ever written to the chezmoi repo**:
+ever written to the chezmoi repo**. `aws` is the exception that proves the rule —
+it needs credentials but stores none, because it signs with SigV4 from the
+standard boto chain (see below).
 
 OpenBao credentials are written as **`secret/users/<you>/<category>:<FIELD>`** —
 the KV path, then `:`, then the field (env-var) name. e.g.
@@ -56,6 +59,60 @@ the KV path, then `:`, then the field (env-var) name. e.g.
 | `outline` | `Authorization: Bearer …` | `secret/users/<you>/outline:OUTLINE_API_TOKEN`, via the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
 | `cairn` | `Authorization: Bearer …` | `secret/users/<you>/cairn:CAIRN_API_TOKEN`, baked as a static header — same reason as outline. The **endpoint** comes from OpenBao too (`CAIRN_BASE_URL`) |
 | `switchboard` | `Authorization: Bearer …` | `secret/users/<you>/switchboard:SWITCHBOARD_CLAUDE_CODE_API_KEY`, baked as a static header. The endpoint is the per-client `SWITCHBOARD_CLAUDE_CODE_URL` from the same bag (full URL incl. the minted `/mcp/<client>` slug) |
+
+### `aws` — the one with no token
+
+The AWS MCP Server is **remote and managed by AWS**; `mcp-proxy-for-aws` is a
+local stdio bridge that exists because the remote endpoint authenticates with
+**IAM SigV4** rather than OAuth, which MCP clients cannot speak natively.
+
+That means there is nothing to bake in and nothing to rotate here: it uses the
+standard boto credential chain, so it picks up whatever is already in the
+environment. Rotating the underlying key changes nothing in this repo.
+
+:::warning Which launch contexts actually have credentials
+
+The boto chain only helps if something put the credentials there, and **that is
+not true in every launch context today**:
+
+| Launched from | Gets `secrets-aws.env`? | Result |
+| --- | --- | --- |
+| Claude Code / Crush started from an interactive shell | yes | works |
+| **Claude Desktop** (GUI) | **no** | auth failure on first tool call |
+| **A harness-launched agent** (systemd/launchd) | **no** | auth failure on first tool call |
+
+`secrets-aws.env` is sourced by `00-secrets.zsh`, an Oh My Zsh custom file, so
+it reaches **interactive zsh only**. The non-interactive bags do not carry AWS —
+`secrets-static.env.ctmpl` deliberately excludes the `aws` category, and neither
+`secrets-static.env` nor `secrets-static.systemd.env` contains
+`AWS_ACCESS_KEY_ID`. Both harness launchers load only the static bag.
+
+`~/.aws` is not a working fallback either: the `[default]` profile on this Mac
+holds a static key from April 2025 that is both a different key from the
+OpenBao-rendered one and dead (`aws sts get-caller-identity` → `InvalidClientTokenId`).
+On a Linux agent box with no `~/.aws` at all, the failure is `NoCredentialsError`.
+
+Making this work everywhere needs a credential source the non-interactive
+contexts can read — most likely a second Vault Agent template rendering the same
+OpenBao bag in INI form to `~/.config/aws/credentials`, with
+`AWS_SHARED_CREDENTIALS_FILE` set on the server entry. That is a change to the
+secrets flow rather than to this server, so it is tracked separately.
+
+:::
+
+Two things worth knowing:
+
+- **The version is pinned** (`mcp-proxy-for-aws==1.6.4`). An unpinned `uvx`
+  resolves to whatever is newest at launch, which makes a config that is supposed
+  to be reproducible depend on release timing. Bump it deliberately.
+- **The two AWS entries are different servers.** `aws-knowledge` (Crush only,
+  `knowledge-mcp.global.api.aws`) is public documentation and needs no auth.
+  `aws` reaches your actual account — it exposes `aws___call_aws` and
+  `aws___run_script`, so it can change real resources.
+
+The endpoint region (`us-east-1`) is the *service's* and is independent of
+`AWS_REGION` in `--metadata`, which is the region the tools operate **on**
+(`us-west-2`, matching `~/.aws/config`).
 
 Rotating any of these is just `vault kv put …` then `chezmoi apply` (the merge
 re-reads OpenBao every run).
