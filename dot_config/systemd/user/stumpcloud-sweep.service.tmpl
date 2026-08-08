@@ -1,0 +1,27 @@
+# Scheduled StumpCloud sweep — systemd USER oneshot (no sudo), agent boxes
+# only: the .chezmoiignore role gate keeps these units off human logins. Fired
+# by stumpcloud-sweep.timer every ~6h. macOS uses the launchd equivalent
+# (rocks.stump.stumpcloud-sweep.plist). Managed by chezmoi.
+[Unit]
+Description=Scheduled StumpCloud sweep (headless agent)
+After=network-online.target vault-agent.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# claude and whatever it shells out to live in ~/.local/bin and ~/go/bin; a
+# bare systemd --user PATH breaks them (same rationale as harness.service).
+Environment=PATH=%h/.local/bin:%h/go/bin:/usr/local/bin:/usr/bin:/bin
+Environment=VAULT_ADDR={{ .vaultAddr }}
+# No login shell here — consume the systemd-syntax secrets render, same as
+# harness.service. `-` keeps an unprovisioned machine clean.
+EnvironmentFile=-%h/.config/vault/secrets-static.systemd.env
+# `-`: a box without the monorepo checkout must not fail the spawn — the
+# ExecCondition below turns that case into a clean skip instead.
+WorkingDirectory=-%h/src/stumpcloud
+ExecCondition=/bin/sh -c 'test -d %h/src/stumpcloud/.git'
+ExecStart=/bin/sh -c 'exec %h/.local/bin/claude -p "$(cat %h/.config/dotfiles/stumpcloud-sweep.prompt.md)" --dangerously-skip-permissions'
+# A wedged sweep must not outlive the next timer firing.
+TimeoutStartSec=2h
+StandardOutput=append:%h/.cache/stumpcloud-sweep.log
+StandardError=append:%h/.cache/stumpcloud-sweep.log

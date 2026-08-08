@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Enable the scheduled StumpCloud sweep — a headless `claude -p` run over
+# ~/src/stumpcloud every 6h that root-causes anything degraded, files OMGs at
+# medium+ severity, and always Signals the operator the results. Agent boxes
+# only: the .chezmoiignore role gate keeps the units off human logins, and the
+# template gate below makes this script a no-op there too.
+#   Linux: systemd --user timer.   macOS: launchd LaunchAgent (StartInterval).
+# Re-runs whenever the prompt or a unit changes (hashes embedded below).
+#
+# prompt hash:  {{ include "dot_config/dotfiles/stumpcloud-sweep.prompt.md" | sha256sum }}
+# service hash: {{ include "dot_config/systemd/user/stumpcloud-sweep.service.tmpl" | sha256sum }}
+# timer hash:   {{ include "dot_config/systemd/user/stumpcloud-sweep.timer.tmpl" | sha256sum }}
+# plist hash:   {{ include "Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist.tmpl" | sha256sum }}
+set -euo pipefail
+
+{{ $sweepUser := .agentIdentity | default .chezmoi.username -}}
+{{ if hasSuffix "-agent" $sweepUser -}}
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
+heading "🧹 stumpcloud sweep"
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  plist="$HOME/Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist"
+  if [ -f "$plist" ]; then
+    launchctl bootout "gui/$(id -u)" "$plist" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
+      item ok "sweep scheduled every 6h (launchd)"
+    else
+      warn "could not load the stumpcloud-sweep plist"
+    fi
+  fi
+  exit 0
+fi
+
+command -v systemctl >/dev/null 2>&1 || { say "no systemd; skipping the sweep timer"; exit 0; }
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if ! systemctl --user daemon-reload 2>/dev/null; then
+  warn "no user systemd bus right now — enable later with: systemctl --user enable --now stumpcloud-sweep.timer"
+  exit 0
+fi
+if systemctl --user enable --now stumpcloud-sweep.timer 2>/dev/null; then
+  item ok "sweep scheduled every 6h (systemd timer)"
+else
+  warn "couldn't enable stumpcloud-sweep.timer yet."
+fi
+{{ else -}}
+# Human login — the sweep is an agent job; nothing to schedule here.
+exit 0
+{{ end -}}
