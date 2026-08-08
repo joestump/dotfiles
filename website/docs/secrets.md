@@ -96,8 +96,14 @@ OIDC login opens a `localhost:8250` callback that needs your laptop's browser. T
 tooling detects you're remote and prints the tunnel. Fastest path, from your **laptop**:
 
 ```bash
-vault-login <host>     # opens the tunnel AND logs in on that host
+vault-login <host>              # opens the tunnel AND logs in on that host
+vault-login -r admin <host>     # same, but request the admin role
 ```
+
+Without `-r`, you land on the mount's `default_role` — `self-service`, which is
+CRUD on your own `secret/users/<you>/*` and nothing else. Admin work needs
+`-r admin`, gated on Pocket ID `admins` group membership. The same argument
+works on the remote-side helper: `vault-oidc-login admin`.
 
 The agent itself talks to OpenBao directly, so once you're logged in, everything
 renders without a tunnel.
