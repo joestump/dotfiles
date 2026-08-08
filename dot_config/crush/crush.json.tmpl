@@ -244,7 +244,10 @@
            aws-knowledge above, which is public docs only and needs no auth.
            This one reaches real resources, so every request is SigV4-signed by
            the local mcp-proxy-for-aws bridge using the standard boto credential
-           chain (Vault Agent's secrets-aws.env, or ~/.aws). Nothing to store here.
+           chain. Nothing to store here — but note the chain is only populated
+           when Crush is started from an INTERACTIVE shell: secrets-aws.env comes
+           from 00-secrets.zsh (OMZ custom), and ~/.aws holds a stale key. A
+           Crush launched by the harness gets no AWS credentials.
            Pinned: an unpinned uvx resolves to whatever is newest at launch. */}}
     "aws": {
       "type": "stdio",

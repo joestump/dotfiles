@@ -68,8 +68,37 @@ local stdio bridge that exists because the remote endpoint authenticates with
 
 That means there is nothing to bake in and nothing to rotate here: it uses the
 standard boto credential chain, so it picks up whatever is already in the
-environment — Vault Agent's short-lived `secrets-aws.env` — or `~/.aws`. Rotating
-the underlying key changes nothing in this repo.
+environment. Rotating the underlying key changes nothing in this repo.
+
+:::warning Which launch contexts actually have credentials
+
+The boto chain only helps if something put the credentials there, and **that is
+not true in every launch context today**:
+
+| Launched from | Gets `secrets-aws.env`? | Result |
+| --- | --- | --- |
+| Claude Code / Crush started from an interactive shell | yes | works |
+| **Claude Desktop** (GUI) | **no** | auth failure on first tool call |
+| **A harness-launched agent** (systemd/launchd) | **no** | auth failure on first tool call |
+
+`secrets-aws.env` is sourced by `00-secrets.zsh`, an Oh My Zsh custom file, so
+it reaches **interactive zsh only**. The non-interactive bags do not carry AWS —
+`secrets-static.env.ctmpl` deliberately excludes the `aws` category, and neither
+`secrets-static.env` nor `secrets-static.systemd.env` contains
+`AWS_ACCESS_KEY_ID`. Both harness launchers load only the static bag.
+
+`~/.aws` is not a working fallback either: the `[default]` profile on this Mac
+holds a static key from April 2025 that is both a different key from the
+OpenBao-rendered one and dead (`aws sts get-caller-identity` → `InvalidClientTokenId`).
+On a Linux agent box with no `~/.aws` at all, the failure is `NoCredentialsError`.
+
+Making this work everywhere needs a credential source the non-interactive
+contexts can read — most likely a second Vault Agent template rendering the same
+OpenBao bag in INI form to `~/.config/aws/credentials`, with
+`AWS_SHARED_CREDENTIALS_FILE` set on the server entry. That is a change to the
+secrets flow rather than to this server, so it is tracked separately.
+
+:::
 
 Two things worth knowing:
 

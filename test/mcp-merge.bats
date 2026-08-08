@@ -141,6 +141,21 @@ JSON
   [ "$output" = "0" ]
 }
 
+@test "the aws entry documents that the boto chain is interactive-shell only" {
+  # The credential chain is only populated by 00-secrets.zsh, an OMZ custom
+  # file, so Claude Desktop and harness-launched agents get nothing and fail on
+  # the first tool call. Anyone reading the entry must see that before wiring it
+  # into a non-interactive context and debugging an opaque auth error.
+  local f="$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+  run jq -re '.aws._comment' "$f"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"INTERACTIVE"* ]]
+  [[ "$output" == *"00-secrets.zsh"* ]]
+  # And it must not re-assert the claim that was wrong: that the rendered
+  # secrets-aws.env or ~/.aws simply supplies credentials wherever it runs.
+  [[ "$output" != *"picks up whatever Vault Agent has rendered"* ]]
+}
+
 @test "the rendered aws entry is what Claude would actually launch" {
   local h="$BATS_TEST_TMPDIR/home"
   mkdir -p "$h/.config/dotfiles"
