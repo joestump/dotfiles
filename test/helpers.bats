@@ -55,6 +55,61 @@ setup() { setup_stub_path; }
   [[ "$output" == *"VAULT login -method=oidc"* ]]
 }
 
+# --- OIDC role selection ------------------------------------------------------
+# The mount's default_role is `self-service` (own secret/users/<you>/* only), so
+# admin work needs an explicit role. A valid-but-wrong token is worse than a
+# failed login: the later denials surface as missing objects, not missing
+# privilege — so every path that offers to log you in must carry the role.
+
+@test "vault-oidc-login: no argument logs in on the default role" {
+  make_stub vault 'echo "VAULT $*"'
+  run zsh -c 'unset SSH_CONNECTION SSH_TTY; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-oidc-login.zsh"; vault-oidc-login'
+  [[ "$output" == *"VAULT login -method=oidc"* ]]
+  # No bare `role=` may leak in when none was asked for.
+  [[ "$output" != *"role="* ]]
+}
+
+@test "vault-oidc-login: an explicit role reaches the vault CLI" {
+  make_stub vault 'echo "VAULT $*"'
+  run zsh -c 'unset SSH_CONNECTION SSH_TTY; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-oidc-login.zsh"; vault-oidc-login admin'
+  [[ "$output" == *"VAULT login -method=oidc role=admin"* ]]
+}
+
+@test "vault-oidc-login: the printed vault-login hint carries the role" {
+  # Regression guard: the SSH branch advertises `vault-login <host>` as the
+  # "easiest" path. If that hint drops the role the user just asked for, they
+  # follow it and land on self-service while believing they are admin.
+  make_stub vault 'echo "VAULT $*"'
+  run zsh -c 'export SSH_CONNECTION="1 2 3 4" HOST=ie01; source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-oidc-login.zsh"; vault-oidc-login admin' </dev/null
+  [[ "$output" == *"vault-login -r admin ie01"* ]]
+}
+
+@test "vault-login: forwards an explicit role to the remote vault login" {
+  make_stub ssh 'echo "SSH $*"'
+  make_stub lsof 'exit 1'   # port free
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-login.zsh"; vault-login -r admin ie01'
+  [[ "$output" == *"vault login -method=oidc role=admin"* ]]
+  # The documented `<host> [port]` signature must survive the new flag.
+  [[ "$output" == *"8250:localhost:8250"* ]]
+}
+
+@test "vault-login: port stays positional and is never read as a role" {
+  make_stub ssh 'echo "SSH $*"'
+  make_stub lsof 'exit 1'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-login.zsh"; vault-login ie01 8300'
+  [[ "$output" == *"8300:localhost:8300"* ]]
+  [[ "$output" != *"role="* ]]
+}
+
+@test "vault-login: refuses a role that would inject into the remote shell" {
+  make_stub ssh 'echo "SSH $*"'
+  make_stub lsof 'exit 1'
+  run zsh -c 'source "$REPO_ROOT/dot_oh-my-zsh/custom/vault-login.zsh"; vault-login -r "admin; rm -rf /" ie01'
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid role"* ]]
+  [[ "$output" != *"SSH "* ]]
+}
+
 @test "flush-dns: refuses on non-macOS" {
   make_stub sudo 'exit 0'; make_stub dscacheutil 'exit 0'; make_stub killall 'exit 0'
   run zsh -c 'OSTYPE="linux-gnu"; source "$REPO_ROOT/dot_oh-my-zsh/custom/gum-ui.zsh"; source "$REPO_ROOT/dot_oh-my-zsh/custom/flush-dns.zsh"; flush-dns'

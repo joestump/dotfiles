@@ -81,9 +81,11 @@ automatically.)
 
 ## Helpers (current)
 
-- `vault-login <host> [port]` — opens an SSH tunnel to `<host>` forwarding the
-  Vault/OpenBao port (default 8250) and runs an OIDC `vault login` on the remote.
-  Refuses if the local port is already in use (checked with `lsof`).
+- `vault-login [-r <role>] <host> [port]` — opens an SSH tunnel to `<host>`
+  forwarding the Vault/OpenBao port (default 8250) and runs an OIDC
+  `vault login` on the remote. `-r` selects the OIDC role; without it the mount's
+  `default_role` (self-service) applies. Refuses if the local port is already in
+  use (checked with `lsof`).
 - `direnv.zsh` — hooks direnv into the shell.
 - `czu` — the interactive command IS a thin wrapper around
   `dot_config/dotfiles/executable_czu-run.zsh`, which also runs unattended every 6h

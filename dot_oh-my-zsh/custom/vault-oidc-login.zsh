@@ -19,7 +19,11 @@ vault-oidc-login() {
     local host=${HOST:-$(hostname)}
     print -u2 "🔌 SSH session detected — OIDC needs a tunnel for the localhost:${port} callback.\n"
     print -u2 "Easiest — on your LAPTOP (opens tunnel AND logs in here, one step):"
-    print -u2 "    vault-login ${host}\n"
+    # Carry the role through. Without it, following this instruction logs you in
+    # on the mount's default_role (self-service) while you asked for admin — and
+    # a valid-but-wrong token is worse than a failure, because the later
+    # permission denials read as missing objects rather than missing privilege.
+    print -u2 "    vault-login ${role:+-r ${role} }${host}\n"
     print -u2 "Or manually — on your LAPTOP, in another terminal:"
     print -u2 "    ssh -L ${port}:localhost:${port} ${USER}@${host}"
     print -u2 "leave it open, then continue here.\n"
