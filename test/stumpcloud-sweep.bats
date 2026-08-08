@@ -34,6 +34,20 @@ _render() {
   ! grep -Eq '\+[0-9]{7,}' "$PROMPT"
 }
 
+@test "sweep: prompt requires OMG de-duplication before filing" {
+  # The sweep runs 4x/day and an outage outlives one sweep, so filing on
+  # severity alone would re-file the same postmortem (and its issues) every 6
+  # hours. The stumpcloud-omg skill has no existence check of its own, so the
+  # prompt has to carry the rule.
+  grep -qi 'new to this sweep' "$PROMPT"
+  grep -qi 'do NOT file again' "$PROMPT"
+  # It must say HOW to find the existing one, not merely that it should.
+  grep -qi 'OMGs parent doc' "$PROMPT"
+  grep -qi 'OMG label' "$PROMPT"
+  # And it must handle the incident clearing, not just persisting.
+  grep -qi 'now resolved' "$PROMPT"
+}
+
 @test "sweep: systemd unit execs claude -p with the prompt, secrets, and a usable PATH" {
   grep -Eq '^Environment=PATH=%h/\.local/bin:%h/go/bin' "$UNIT"
   grep -Eq '^EnvironmentFile=-%h/\.config/vault/secrets-static\.systemd\.env$' "$UNIT"
@@ -46,8 +60,12 @@ _render() {
   grep -Eq '^TimeoutStartSec=' "$UNIT"
 }
 
-@test "sweep: timer fires every 6h and catches up after downtime" {
+@test "sweep: timer fires every 6h, matching the repo's other user timers" {
   grep -Eq '^OnUnitActiveSec=6h$' "$TIMER"
+  # Persistent= is inert on a monotonic timer (systemd honours it only with
+  # OnCalendar=), so this pins consistency with czu/vault-agent-stale/
+  # qmd-index-src rather than any catch-up behaviour. Named accordingly: the
+  # timer does NOT replay a firing missed while the box was off.
   grep -Eq '^Persistent=true$' "$TIMER"
 }
 
