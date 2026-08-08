@@ -240,6 +240,24 @@
       "timeout": 120,
       "disabled": false
     },
+    {{- /* The AWS MCP Server (GA 2026) — the ACCOUNT-facing one, distinct from
+           aws-knowledge above, which is public docs only and needs no auth.
+           This one reaches real resources, so every request is SigV4-signed by
+           the local mcp-proxy-for-aws bridge using the standard boto credential
+           chain (Vault Agent's secrets-aws.env, or ~/.aws). Nothing to store here.
+           Pinned: an unpinned uvx resolves to whatever is newest at launch. */}}
+    "aws": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws==1.6.4",
+        "https://aws-mcp.us-east-1.api.aws/mcp",
+        "--metadata",
+        "AWS_REGION=us-west-2"
+      ],
+      "timeout": 120,
+      "disabled": false
+    },
     "memory": {
       "type": "stdio",
       "command": "npx",

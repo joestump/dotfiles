@@ -35,8 +35,18 @@ mcp_env() {
   [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$2"
 }
 
-# mcp_base  — emit the shared non-secret server defs (._comment stripped).
-mcp_base() { jq 'del(._comment)' "$HOME/.config/dotfiles/mcp-servers.json"; }
+# mcp_base  — emit the shared non-secret server defs, with `_comment` stripped at
+#   BOTH levels: the file-level one, and any per-server one.
+#
+#   Per-server comments earn their keep — the aws entry needs to explain why a
+#   remote managed server is launched through a local stdio proxy, and that
+#   belongs next to the entry rather than in a paragraph at the top of the file.
+#   But `_comment` is not part of the MCP client schema, so it must not reach
+#   ~/.claude.json; strip it here rather than making every author remember.
+mcp_base() {
+  jq 'del(._comment) | map_values(del(._comment))' \
+    "$HOME/.config/dotfiles/mcp-servers.json"
+}
 
 # mcp_merge <target-file> <desired-mcpServers-json>
 #   Repo-authoritative: managed servers replace live ones; other servers + every

@@ -96,3 +96,57 @@ assert url == \"\$SWITCHBOARD_CRUSH_URL\", url
   run bash -c "grep -vE '^[[:space:]]*#' \"$LIB\" | grep -nE 'vault kv get|secret/personal'"
   [ "$status" -eq 1 ]   # grep exits 1 = no matches
 }
+
+# --- mcp_base: comment stripping + the aws server -----------------------------
+# Per-server `_comment` keys document non-obvious entries (why a remote managed
+# server is launched through a local stdio proxy) but are NOT part of the MCP
+# client schema, so they must never reach ~/.claude.json.
+
+@test "mcp_base strips _comment at BOTH the file and per-server level" {
+  local h="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$h/.config/dotfiles"
+  cat > "$h/.config/dotfiles/mcp-servers.json" <<'JSON'
+{
+  "_comment": "file level",
+  "demo": { "_comment": "server level", "command": "true", "args": [], "env": {} }
+}
+JSON
+  run env HOME="$h" bash -c ". '$LIB'; mcp_base"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"file level"* ]]
+  [[ "$output" != *"server level"* ]]
+  # the real keys survive
+  echo "$output" | jq -e '.demo.command == "true"'
+}
+
+@test "the aws MCP server is defined, version-pinned, and carries no secret" {
+  local f="$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+  run jq -e '.aws' "$f"
+  [ "$status" -eq 0 ]
+
+  # uvx launcher, matching the file's "plain stdio launcher" contract.
+  run jq -re '.aws.command' "$f"
+  [ "$output" = "uvx" ]
+
+  # Pinned: an unpinned uvx resolves to whatever is newest at launch, which
+  # makes a config that is supposed to be reproducible depend on release timing.
+  run jq -re '.aws.args[0]' "$f"
+  [[ "$output" =~ ^mcp-proxy-for-aws==[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+  # Auth is SigV4 via the boto credential chain — there is no token to bake in,
+  # and baking one here would put a credential in a committed file.
+  run jq -re '.aws.env | length' "$f"
+  [ "$output" = "0" ]
+  run grep -c "AKIA" "$f"
+  [ "$output" = "0" ]
+}
+
+@test "the rendered aws entry is what Claude would actually launch" {
+  local h="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$h/.config/dotfiles"
+  cp "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json" "$h/.config/dotfiles/"
+  run env HOME="$h" bash -c ". '$LIB'; mcp_base"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.aws | has("_comment") | not'
+  echo "$output" | jq -e '.aws.args | index("https://aws-mcp.us-east-1.api.aws/mcp") != null'
+}
