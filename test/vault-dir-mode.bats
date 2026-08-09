@@ -32,9 +32,13 @@ setup() {
     --exclude=scripts,externals,encrypted --no-tty "$dest/.config/vault"
   [ "$status" -eq 0 ]
 
-  # 700 on any POSIX stat: BSD/macOS uses -f %Lp, GNU uses -c %a.
+  # GNU first, BSD second — the order matters and is not interchangeable.
+  # BSD stat rejects -c outright (rc 1), so the fallback fires on macOS. The
+  # reverse order silently breaks on Linux: GNU reads -f as --file-system and
+  # prints "?" for the unknown %Lp directive while still exiting 0, so the
+  # fallback never runs and the comparison gets garbage instead of a mode.
   local mode
-  mode="$(stat -f '%Lp' "$dest/.config/vault" 2>/dev/null || stat -c '%a' "$dest/.config/vault")"
+  mode="$(stat -c '%a' "$dest/.config/vault" 2>/dev/null || stat -f '%Lp' "$dest/.config/vault")"
   [ "$mode" = "700" ]
 }
 
