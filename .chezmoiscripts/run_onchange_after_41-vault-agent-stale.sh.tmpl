@@ -3,7 +3,7 @@
 #   Linux: systemd --user timer.   macOS: launchd LaunchAgent (StartInterval).
 # Re-runs whenever the detector or its units change (hashes embedded below).
 #
-# detector hash: {{ include "dot_config/vault/vault-agent-stale.sh.tmpl" | sha256sum }}
+# detector hash: {{ include "dot_config/private_vault/vault-agent-stale.sh.tmpl" | sha256sum }}
 # service hash:  {{ include "dot_config/systemd/user/vault-agent-stale.service.tmpl" | sha256sum }}
 # timer hash:    {{ include "dot_config/systemd/user/vault-agent-stale.timer.tmpl" | sha256sum }}
 # plist hash:    {{ include "Library/LaunchAgents/rocks.stump.vault-agent-stale.plist.tmpl" | sha256sum }}

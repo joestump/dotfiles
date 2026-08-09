@@ -21,7 +21,7 @@ setup() { setup_stub_path; CALLS="$BATS_TEST_TMPDIR/calls.log"; : > "$CALLS"; }
 }
 
 @test "vault-agent-service: re-runs on agent.hcl changes (config hash embedded)" {
-  grep -qF 'include "dot_config/vault/agent.hcl.tmpl" | sha256sum' "$SCRIPT"
+  grep -qF 'include "dot_config/private_vault/agent.hcl.tmpl" | sha256sum' "$SCRIPT"
 }
 
 @test "vault-agent-service: re-runs on launchd plist changes (plist hash embedded)" {

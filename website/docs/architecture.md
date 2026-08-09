@@ -36,7 +36,7 @@ dot_zshrc                          → ~/.zshrc
 dot_oh-my-zsh/custom/*.zsh         → helpers, prompt, secrets loader
 dot_Brewfile                       → ~/.Brewfile
 dot_config/dotfiles/               → Brewfile-adjacent manifests (apt, go, mcp, plugins)
-dot_config/vault/                  → Vault Agent config + Consul-Templates
+dot_config/private_vault/          → Vault Agent config + Consul-Templates (dir 0700)
 .chezmoiscripts/                   → run_onchange_ installers (packages, claude, …)
 .chezmoiexternal.toml              → cloned themes, plugins, marketplaces
 .githooks/  .gitleaks.toml         → secret-leak prevention

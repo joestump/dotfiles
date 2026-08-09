@@ -79,7 +79,7 @@ _fakehome() {
 @test "agent.hcl: the AppRole branch does NOT mirror the token to ~/.vault-token" {
   # ADR-0038: the personal token is quarantined to ~/.config/vault/agent-token so
   # it can't shadow the operator's OIDC login in ~/.vault-token.
-  local tmpl="$REPO_ROOT/dot_config/vault/agent.hcl.tmpl"
+  local tmpl="$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
   awk '/\{\{ if stat/{f=1;next} /\{\{ else/{f=0} f' "$tmpl" > "$BATS_TEST_TMPDIR/approle.hcl"
   [ -s "$BATS_TEST_TMPDIR/approle.hcl" ]
   run grep -E '^[[:space:]]+path = .*/\.vault-token"' "$BATS_TEST_TMPDIR/approle.hcl"
@@ -89,7 +89,7 @@ _fakehome() {
 @test "agent.hcl: the legacy token_file branch has NO ~/.vault-token sink" {
   # That path authenticates FROM ~/.vault-token (token_file_path); a sink writing
   # the same file would be circular, so the mirror must not appear there.
-  local tmpl="$REPO_ROOT/dot_config/vault/agent.hcl.tmpl"
+  local tmpl="$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
   awk '/\{\{ else/{f=1;next} /\{\{ end/{f=0} f' "$tmpl" > "$BATS_TEST_TMPDIR/legacy.hcl"
   [ -s "$BATS_TEST_TMPDIR/legacy.hcl" ]
   run grep -E '^[[:space:]]+path = .*/\.vault-token"' "$BATS_TEST_TMPDIR/legacy.hcl"
@@ -97,7 +97,7 @@ _fakehome() {
 }
 
 @test "agent.hcl: both branches keep the agent-token sink" {
-  local tmpl="$REPO_ROOT/dot_config/vault/agent.hcl.tmpl"
+  local tmpl="$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
   awk '/\{\{ if stat/{f=1;next} /\{\{ else/{f=0} f' "$tmpl" > "$BATS_TEST_TMPDIR/approle.hcl"
   awk '/\{\{ else/{f=1;next} /\{\{ end/{f=0} f'   "$tmpl" > "$BATS_TEST_TMPDIR/legacy.hcl"
   run grep -E '^[[:space:]]+path = .*/agent-token"' "$BATS_TEST_TMPDIR/approle.hcl"
@@ -109,7 +109,7 @@ _fakehome() {
 @test "agent.hcl: renders WITHOUT a ~/.vault-token sink on this AppRole host" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   [ -f "$HOME/.config/vault/approle/secret-id" ] || skip "no AppRole secret-id on this host"
-  run chezmoi execute-template --source "$REPO_ROOT" < "$REPO_ROOT/dot_config/vault/agent.hcl.tmpl"
+  run chezmoi execute-template --source "$REPO_ROOT" < "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/rendered.hcl"
   run grep -E '^[[:space:]]+path = .*/\.vault-token"' "$BATS_TEST_TMPDIR/rendered.hcl"

@@ -57,7 +57,7 @@ dot_zshrc                          → ~/.zshrc  (theme + plugins; seeded from O
 dot_oh-my-zsh/custom/*.zsh         → ~/.oh-my-zsh/custom/  (helpers + secrets loader)
 dot_Brewfile                       → ~/.Brewfile  (declarative tooling; brew bundle)
 dot_config/dotfiles/               → manifests (apt-packages, go-tools, MCP defs, UI libs)
-dot_config/vault/                  → Vault Agent config + Consul-Templates
+dot_config/private_vault/          → Vault Agent config + Consul-Templates (dir 0700)
 dot_config/git/                    → git config + Gitea credential helper
 dot_config/chezmoi/                → chezmoi config (autoCommit/autoPush)
 dot_config/crush/                  → Crush (AI coding assistant) config

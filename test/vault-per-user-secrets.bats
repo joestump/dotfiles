@@ -4,10 +4,10 @@
 # the OS login exported as $USER. SSH keys follow the same auto-discovery pattern
 # as env vars — ssh-keys.ctmpl writeToFile()s every field of secret/users/$USER/ssh
 # to ~/.ssh/<field>, so no per-key template or gating is needed. See
-# dot_config/vault/*.ctmpl + agent.hcl.tmpl.
+# dot_config/private_vault/*.ctmpl + agent.hcl.tmpl.
 load test_helper
 
-V="$REPO_ROOT/dot_config/vault"
+V="$REPO_ROOT/dot_config/private_vault"
 
 # ----- render templates read the per-user path, never the old shared one -----
 
