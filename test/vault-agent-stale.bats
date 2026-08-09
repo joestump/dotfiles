@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Tests for the vault-agent-stale detector state machine
-# (dot_config/vault/vault-agent-stale.sh.tmpl). The detector is transition-based:
+# (dot_config/private_vault/vault-agent-stale.sh.tmpl). The detector is transition-based:
 # it must Signal-alert exactly ONCE when auth goes DEAD (ok -> stale) or a
 # token_file login is about to expire (ok -> expiring), announce recovery ONCE
 # (stale -> ok), and stay SILENT while nothing changes. State lives in
@@ -17,7 +17,7 @@ setup() {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
 }
 
-DETECTOR="$REPO_ROOT/dot_config/vault/vault-agent-stale.sh.tmpl"
+DETECTOR="$REPO_ROOT/dot_config/private_vault/vault-agent-stale.sh.tmpl"
 
 # Render the chezmoi template once into a runnable script. The only directive is
 # {{ .vaultAddr }} (from .chezmoidata.yaml); mirrors the chezmoiexternal.bats

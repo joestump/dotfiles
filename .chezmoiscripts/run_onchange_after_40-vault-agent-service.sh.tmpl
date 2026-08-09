@@ -10,7 +10,7 @@
 #
 # unit hash:   {{ include "dot_config/systemd/user/vault-agent.service.tmpl" | sha256sum }}
 # plist hash:  {{ include "Library/LaunchAgents/rocks.stump.vault-agent.plist.tmpl" | sha256sum }}
-# config hash: {{ include "dot_config/vault/agent.hcl.tmpl" | sha256sum }}
+# config hash: {{ include "dot_config/private_vault/agent.hcl.tmpl" | sha256sum }}
 set -euo pipefail
 
 case "$(uname -s)" in

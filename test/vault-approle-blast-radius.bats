@@ -133,7 +133,7 @@ _czapprole() {
 
 _render_agent_hcl() {
   HOME="$1" chezmoi execute-template --source "$REPO_ROOT" \
-    < "$REPO_ROOT/dot_config/vault/agent.hcl.tmpl" > "$BATS_TEST_TMPDIR/agent.hcl"
+    < "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl" > "$BATS_TEST_TMPDIR/agent.hcl"
   [ -s "$BATS_TEST_TMPDIR/agent.hcl" ]
 }
 
