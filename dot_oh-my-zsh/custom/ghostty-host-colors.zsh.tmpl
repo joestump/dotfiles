@@ -1,0 +1,71 @@
+# Ghostty host-based terminal coloring via OSC 11.
+#
+# Emits an OSC 11 (set background color) escape sequence on every precmd and
+# chpwd so the active terminal surface — and, with macos-titlebar-style=tabs,
+# the tab bar — reflects the current hostname. Switching tabs triggers precmd
+# in that tab's shell, updating the color to match. SSH into a host and the
+# color follows; return home and it resets.
+#
+# Known hosts get explicit colors from .chezmoidata.yaml (ghostty.hostColors).
+# Unknown hosts hash deterministically into ghostty.fallbackPalette so the same
+# host always gets the same color across sessions.
+#
+# Only fires when $TERM_PROGRAM is "ghostty" — other terminals ignore OSC 11 or
+# handle it differently, so we scope this to avoid side effects.
+
+_ghostty_host_color() {
+  [[ "$TERM_PROGRAM" == "ghostty" ]] || return 0
+
+  local host="${HOST%%.*}"
+  local fqdn="$HOST"
+  local color=""
+
+  # Check explicit mappings first (exact match on short name, then FQDN).
+  {{- range .ghostty.hostColors }}
+  {{- if not (hasPrefix "*" .host) }}
+  if [[ "$host" == "{{ .host }}" || "$fqdn" == "{{ .host }}" ]]; then
+    color="{{ .color }}"
+  fi
+  {{- end }}
+  {{- end }}
+
+  # Glob patterns (*.stump.rocks etc.) — check against FQDN.
+  if [[ -z "$color" ]]; then
+    {{- range .ghostty.hostColors }}
+    {{- if hasPrefix "*" .host }}
+    if [[ "$fqdn" == {{ .host }} ]]; then
+      color="{{ .color }}"
+    fi
+    {{- end }}
+    {{- end }}
+  fi
+
+  # Hash-based fallback for unknown hosts.
+  if [[ -z "$color" ]]; then
+    local -a palette=(
+      {{- range .ghostty.fallbackPalette }}
+      "{{ . }}"
+      {{- end }}
+    )
+    if (( ${#palette} > 0 )); then
+      local hash=0
+      local i
+      for (( i = 0; i < ${#host}; i++ )); do
+        hash=$(( (hash * 31 + ##host[i+1]) % 2147483647 ))
+      done
+      color="${palette[$(( hash % ${#palette} + 1 ))]}"
+    fi
+  fi
+
+  [[ -n "$color" ]] && printf '\e]11;%s\a' "$color"
+}
+
+# Fire on prompt display (covers tab switches, command completion, SSH return).
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _ghostty_host_color
+
+# Fire on directory change (covers cd after SSH, new tab inheriting cwd).
+add-zsh-hook chpwd _ghostty_host_color
+
+# Set initial color immediately on shell startup.
+_ghostty_host_color
