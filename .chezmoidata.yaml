@@ -352,3 +352,37 @@ claude:
   skipWorkflowUsageWarning: false
   # Skip the "bypass permissions" acceptance dialog. Independent of permissionMode.
   skipDangerousModePermissionPrompt: false
+
+# Ghostty host-based tab/window coloring via OSC 11. The zsh hook in
+# dot_oh-my-zsh/custom/ghostty-host-colors.zsh.tmpl reads these mappings and
+# emits an OSC 11 escape on every precmd + chpwd, tinting the active terminal
+# surface (and the macOS tabs titlebar) to match the current hostname. Known
+# hosts get explicit colors; unknown hosts hash into the fallback palette.
+#
+# Colors are Catppuccin Mocha surface/base tints — muted enough to keep text
+# readable but distinct enough to tell tabs apart at a glance. Each entry is
+# {host: <hostname or pattern>, color: "#rrggbb"}.
+ghostty:
+  hostColors:
+    - host: "dagda"
+      color: "#1e1e2e"   # base — the default/local machine
+    - host: "tars"
+      color: "#1a1b26"   # deep blue-grey
+    - host: "cloud01"
+      color: "#1e2030"   # mantle blue
+    - host: "lir"
+      color: "#24273a"   # surface0
+    - host: "*.stump.rocks"
+      color: "#181926"   # crust — catch-all for infra hosts
+  # Palette used for hosts not listed above. The hook hashes the hostname into
+  # this list so the same unknown host always gets the same color. All entries
+  # are dark Catppuccin-compatible backgrounds that keep white/light text legible.
+  fallbackPalette:
+    - "#1e1e2e"   # base
+    - "#1a1b26"   # deep blue-grey
+    - "#1e2030"   # mantle blue
+    - "#24273a"   # surface0
+    - "#181926"   # crust
+    - "#1c1e2d"   # custom dark navy
+    - "#1f2028"   # custom charcoal-blue
+    - "#21222e"   # custom slate

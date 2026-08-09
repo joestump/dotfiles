@@ -1,0 +1,86 @@
+# Ghostty host-based terminal coloring via OSC 11.
+#
+# Emits an OSC 11 (set background color) escape sequence on every precmd and
+# chpwd so the active terminal surface — and, with macos-titlebar-style=tabs,
+# the tab bar — reflects the current hostname. Switching tabs triggers precmd
+# in that tab's shell, updating the color to match. SSH into a host and the
+# color follows; return home and it resets.
+#
+# Known hosts get explicit colors from .chezmoidata.yaml (ghostty.hostColors).
+# Unknown hosts hash deterministically into ghostty.fallbackPalette so the same
+# host always gets the same color across sessions.
+#
+# Only fires when $TERM_PROGRAM is "ghostty" — other terminals ignore OSC 11 or
+# handle it differently, so we scope this to avoid side effects.
+
+_ghostty_host_color() {
+  [[ "$TERM_PROGRAM" == "ghostty" ]] || return 0
+
+  local host="${HOST%%.*}"
+  local fqdn="$HOST"
+  local color=""
+
+  # Check explicit mappings first (exact match on short name, then FQDN).
+  {{- range .ghostty.hostColors }}
+  {{- if not (hasPrefix "*" .host) }}
+  if [[ "$host" == "{{ .host }}" || "$fqdn" == "{{ .host }}" ]]; then
+    color="{{ .color }}"
+  fi
+  {{- end }}
+  {{- end }}
+
+  # Glob patterns (*.stump.rocks etc.). Matched against BOTH names, not just the
+  # FQDN: zsh's $HOST is whatever gethostname(2) returns, which on macOS and on
+  # most of these boxes is the SHORT name ("dagda", not "dagda.stump.rocks"), so
+  # a FQDN-only test would leave every glob entry dead on exactly the machines
+  # it is meant to cover. Testing both makes short-name globs ("dagda*") work too.
+  if [[ -z "$color" ]]; then
+    {{- range .ghostty.hostColors }}
+    {{- if hasPrefix "*" .host }}
+    if [[ "$fqdn" == {{ .host }} || "$host" == {{ .host }} ]]; then
+      color="{{ .color }}"
+    fi
+    {{- end }}
+    {{- end }}
+  fi
+
+  # Hash-based fallback for unknown hosts.
+  if [[ -z "$color" ]]; then
+    local -a palette=(
+      {{- range .ghostty.fallbackPalette }}
+      "{{ . }}"
+      {{- end }}
+    )
+    if (( ${#palette} > 0 )); then
+      local hash=0
+      local i c
+      for (( i = 0; i < ${#host}; i++ )); do
+        # `#c` in a math context is zsh for "ordinal of the first character of
+        # $c". It must go through a variable: `##host[i+1]` does NOT index the
+        # string — `##x` takes the ordinal of the LITERAL character x, so zsh
+        # reads `##h` and then chokes on the trailing `ost[i+1]` with
+        # "bad math expression: operator expected". That fired on every prompt
+        # for every host not listed above, which is most of them.
+        c="${host[i+1]}"
+        hash=$(( (hash * 31 + #c) % 2147483647 ))
+      done
+      color="${palette[$(( hash % ${#palette} + 1 ))]}"
+    fi
+  fi
+
+  # Explicit `return 0`: the bare `[[ -n … ]] &&` would make the function — and
+  # therefore the `source` of this file at shell startup — exit non-zero
+  # whenever no color resolved.
+  [[ -n "$color" ]] && printf '\e]11;%s\a' "$color"
+  return 0
+}
+
+# Fire on prompt display (covers tab switches, command completion, SSH return).
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _ghostty_host_color
+
+# Fire on directory change (covers cd after SSH, new tab inheriting cwd).
+add-zsh-hook chpwd _ghostty_host_color
+
+# Set initial color immediately on shell startup.
+_ghostty_host_color
