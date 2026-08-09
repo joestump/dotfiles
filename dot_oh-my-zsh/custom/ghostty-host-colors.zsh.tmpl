@@ -29,11 +29,15 @@ _ghostty_host_color() {
   {{- end }}
   {{- end }}
 
-  # Glob patterns (*.stump.rocks etc.) — check against FQDN.
+  # Glob patterns (*.stump.rocks etc.). Matched against BOTH names, not just the
+  # FQDN: zsh's $HOST is whatever gethostname(2) returns, which on macOS and on
+  # most of these boxes is the SHORT name ("dagda", not "dagda.stump.rocks"), so
+  # a FQDN-only test would leave every glob entry dead on exactly the machines
+  # it is meant to cover. Testing both makes short-name globs ("dagda*") work too.
   if [[ -z "$color" ]]; then
     {{- range .ghostty.hostColors }}
     {{- if hasPrefix "*" .host }}
-    if [[ "$fqdn" == {{ .host }} ]]; then
+    if [[ "$fqdn" == {{ .host }} || "$host" == {{ .host }} ]]; then
       color="{{ .color }}"
     fi
     {{- end }}
@@ -49,15 +53,26 @@ _ghostty_host_color() {
     )
     if (( ${#palette} > 0 )); then
       local hash=0
-      local i
+      local i c
       for (( i = 0; i < ${#host}; i++ )); do
-        hash=$(( (hash * 31 + ##host[i+1]) % 2147483647 ))
+        # `#c` in a math context is zsh for "ordinal of the first character of
+        # $c". It must go through a variable: `##host[i+1]` does NOT index the
+        # string — `##x` takes the ordinal of the LITERAL character x, so zsh
+        # reads `##h` and then chokes on the trailing `ost[i+1]` with
+        # "bad math expression: operator expected". That fired on every prompt
+        # for every host not listed above, which is most of them.
+        c="${host[i+1]}"
+        hash=$(( (hash * 31 + #c) % 2147483647 ))
       done
       color="${palette[$(( hash % ${#palette} + 1 ))]}"
     fi
   fi
 
+  # Explicit `return 0`: the bare `[[ -n … ]] &&` would make the function — and
+  # therefore the `source` of this file at shell startup — exit non-zero
+  # whenever no color resolved.
   [[ -n "$color" ]] && printf '\e]11;%s\a' "$color"
+  return 0
 }
 
 # Fire on prompt display (covers tab switches, command completion, SSH return).

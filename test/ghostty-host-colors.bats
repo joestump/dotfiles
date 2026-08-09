@@ -80,23 +80,33 @@ _render() {
   [[ "$output" == *"#1c1e2d"* ]]
 }
 
-@test ".chezmoidata.yaml ghostty section is valid YAML" {
-  python3 -c '
-import yaml, sys
-with open("'"$REPO_ROOT"'/.chezmoidata.yaml") as f:
-    data = yaml.safe_load(f)
-g = data.get("ghostty", {})
-assert "hostColors" in g, "ghostty.hostColors missing"
-assert "fallbackPalette" in g, "ghostty.fallbackPalette missing"
-assert len(g["hostColors"]) >= 1, "hostColors empty"
-assert len(g["fallbackPalette"]) >= 1, "fallbackPalette empty"
-for entry in g["hostColors"]:
-    assert "host" in entry, "hostColors entry missing host"
-    assert "color" in entry, "hostColors entry missing color"
-    assert entry["color"].startswith("#"), f"color must be hex: {entry}"
-for c in g["fallbackPalette"]:
-    assert c.startswith("#"), f"palette color must be hex: {c}"
-'
+@test ".chezmoidata.yaml ghostty section is well-formed" {
+  # Validated through chezmoi's own YAML parse rather than PyYAML: chezmoi is
+  # the actual consumer of this data, and CI installs plain python3 with no
+  # `yaml` module (see .gitea/workflows/ci.yml), so an `import yaml` here fails
+  # the bats job on every run regardless of whether the data is correct.
+  run chezmoi execute-template --source "$REPO_ROOT" '
+{{- range .ghostty.hostColors }}host={{ .host }} color={{ .color }}
+{{ end }}
+{{- range .ghostty.fallbackPalette }}palette={{ . }}
+{{ end }}'
+  [ "$status" -eq 0 ]
+
+  # Both lists are non-empty...
+  [[ "$output" == *"host="* ]]
+  [[ "$output" == *"palette="* ]]
+
+  # ...every hostColors entry carries both keys, and every color is a 6-digit
+  # hex literal. A missing key renders as the empty string, which these catch.
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      host=*)
+        [[ "$line" =~ ^host=[^[:space:]]+\ color=\#[0-9a-fA-F]{6}$ ]] ;;
+      palette=*)
+        [[ "$line" =~ ^palette=\#[0-9a-fA-F]{6}$ ]] ;;
+    esac
+  done <<< "$output"
 }
 
 @test "function does nothing when TERM_PROGRAM is not ghostty" {
@@ -114,4 +124,85 @@ for c in g["fallbackPalette"]:
   '
   [ "$status" -eq 0 ]
   [ -z "$output" ]
+}
+
+# ---------------------------------------------------------------------------
+# Runtime behaviour. The tests above only ever assert on the RENDERED TEXT, and
+# the one test that executed the function took the non-ghostty early return —
+# so the whole colour-resolution body was uncovered. That is exactly how
+# `##host[i+1]` (invalid zsh math: `##x` is the ordinal of the literal char x,
+# so zsh read `##h` and choked on `ost[i+1]`) shipped green while erroring on
+# every single prompt for every host not named in .chezmoidata.yaml.
+# ---------------------------------------------------------------------------
+
+# Source the rendered hook with TERM_PROGRAM unset (so the load-time call is a
+# no-op), then invoke it for $1 with the ghostty gate on. stderr is folded into
+# stdout so a math/parse error can't hide behind a passing exit status.
+_color_for() {
+  local rendered="$BATS_TEST_TMPDIR/ghostty-host-colors.zsh"
+  if [ ! -f "$rendered" ]; then
+    _render > "$rendered"
+  fi
+  zsh -c '
+    add-zsh-hook() { :; }
+    unset TERM_PROGRAM
+    source "'"$rendered"'"
+    TERM_PROGRAM=ghostty
+    HOST="'"$1"'"
+    _ghostty_host_color
+  ' 2>&1
+}
+
+@test "a known host resolves to its explicit colour" {
+  run _color_for dagda
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"#1e1e2e"* ]]
+}
+
+@test "a glob entry matches an FQDN host" {
+  run _color_for box.stump.rocks
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"#181926"* ]]
+}
+
+@test "an unknown host falls back to the palette without erroring" {
+  # The `##host[i+1]` regression: this emitted
+  # "bad math expression: operator expected at \`ost[i+1]) ...'" on every
+  # prompt and set no colour at all.
+  run _color_for someunknownbox
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"bad math expression"* ]]
+  [[ "$output" != *"parse error"* ]]
+  # An OSC 11 sequence carrying one of the palette colours.
+  [[ "$output" == *$'\e]11;#'* ]]
+  [[ "$output" =~ \#[0-9a-f]{6} ]]
+}
+
+@test "the fallback colour is stable for the same host" {
+  run _color_for anotherunknownbox
+  [ "$status" -eq 0 ]
+  local first="$output"
+  run _color_for anotherunknownbox
+  [ "$status" -eq 0 ]
+  [ "$output" = "$first" ]
+  [ -n "$first" ]
+}
+
+@test "the hook returns 0 on the ghostty path" {
+  # precmd hooks run between the command and the prompt, so a non-zero return
+  # here is a status leak into anything that inspects $? — and the hook is also
+  # called at load time, which would make `source` of this file fail. Assert it
+  # for the unknown-host path, which is the one that used to blow up.
+  local rendered="$BATS_TEST_TMPDIR/ghostty-host-colors.zsh"
+  _render > "$rendered"
+  run zsh -c '
+    add-zsh-hook() { :; }
+    unset TERM_PROGRAM
+    source "'"$rendered"'"
+    TERM_PROGRAM=ghostty
+    HOST="yetanotherunknownbox"
+    _ghostty_host_color >/dev/null 2>&1
+    exit $?
+  '
+  [ "$status" -eq 0 ]
 }
