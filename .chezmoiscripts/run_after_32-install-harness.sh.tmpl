@@ -62,6 +62,24 @@ fi
 # Go fetch the exact version go.mod pins.
 command -v go >/dev/null 2>&1 || { echo "go toolchain absent; skipping harness build"; exit 0; }
 
+# GOPRIVATE must be set HERE, not inherited. It is exported by
+# dot_oh-my-zsh/custom/go.zsh.tmpl, which only a login zsh reads — and a chezmoi
+# run script executes under sh during apply, with almost none of that
+# environment. Without it, `go build` resolves private modules through the
+# PUBLIC proxy and checksum database and dies:
+#
+#   go: gitea.stump.rocks/stump.wtf/harness@v0.1.0: verifying module:
+#       reading https://sum.golang.org/lookup/...: 404 Not Found
+#
+# Same shape as the `{{ "{{ if env ... }}" }}` gating trap this repo already
+# banned: a scheduled apply has no environment, so anything depending on the
+# login shell silently behaves differently under czu than it does by hand.
+# Observed on tars 2026-08-10 — the binary had been stale for weeks.
+export GOPRIVATE="{{ trimPrefix "https://" .giteaUrl }}/*,github.com/{{ .githubUser }}/*,github.com/{{ .githubUser }}-agent/*"
+export GONOSUMDB="$GOPRIVATE"
+export GONOSUMCHECK=1
+
+
 heading "🛠  harness"
 
 head="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
@@ -87,5 +105,14 @@ if ( cd "$SRC" && GOTOOLCHAIN=auto \
   printf '%s' "$head" >"$STATE"
   item ok "harness ${ver} → $BIN"
 else
+  # Exit non-zero so the failure actually surfaces. This used to only warn, so
+  # czu completed "ok", the scheduled-state file stayed ok, no Signal alert
+  # fired — and the stale binary kept running. A build that fails while the
+  # toolchain and the clone are both present is a real fault, and the whole
+  # point of the scheduled run is that a failure means something.
+  #
+  # Note the state file is only written on success, so a failed build never
+  # marks itself up to date; the next run retries from scratch.
   warn "harness build failed — 'cd $SRC && go build ./cmd/harness' by hand to see why"
+  exit 1
 fi
