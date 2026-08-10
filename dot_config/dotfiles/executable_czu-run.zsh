@@ -133,8 +133,17 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # plenty of things call that — czinit does during bootstrap, `gh auth setup-git`
 # does, and so does anyone typing it by hand. One such write and the render
 # stops landing on that box, silently on the scheduled run.
+#
+# ~/.config/harness/harness.toml joined this list when it stopped being a
+# create_ seed. harness's new-harness TUI form rewrites it wholesale, which is
+# exactly the guard-tripping shape above — but the declared harness set has to
+# win, because it is the only copy that propagates to every machine. The
+# trade-off is deliberate and worth knowing: a harness created through the TUI
+# does NOT survive a czu. Declare harnesses in
+# dot_config/harness/harness.toml.tmpl instead.
 czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" \
   "$HOME/.config/crush/crush.json" \
+  "$HOME/.config/harness/harness.toml" \
   "$HOME/.gitconfig")"
 for czu_reassert_line in ${(f)czu_reassert_out}; do
   case "$czu_reassert_line" in

@@ -46,9 +46,9 @@ V="$REPO_ROOT/dot_config/private_vault"
   # secrets-static.env. The Go harness inherits the daemon's (login-shell)
   # environment instead, so its env_file carries only per-harness knobs — and
   # therefore must never carry a credential. The seed itself is a template now
-  # (dot_config/harness/create_harness.toml.tmpl); test/harness.bats owns the
+  # (dot_config/harness/harness.toml.tmpl); test/harness.bats owns the
   # rest of its couplings.
-  local seed="$REPO_ROOT/dot_config/harness/create_harness.toml.tmpl"
+  local seed="$REPO_ROOT/dot_config/harness/harness.toml.tmpl"
   [ -f "$seed" ]
   run grep -nE "API_KEY *=|TOKEN *=|SECRET *=|PASSWORD *=" "$seed"
   [ "$status" -ne 0 ]

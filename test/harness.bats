@@ -8,7 +8,7 @@
 # pin the couplings that a careless edit to any one file would break.
 load test_helper
 
-HARNESS_TOML="$REPO_ROOT/dot_config/harness/create_harness.toml.tmpl"
+HARNESS_TOML="$REPO_ROOT/dot_config/harness/harness.toml.tmpl"
 HARNESS_ENV="$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
 # private_ (0600) matches the mode crush itself writes the file with. Without it
 # chezmoi wants to chmod 644 on every apply, and because crush has also rewritten
@@ -21,11 +21,39 @@ _render() {
   chezmoi execute-template --source "$REPO_ROOT" < "$1"
 }
 
-@test "harness: seed files use the create_ attribute so the TUI can own them" {
-  # harness's new-harness form and crush both rewrite these files wholesale. A
-  # normally-managed file would be clobbered on the next apply.
+@test "harness: harness.toml is MANAGED (not create_) so edits reach every machine" {
+  # This was create_ — seed-once — on the reasoning that harness's new-harness
+  # TUI form rewrites it. That held, but the cost was worse: a create_ file is
+  # never updated again, so every edit to the template reached NEW machines only.
+  # tars sat on a 2026-07-26 copy whose harness names and profiles had drifted
+  # completely from this template, and no amount of czu could reconcile it.
+  #
+  # The declared set has to win, because it is the only copy that propagates.
+  # The TUI-rewrite problem is handled the way this repo handles every other
+  # app-fought file: czu_reassert_targets in executable_czu-run.zsh. Deliberate
+  # consequence: a harness created through the TUI does not survive a czu.
   [ -f "$HARNESS_TOML" ]
-  [ -f "$MODEL_PIN" ]
+  case "$HARNESS_TOML" in
+    */create_*) fail "harness.toml must NOT be create_ — it has to update on czu" ;;
+  esac
+}
+
+@test "harness: czu reasserts harness.toml, since the TUI rewrites it" {
+  # Managed-but-app-rewritten trips chezmoi's changed-since-last-write guard:
+  # interactive apply prompts, scheduled apply silently skips. Without this the
+  # switch away from create_ would trade one silent no-op for another.
+  grep -q '"\$HOME/.config/harness/harness.toml"' \
+    "$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh"
+}
+
+@test "harness: the crush model pin STAYS create_ (crush owns it outright)" {
+  # Unchanged by the harness.toml switch. crush rewrites this on every model
+  # change and nothing in it needs to propagate — it is per-machine state, not
+  # declared config.
+  case "$MODEL_PIN" in
+    */create_private_crush.json.tmpl) ;;
+    *) fail "crush model pin must stay create_private_, got: $MODEL_PIN" ;;
+  esac
 }
 
 @test "harness: the crush model pin is private_ (0600) so apply never prompts" {

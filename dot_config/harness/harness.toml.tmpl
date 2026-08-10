@@ -1,3 +1,19 @@
+# MANAGED, NOT create_. This file used to be create_harness.toml.tmpl —
+# seed-once-then-never-touch — which meant every edit here reached new machines
+# only. tars' copy sat frozen at 2026-07-26 while this template moved on, so its
+# harness names and profiles had drifted completely out of sync and no amount of
+# `czu` would reconcile them. Verified before switching: harness does NOT rewrite
+# this file (untouched through weeks of heavy use), so the create_ escape hatch
+# was not buying anything — the daemon keeps its runtime state, including the
+# active profile, in ~/.local/state/harness/state.json instead.
+#
+# Consequence to know: this template is now authoritative and an apply
+# OVERWRITES the target. Do not hand-edit ~/.config/harness/harness.toml; the
+# next czu reverts it.
+#
+# The daemon does not yet re-read on change (stump.wtf/harness#98), so a config
+# that arrives via czu needs `harness reload` — or a daemon restart — to take
+# effect. Until that lands, changing this file is two steps, not one.
 # harness.toml — supervised long-running agents. Seeded by chezmoi, then YOURS.
 #
 # Note the `create_` prefix on the chezmoi SOURCE file: chezmoi writes this file
@@ -101,3 +117,22 @@ args = ["--dangerously-skip-permissions"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 description = "Claude Code · ~/src · headless queue worker · skip-permissions"
 enabled = false
+
+# ── Profiles ─────────────────────────────────────────────────────────────────
+# Named sets that `harness use-profile <name>` switches between. These existed
+# in the rendered copies on real machines but never in this template, because
+# create_ meant the template stopped being the source of truth the moment a
+# machine was seeded. They are declared here so the set is the same everywhere.
+#
+# autostart marks which profile the daemon brings up on start. Exactly one
+# should carry it — see stump.wtf/harness#99 for what happens when the daemon's
+# persisted active profile does not resolve (it silently starts nothing).
+[profile.default]
+description = "Everyday set — Crush Signal channel + headless Claude worker"
+harnesses = ["crush-signal", "claude-headless"]
+autostart = true
+
+[profile.full]
+description = "All harnesses running"
+harnesses = ["crush-signal", "claude-code", "claude-headless"]
+autostart = false
