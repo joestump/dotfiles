@@ -108,6 +108,24 @@ else
   #
   # Note the state file is only written on success, so a failed build never
   # marks itself up to date; the next run retries from scratch.
-  warn "crush build failed — 'cd $SRC && go build .' by hand to see why"
-  exit 1
+  # Retry once before failing. czu.timer is Persistent=true with no OnBootSec,
+  # so a run missed while the machine was off fires within minutes of boot — and
+  # czu.service is ordered After=network-online.target, which says nothing about
+  # the FORGE being up, because gitea lives on a different machine. A cold boot
+  # therefore races the forge and `go build` fails fetching modules.
+  #
+  # Without this, the exit 1 below would Signal-alert on every reboot — and an
+  # alert that cries wolf gets ignored, which is the same disease as the silence
+  # it replaced. One retry separates "the forge was still coming up" from "the
+  # build is broken": a real failure fails twice and still exits non-zero.
+  warn "crush build failed — retrying once in 20s (forge may still be coming up)"
+  sleep 20
+  if ( cd "$SRC" && CGO_ENABLED=0 GOTOOLCHAIN=auto \
+       go build -ldflags "-X github.com/charmbracelet/crush/internal/version.Version=${ver}" -o "$BIN" . ); then
+    printf '%s' "$head" >"$STATE"
+    item ok "crush ${ver} → $BIN (succeeded on retry)"
+  else
+    warn "crush build failed twice — 'cd $SRC && go build .' by hand to see why"
+    exit 1
+  fi
 fi

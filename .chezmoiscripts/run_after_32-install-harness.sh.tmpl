@@ -113,6 +113,26 @@ else
   #
   # Note the state file is only written on success, so a failed build never
   # marks itself up to date; the next run retries from scratch.
-  warn "harness build failed — 'cd $SRC && go build ./cmd/harness' by hand to see why"
-  exit 1
+  # Retry once before failing. czu.timer is Persistent=true with no OnBootSec,
+  # so a run missed while the machine was off fires within minutes of boot — and
+  # czu.service is ordered After=network-online.target, which says nothing about
+  # the FORGE being up, because gitea lives on a different machine. A cold boot
+  # therefore races the forge and `go build` fails fetching modules.
+  #
+  # Without this, the exit 1 below would Signal-alert on every reboot — and an
+  # alert that cries wolf gets ignored, which is the same disease as the silence
+  # it replaced. One retry separates "the forge was still coming up" from "the
+  # build is broken": a real failure fails twice and still exits non-zero.
+  warn "harness build failed — retrying once in 20s (forge may still be coming up)"
+  sleep 20
+  if ( cd "$SRC" && GOTOOLCHAIN=auto \
+       go build -trimpath \
+         -ldflags "-X gitea.stump.rocks/stump.wtf/harness/internal/buildinfo.Version=${ver}" \
+         -o "$BIN" ./cmd/harness ); then
+    printf '%s' "$head" >"$STATE"
+    item ok "harness ${ver} → $BIN (succeeded on retry)"
+  else
+    warn "harness build failed twice — 'cd $SRC && go build ./cmd/harness' by hand to see why"
+    exit 1
+  fi
 fi
