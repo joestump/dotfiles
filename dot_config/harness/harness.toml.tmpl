@@ -14,21 +14,41 @@
 # The daemon does not yet re-read on change (stump.wtf/harness#98), so a config
 # that arrives via czu needs `harness reload` — or a daemon restart — to take
 # effect. Until that lands, changing this file is two steps, not one.
-# harness.toml — supervised long-running agents. Seeded by chezmoi, then YOURS.
+# harness.toml — supervised long-running agents, managed end-to-end by chezmoi.
 #
-# Note the `create_` prefix on the chezmoi SOURCE file: chezmoi writes this file
-# once, on a machine that doesn't already have it, and never touches it again.
-# That's deliberate — harness's own TUI rewrites this file wholesale
-# (internal/tui/form.go → os.WriteFile) when you add or edit a harness in the
-# new-harness form, so a normally-managed file would be clobbered on the next
-# `chezmoi apply`. Consequence: editing the chezmoi source changes the seed for
-# FUTURE machines only; to change THIS machine, edit this file or use the TUI.
+# Caveat that survives from the create_ era: harness's own TUI rewrites this
+# file wholesale (internal/tui/form.go → os.WriteFile) when you add or edit a
+# harness in the new-harness form. Those edits are TARGET-side, so the next
+# `chezmoi apply` reverts them. Add a harness here, in the template — not in the
+# TUI — or the change lives exactly until the next czu.
 #
 # Full field reference: ~/.local/share/harness-src/harness.toml.example and
-# `harness daemon -h`. Fields not used here: restart_delay, tmux_socket, and
-# backend (defaults to "native", which runs the process under the daemon's own
-# PTY per ADR-0003 — that's what a full-screen TUI like crush or claude needs;
-# "tmux" is the compat escape hatch).
+# `harness daemon -h`. Fields not used here: tmux_socket and backend (defaults
+# to "native", which runs the process under the daemon's own PTY per ADR-0003 —
+# that's what a full-screen TUI like crush or claude needs; "tmux" is the compat
+# escape hatch).
+#
+# RESTART POLICY. Every harness below sets `restart` and `restart_delay`
+# explicitly. Both previously relied on defaults, and the defaults are a trap
+# for an agent you drive from your phone:
+#
+#   restart       unset → "always" (fine, but pinned here so a future upstream
+#                 default change cannot silently retire our supervision)
+#   restart_delay unset → 0 — respawn INSTANTLY on exit
+#
+# A zero delay is what turns one bad afternoon into a dead agent. The daemon's
+# crash-loop policy (internal/supervisor/policy.go DefaultPolicy) is 3 exits
+# inside a 10s window → flapping, then escalating backoff, then FAILED after 5
+# attempts — and `failed` is terminal, needing a human. With delay 0 a
+# fast-failing crush burns all five attempts in about half a minute and is gone
+# until someone runs `harness start`, from a phone, having had no notification.
+#
+# restart_delay = 5 spaces retries wider than the 10s crash window, so a
+# transient failure (Z.ai 5xx, a Signal reconnect, an OOM) is retried
+# indefinitely instead of latching. The deliberate trade: a genuinely broken
+# harness now retries forever rather than surfacing as `failed` in
+# `harness doctor` — for a phone-driven agent, self-healing beats a tidy error
+# state nobody is at a desk to read.
 #
 # Every agent below runs with permission prompts off, so all are
 # `enabled = false`: the daemon will NOT autostart them on boot. Start one
@@ -71,6 +91,8 @@ args = ["--yolo", "--channels", "signal", "--channels", "switchboard"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
 description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel (cc prefix)"
+restart = "always"
+restart_delay = 5
 enabled = false
 
 # Claude Code in ~/src, driven from the Claude app / claude.ai via Remote Control.
@@ -100,6 +122,8 @@ cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
 args = ["--remote-control", "--dangerously-skip-permissions"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 description = "Claude Code · ~/src · Remote Control · skip-permissions"
+restart = "always"
+restart_delay = 5
 enabled = false
 
 # The always-on background worker: Claude Code sitting in ~/src waiting for
@@ -116,6 +140,8 @@ cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
 args = ["--dangerously-skip-permissions"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 description = "Claude Code · ~/src · headless queue worker · skip-permissions"
+restart = "always"
+restart_delay = 5
 enabled = false
 
 # ── Profiles ─────────────────────────────────────────────────────────────────

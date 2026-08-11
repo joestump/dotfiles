@@ -86,6 +86,25 @@ for name, h in d[\"harness\"].items():
   [ "$status" -eq 0 ]
 }
 
+@test "harness: every harness pins an explicit restart policy and a non-zero delay" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # Both keys used to be omitted, and the default restart_delay is 0 — an
+  # instant respawn. The daemon gives up after 3 exits in a 10s window plus 5
+  # backoff attempts and latches FAILED, which is terminal, so a fast-failing
+  # agent was permanently gone in ~30s with nobody at a desk to notice. The
+  # delay must stay wider than that 10s crash window's per-retry spacing, so a
+  # transient upstream failure is retried instead of latching.
+  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+d = tomllib.load(sys.stdin.buffer)[\"harness\"]
+for name, h in d.items():
+    assert h.get(\"restart\") == \"always\", (name, h.get(\"restart\"))
+    assert h.get(\"restart_delay\", 0) >= 5, (name, h.get(\"restart_delay\"))
+'"
+  [ "$status" -eq 0 ]
+}
+
 @test "harness: claude-code is Remote Control + skip-permissions, no Signal wiring" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
