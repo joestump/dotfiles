@@ -109,10 +109,10 @@ for name, h in d.items():
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   # The phone drives this one through Remote Control, not the Signal channel: the
-  # signal MCP in ~/.claude.json is wired WITHOUT --channel, and the cc prefix
-  # belongs to crush-signal. An env_file here would be the tell that someone gave
-  # claude a channel too — if that's ever wanted it needs its OWN prefix, because
-  # two agents on one prefix both answer the same message.
+  # signal MCP in ~/.claude.json is wired WITHOUT --channel, and crush-signal now
+  # answers every trusted-sender message unprefixed. An env_file here would be the
+  # tell that someone gave claude a channel too — which now guarantees duplicate
+  # replies, since neither agent would be filtering.
   run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
 import tomllib,sys
 h = tomllib.load(sys.stdin.buffer)[\"harness\"][\"claude-code\"]
@@ -215,10 +215,36 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
   ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
 }
 
-@test "harness: crush-signal's env file carries the cc opt-in" {
-  # The opt-in must live in the env_file the harness daemon loads, or the
-  # general-purpose agent silently starts answering every Signal message.
-  grep -q '^SIGNAL_MCP_PREFIX=cc$' "$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
+@test "harness: the signal prefix is gated on the identity role, not hardcoded" {
+  # This used to be a flat `grep SIGNAL_MCP_PREFIX=cc`, which is exactly how both
+  # deployments ended up with the prefix. On joestump-agent@ (tars) that made a
+  # healthy agent look dead — `running`, zero restarts, clean doctor, and silent
+  # to every unprefixed message — because that account IS the agent's and nobody
+  # prefixes when writing to it. Pin the gate itself, same as the sweep's role
+  # gate, so the structure survives whichever box CI runs on.
+  grep -q 'hasSuffix "-agent"' "$HARNESS_ENV"
+}
+
+@test "harness: the prefix renders per role — absent for agent, cc for human" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # Behavioral check with THIS machine's identity, following the same shape as
+  # test/stumpcloud-sweep.bats' role gate.
+  #
+  #   agent login (joestump-agent, tars) — the Signal account IS the agent's, so
+  #     every trusted-sender message is meant for it: NO prefix. Absent, not
+  #     empty: signal-mcp treats unset and empty the same, but harness appends
+  #     this file last and later duplicates shadow earlier ones (spawn.go
+  #     buildEnv), so any line here — even an empty one — shadows OpenBao.
+  #
+  #   human login (joestump, kitt) — the account is Joe's own and its Note to
+  #     Self carries #todo / #bookmark / #journal owned by other automations, so
+  #     the agent takes only what is addressed to it: cc stays.
+  rendered="$(_render "$HARNESS_ENV")"
+  if [[ "$(whoami)" == *-agent ]]; then
+    ! grep -qE '^[[:space:]]*SIGNAL_MCP_PREFIX' <<<"$rendered"
+  else
+    grep -qE '^SIGNAL_MCP_PREFIX=cc$' <<<"$rendered"
+  fi
 }
 
 @test "harness: the channel-enabled MCP servers are actually named 'signal' and 'switchboard'" {

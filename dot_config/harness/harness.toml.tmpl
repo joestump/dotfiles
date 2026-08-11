@@ -79,18 +79,24 @@
 # when a tool is polled. Opt-in is per-server and CLI-only (there is no config
 # key for it — hence args), and both "signal" and "server:signal" are accepted.
 #
-# The signal MCP defaults to NO prefix (see dot_config/crush/crush.json.tmpl),
-# so a dedicated signal-channel bot receives every trusted-sender message
-# unconditionally. This general-purpose harness opts INTO the `cc` prefix via
-# SIGNAL_MCP_PREFIX=cc in its env_file, so messages must start with `cc` on a
-# word boundary ("cc deploy" and "cc: deploy" match, "ccdeploy" does not) and
-# the prefix is stripped before the text reaches the agent.
+# PREFIX IS IDENTITY-CONDITIONAL — see crush-signal.env.tmpl, which renders it.
+# On a human login (joestump, e.g. kitt) the Signal account is Joe's own and its
+# Note to Self carries other automations' items, so the agent keeps the `cc`
+# prefix. On an agent login (joestump-agent, e.g. tars) the account IS the
+# agent's, every trusted-sender message is meant for it, and no prefix is set.
+#
+# Both boxes used to ship `cc`, which made the tars agent look dead: green in
+# `harness list`, zero restarts, silent to every unprefixed message.
+#
+# Changing this is an env_file change, NOT an OpenBao one: harness appends
+# env_file last (spawn.go buildEnv) and later duplicates shadow earlier ones, so
+# an env_file line beats anything Vault Agent renders.
 [harness.crush-signal]
 cmd = "{{ .chezmoi.homeDir }}/.local/bin/crush"
 args = ["--yolo", "--channels", "signal", "--channels", "switchboard"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
-description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel (cc prefix)"
+description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
 restart = "always"
 restart_delay = 5
 enabled = false
@@ -106,10 +112,13 @@ enabled = false
 #
 # Deliberately NOT Signal-driven: the `signal` MCP in ~/.claude.json is wired
 # WITHOUT --channel (see .chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl),
-# and the `cc` prefix already belongs to crush-signal above. If you ever do want a
-# Signal-channel Claude, give it an env_file setting SIGNAL_MCP_CHANNEL=1 and its
-# own SIGNAL_MCP_PREFIX — signal-mcp reads both from the environment — rather than
-# sharing a prefix with crush, or both agents answer the same message.
+# and crush-signal above already owns this box's Signal channel — on an agent
+# login it answers every trusted-sender message with no prefix at all. A second
+# Signal-channel agent there would answer the very same messages, so the human
+# gets two replies to everything. If you ever do want a Signal-channel Claude,
+# give it an env_file setting SIGNAL_MCP_CHANNEL=1 AND its own
+# SIGNAL_MCP_PREFIX — signal-mcp reads both from the environment — and expect to
+# give crush-signal a distinct prefix at the same time.
 #
 # --dangerously-skip-permissions is the claude equivalent of crush's --yolo, and
 # carries the same consequence: `enabled = false`, start it by hand.
