@@ -28,7 +28,7 @@ GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.git
 # github is the REMOTE hosted GitHub MCP, reached via the npx mcp-remote bridge with
 # a PAT Bearer (no Docker). Fallback extracts the prior token from the bridge's
 # --header arg (ltrimstr no-ops on a bare pre-migration env value).
-GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '(([.mcpServers.github.args[]?] | map(select(startswith("Authorization:Bearer ")))[0]) // .mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // "") | ltrimstr("Authorization:Bearer ")' "$DC")")"
+GH="$(mcp_secret github   GITHUB_TOKEN                  "$(jq -r '(([.mcpServers.github.args[]?] | map(select(startswith("Authorization:Bearer ")))[0]) // .mcpServers.github.env.GITHUB_TOKEN // "") | ltrimstr("Authorization:Bearer ")' "$DC")")"
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$DC")")"
 # Desktop is GUI-launched (no shell env to inherit), so outline's Bearer token is
 # baked here at apply time — read straight from the Vault-Agent-rendered secrets

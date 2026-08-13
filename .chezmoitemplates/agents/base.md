@@ -254,6 +254,59 @@ Also expose `make check` to run both, and wire **the same targets into CI** so l
 
 **If a repo you are working in lacks these targets, add them as part of your change.** A one-line `Makefile` wrapping the native commands is enough, and it is the single highest-leverage thing you can do for every future session in that repo.
 
+## Secrets — investigate them without leaking them
+
+Everything you print lands in a transcript that is stored, summarized, replayed into later turns, and often shipped to a model provider or pasted into a PR. **A secret that reaches your context is compromised**, regardless of how the turn ends — you cannot un-print it. So the invariant is *never emit the value*, not *emit it only when it seems necessary*.
+
+This is not hypothetical: the usual way it happens is not a deliberate `echo $TOKEN`, it is an ordinary diagnostic command that happens to embed a credential in its output.
+
+### Fingerprint instead of echoing
+
+A truncated SHA-256 answers almost every real question — did the rotation land, does the env var match the file, are these two configs using the same key — while revealing nothing:
+
+```sh
+# Portable across macOS and Linux. Prints 12 hex chars, never the secret.
+sfp() {
+  if command -v sha256sum >/dev/null 2>&1; then printf %s "$1" | sha256sum
+  elif command -v shasum >/dev/null 2>&1; then printf %s "$1" | shasum -a 256
+  else printf %s "$1" | openssl dgst -sha256
+  fi | awk '{for (i=1; i<=NF; i++) if ($i ~ /^[0-9a-f]{64}$/) { print substr($i,1,12); exit }}'
+}
+
+sfp "$GITHUB_TOKEN"                                  # -> 7cdbdb2b6b73
+[ "$(sfp "$A")" = "$(sfp "$B")" ] && echo match || echo differ
+```
+
+Use `printf %s`, **never `echo`** — `echo` appends a newline, so the same secret fingerprints differently depending on how it was fed in, and you will chase a phantom mismatch.
+
+Cheaper checks that leak nothing and usually settle the question on their own:
+
+- **Is it set:** `[ -n "$TOKEN" ] && echo set || echo empty`
+- **Length:** `echo ${#TOKEN}` — catches truncation, a double paste, or a trailing newline.
+- **Vendor prefix only:** `printf '%.4s\n' "$TOKEN"` → `ghp_`, `sk-a`. Four characters identify the type and reveal nothing usable.
+- **Equality:** `[ "$A" = "$B" ]` — compare directly, print only the verdict.
+
+### Redact at the source, not after reading
+
+Pipe credential-bearing commands through a redactor rather than reading them raw and hoping:
+
+```sh
+git remote -v | sed -E 's#://([^:/@]+):[^@]*@#://\1:***@#'
+env | cut -d= -f1 | grep -iE 'token|key|secret|password'   # names only, never values
+```
+
+Known offenders, all of which print secrets in the course of doing something else: `git remote -v` and `git config --list` (credentials embedded in URLs), `curl -v` (the `Authorization` header), `docker inspect`, `kubectl get secret -o yaml` (base64 is encoding, not encryption), `systemctl show` and `Environment=` lines, `.netrc`, and **anything running under `set -x`** — turn xtrace off around secret handling.
+
+Never run a bare `env`, `printenv`, or `cat` of a secrets file (`~/.config/vault/secrets-static.env`, `.envrc`, `.netrc`). Grep for the key *name*; the value is not what you needed.
+
+Prefer passing secrets as environment variables the tool reads itself over interpolating them into a command line, where they surface in output, error messages, and shell history.
+
+### If one does leak, say so and rotate it
+
+If a secret reaches your context — yours or one you printed by accident — it is burned. **Report it plainly in your summary and rotate it.** Do not quietly carry on because it "was only one line" or "the session is private": transcripts get summarized, stored, and shared. Rotation is cheap and reversible; a leaked long-lived token is neither.
+
+Related: never put a secret in a Cairn share, a Signal message, an Outline doc, or a commit (see those sections). OpenBao is the only place a credential belongs at rest.
+
 ## Switchboard — the durable work queue
 
 Switchboard (docs https://joestump.github.io/switchboard/ · repo {{ .giteaUrl }}/stump.wtf/switchboard — the canonical home for its code AND issues; the old github.com/{{ .githubUser }}/switchboard is retired, never file there) turns verified inbound webhooks into durable **todos** on scoped **queues**, and pushes them into live sessions as doorbell events.
