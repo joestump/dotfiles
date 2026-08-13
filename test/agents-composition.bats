@@ -48,6 +48,7 @@ setup() {
     "## Workflow (CI/CD) expectations" \
     "## Cairn" \
     "## Code quality" \
+    "## Secrets" \
     "## Communication"
   do
     echo "$CLAUDE_OUT" | grep -qF "$section" || { echo "missing from CLAUDE.md: $section"; return 1; }
@@ -387,6 +388,104 @@ EOF
   grep -qF "This was posted autonomously by" <<< "$out"
   run grep -cF "Posted on behalf of" <<< "$out"
   [ "$output" -eq 0 ]
+}
+
+# ────── secret hygiene ──────
+
+# The motivating failure: an agent ran `git remote -v` for an unrelated reason
+# and a PAT embedded in the remote URL landed in the transcript. The rules must
+# name that class of command, not just say "don't print secrets".
+@test "secret rules name the commands that leak credentials incidentally" {
+  local rule
+  for rule in \
+    "A secret that reaches your context is compromised" \
+    "git remote -v" \
+    "kubectl get secret -o yaml" \
+    "set -x" \
+    "Grep for the key *name*" \
+    "Report it plainly in your summary and rotate it"
+  do
+    echo "$CLAUDE_OUT" | grep -qF "$rule" || { echo "missing secret rule: $rule"; return 1; }
+  done
+}
+
+# The whole point of shipping a snippet is that an agent will paste it verbatim.
+# A subtly broken one is worse than none: the first version of this helper used a
+# greedy sed that reduced sha256sum's "<hash>  -" output to "-", so EVERY pair of
+# secrets compared equal — a silent false "match". Extract the function from the
+# RENDERED rules and actually run it.
+@test "the documented fingerprint helper works when extracted from the render" {
+  local fn out
+  fn="$(printf '%s\n' "$CLAUDE_OUT" | sed -n '/^sfp() {/,/^}/p')"
+  [ -n "$fn" ] || { echo "sfp() not found in rendered rules"; return 1; }
+
+  out="$(sh -c "$fn"'
+    A="ghp_EXAMPLEfake000000000000000000000000"
+    B="ghp_DIFFERENTfake00000000000000000000000"
+    printf "fp=%s\n" "$(sfp "$A")"
+    [ "$(sfp "$A")" = "$(sfp "$A")" ] && echo same-match || echo same-BROKEN
+    [ "$(sfp "$A")" = "$(sfp "$B")" ] && echo diff-BROKEN || echo diff-differs
+  ')"
+
+  grep -q 'same-match'   <<< "$out" || { echo "identical secrets did not match: $out"; return 1; }
+  grep -q 'diff-differs' <<< "$out" || { echo "different secrets compared equal: $out"; return 1; }
+  # A real fingerprint, not an artifact of the output format.
+  grep -qE 'fp=[0-9a-f]{12}$' <<< "$out" || { echo "bad fingerprint: $out"; return 1; }
+  # And it must never echo the input back.
+  run grep -c 'EXAMPLEfake' <<< "$out"
+  [ "$output" -eq 0 ]
+}
+
+# Every hasher branch must agree, because which one runs is decided by the box:
+# stock macOS has shasum but no sha256sum, most Linux has both.
+# Which hasher runs is decided by the box — stock macOS has shasum but no
+# sha256sum — and the three print the digest in three different layouts:
+#   sha256sum         "<hash>  -"
+#   shasum -a 256     "<hash>  -"
+#   openssl dgst      "SHA2-256(stdin)= <hash>"
+# So the extractor, not the hasher, is the fragile part. Pull the awk program out
+# of the rendered helper (so this tracks the docs rather than duplicating them)
+# and assert every available backend normalises to the same fingerprint.
+@test "the fingerprint is identical across every hasher's output format" {
+  local fn script want ex got h
+  fn="$(printf '%s\n' "$CLAUDE_OUT" | sed -n '/^sfp() {/,/^}/p')"
+  [ -n "$fn" ] || { echo "sfp() not found in rendered rules"; return 1; }
+
+  script="$fn
+sfp \"\$1\""
+  want="$(sh -c "$script" _ secret-under-test)"
+  [ -n "$want" ] || { echo "helper produced no fingerprint"; return 1; }
+
+  ex="$(printf '%s\n' "$fn" | sed -n "s/^.*| awk '\(.*\)'[[:space:]]*$/\1/p")"
+  [ -n "$ex" ] || { echo "could not extract the awk extractor from the helper"; return 1; }
+
+  local ran=0
+  while IFS= read -r h; do
+    command -v "${h%% *}" >/dev/null 2>&1 || continue
+    got="$(printf %s secret-under-test | $h | awk "$ex")"
+    [ "$got" = "$want" ] || { echo "$h -> '$got', want '$want'"; return 1; }
+    ran=$((ran + 1))
+  done <<'HASHERS'
+sha256sum
+shasum -a 256
+openssl dgst -sha256
+HASHERS
+
+  # Guard against the whole loop being skipped and the test passing vacuously.
+  [ "$ran" -ge 2 ] || { echo "only $ran hasher(s) exercised"; return 1; }
+}
+
+@test "the documented redaction strips credentials from remote URLs" {
+  local red
+  red="$(printf '%s\n' \
+      'agent	https://user:ghp_SECRETVALUE@github.com/o/r.git (fetch)' \
+      'origin	https://gitea.stump.rocks/joestump/dotfiles.git (fetch)' \
+    | sed -E 's#://([^:/@]+):[^@]*@#://\1:***@#')"
+  run grep -c 'ghp_SECRETVALUE' <<< "$red"
+  [ "$output" -eq 0 ]
+  grep -qF 'https://user:***@github.com/o/r.git' <<< "$red"
+  # A credential-free remote must survive untouched.
+  grep -qF 'https://gitea.stump.rocks/joestump/dotfiles.git' <<< "$red"
 }
 
 @test "the retired hand-maintained CRUSH.md is gone" {
