@@ -258,6 +258,10 @@
         "--metadata",
         "AWS_REGION=us-west-2"
       ],
+      "env": {
+        "AWS_SHARED_CREDENTIALS_FILE": "{{ .chezmoi.homeDir }}/.config/aws/credentials",
+        "AWS_PROFILE": "agent-readonly"
+      },
       "timeout": 120,
       "disabled": false
     },

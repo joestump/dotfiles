@@ -108,6 +108,16 @@ template {
   perms       = "0600"
 }
 
+# AWS shared-credentials INI for boto3 (non-interactive consumers: MCP servers,
+# harness agents, Claude Desktop). Two profiles: [default] (admin, CLI) and
+# [agent-readonly] (read-only, for MCP). Renders empty for a user without the
+# bag. See dotfiles#136.
+template {
+  source      = "{{ .chezmoi.homeDir }}/.config/vault/secrets-aws.credentials.ctmpl"
+  destination = "{{ .chezmoi.homeDir }}/.config/aws/credentials"
+  perms       = "0600"
+}
+
 # SSH keys rendered as FILES. Source of truth = OpenBao secret/users/$USER/ssh.
 # ssh-keys.ctmpl auto-discovers EVERY field of that bag and writeToFile()s each to
 # ~/.ssh/<field> (0600, or 0644 for *.pub) — the file-secret analogue of the static

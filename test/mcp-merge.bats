@@ -134,26 +134,26 @@ JSON
   [[ "$output" =~ ^mcp-proxy-for-aws==[0-9]+\.[0-9]+\.[0-9]+$ ]]
 
   # Auth is SigV4 via the boto credential chain — there is no token to bake in,
-  # and baking one here would put a credential in a committed file.
-  run jq -re '.aws.env | length' "$f"
-  [ "$output" = "0" ]
+  # and baking one here would put a credential in a committed file. The env
+  # carries only the profile POINTER (INI path + profile name), not a secret.
+  run jq -re '.aws.env.AWS_SHARED_CREDENTIALS_FILE' "$f"
+  [ "$status" -eq 0 ]
+  run jq -re '.aws.env.AWS_PROFILE' "$f"
+  [ "$output" = "agent-readonly" ]
   run grep -c "AKIA" "$f"
   [ "$output" = "0" ]
 }
 
-@test "the aws entry documents that the boto chain is interactive-shell only" {
-  # The credential chain is only populated by 00-secrets.zsh, an OMZ custom
-  # file, so Claude Desktop and harness-launched agents get nothing and fail on
-  # the first tool call. Anyone reading the entry must see that before wiring it
-  # into a non-interactive context and debugging an opaque auth error.
+@test "the aws entry documents the Vault-rendered INI credential path" {
+  # The credential chain is rendered by Vault Agent to ~/.config/aws/credentials
+  # (INI, [agent-readonly] profile), so non-interactive launch contexts (Claude
+  # Desktop, harness) resolve the same rotating credential as the shell. Anyone
+  # reading the entry must see where the creds actually come from.
   local f="$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
   run jq -re '.aws._comment' "$f"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"INTERACTIVE"* ]]
-  [[ "$output" == *"00-secrets.zsh"* ]]
-  # And it must not re-assert the claim that was wrong: that the rendered
-  # secrets-aws.env or ~/.aws simply supplies credentials wherever it runs.
-  [[ "$output" != *"picks up whatever Vault Agent has rendered"* ]]
+  [[ "$output" == *"AWS_SHARED_CREDENTIALS_FILE"* ]]
+  [[ "$output" == *"agent-readonly"* ]]
 }
 
 @test "the rendered aws entry is what Claude would actually launch" {
