@@ -10,6 +10,11 @@
 # Claude Code local settings (machine-specific overrides; not portable)
 .claude/settings.local.json
 
+# Claude Code manages worktrees here. They are checkouts, not repo content —
+# leaving them untracked but unignored makes every `git status` in this repo
+# look dirty and invites `git add -A` into someone else's parked branch.
+.claude/worktrees/
+
 # Agent worktrees. The agent rules mandate worktree isolation for every
 # code-change task, and Claude Code puts them here — so the path must be
 # invisible to git, or every session offers to commit its own checkout.
