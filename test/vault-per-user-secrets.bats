@@ -116,3 +116,36 @@ V="$REPO_ROOT/dot_config/private_vault"
   grep -q '<key>USER</key>' "$plist"
   grep -q '<key>HOME</key>' "$plist"
 }
+
+# ----- AWS shared-credentials INI (boto3 / MCP consumers) -----
+
+@test "secrets-aws.credentials.ctmpl renders both profiles" {
+  grep -q '^\[default\]' "$V/secrets-aws.credentials.ctmpl"
+  grep -q '^\[agent-readonly\]' "$V/secrets-aws.credentials.ctmpl"
+  grep -q 'aws_access_key_id' "$V/secrets-aws.credentials.ctmpl"
+  grep -q 'aws_secret_access_key' "$V/secrets-aws.credentials.ctmpl"
+}
+
+@test "secrets-aws.credentials.ctmpl guards on the metadata listing" {
+  grep -q 'range secrets (printf "secret/metadata/users/%s/"' "$V/secrets-aws.credentials.ctmpl"
+  grep -q 'eq (. | trimSuffix "/") "aws"' "$V/secrets-aws.credentials.ctmpl"
+  grep -q 'eq (. | trimSuffix "/") "aws-readonly"' "$V/secrets-aws.credentials.ctmpl"
+}
+
+@test "agent.hcl.tmpl renders the AWS credentials INI" {
+  grep -q 'secrets-aws.credentials.ctmpl' "$V/agent.hcl.tmpl"
+  grep -q 'destination = "{{ .chezmoi.homeDir }}/.config/aws/credentials"' "$V/agent.hcl.tmpl"
+  grep -q 'perms       = "0600"' "$V/agent.hcl.tmpl"
+}
+
+@test "MCP aws entry points boto at the rendered INI with the read-only profile" {
+  grep -q 'AWS_SHARED_CREDENTIALS_FILE' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+  grep -q 'AWS_PROFILE' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+  grep -q 'agent-readonly' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+}
+
+@test "crush.json.tmpl aws entry points boto at the rendered INI with the read-only profile" {
+  grep -q 'AWS_SHARED_CREDENTIALS_FILE' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
+  grep -q 'AWS_PROFILE' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
+  grep -q 'agent-readonly' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
+}
