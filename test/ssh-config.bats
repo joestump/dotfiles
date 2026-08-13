@@ -281,14 +281,24 @@ YAML
 
 # ────── per-machine [data.ssh] overrides ──────
 
-# Render the REAL template + real data, but under a $HOME carrying a chezmoi.toml
-# whose [data.ssh] table overrides part of it. Documented in maintenance.md.
+# Render the REAL template + real data, but under a chezmoi.toml whose
+# [data.ssh] table overrides part of it. Documented in maintenance.md.
+#
+# --config is passed EXPLICITLY rather than relying on the $HOME override alone.
+# chezmoi resolves its config dir through os.UserConfigDir(), which honours
+# $XDG_CONFIG_HOME ahead of $HOME/.config on Linux — so on a box that exports it,
+# overriding HOME still left the render reading the MACHINE's real chezmoi.toml.
+# A host carrying its own [data.ssh] overrides then failed these tests while CI
+# and macOS passed, which inverts the point of `make test` as the pre-push gate.
+# See #138.
 _render_with_override() {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   local fh="$BATS_TEST_TMPDIR/home"
   mkdir -p "$fh/.config/chezmoi"
   cat > "$fh/.config/chezmoi/chezmoi.toml"
-  HOME="$fh" chezmoi execute-template --source "$REPO_ROOT" < "$SSH_TMPL"
+  HOME="$fh" chezmoi execute-template \
+    --config "$fh/.config/chezmoi/chezmoi.toml" \
+    --source "$REPO_ROOT" < "$SSH_TMPL"
 }
 
 @test "ssh-config: an options override DEEP-MERGES (siblings survive)" {

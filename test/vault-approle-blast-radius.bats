@@ -131,8 +131,20 @@ _czapprole() {
 
 # --- agent.hcl.tmpl vaultSshKeys gate -------------------------------------------
 
+# --config is passed EXPLICITLY rather than relying on the $HOME override alone.
+# chezmoi resolves its config dir through os.UserConfigDir(), which honours
+# $XDG_CONFIG_HOME ahead of $HOME/.config on Linux — so on a box that exports it,
+# overriding HOME still left the render reading the MACHINE's real chezmoi.toml,
+# and a host that sets vaultSshKeys itself failed this gate while CI passed.
+# An empty config is seeded when the caller supplies none, so the default case
+# renders against repo defaults instead of whatever the host happens to carry.
+# See #138.
 _render_agent_hcl() {
-  HOME="$1" chezmoi execute-template --source "$REPO_ROOT" \
+  local fh="$1"
+  local cfg="$fh/.config/chezmoi/chezmoi.toml"
+  mkdir -p "$fh/.config/chezmoi"
+  [ -f "$cfg" ] || : > "$cfg"
+  HOME="$fh" chezmoi execute-template --config "$cfg" --source "$REPO_ROOT" \
     < "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl" > "$BATS_TEST_TMPDIR/agent.hcl"
   [ -s "$BATS_TEST_TMPDIR/agent.hcl" ]
 }
