@@ -37,7 +37,7 @@ heading "🔗 Claude Code MCP"
 #
 # Fallbacks read the prior value from its current home (github → Bearer header;
 # ltrimstr is a no-op on a bare token, so a pre-migration env value also passes).
-GH="$(mcp_secret github   GITHUB_PERSONAL_ACCESS_TOKEN "$(jq -r '(.mcpServers.github.headers.Authorization // .mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // "") | ltrimstr("Bearer ")' "$CJ")")"
+GH="$(mcp_secret github   GITHUB_TOKEN                  "$(jq -r '(.mcpServers.github.headers.Authorization // .mcpServers.github.env.GITHUB_TOKEN // "") | ltrimstr("Bearer ")' "$CJ")")"
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$CJ")")"
 GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.gitea.env.GITEA_ACCESS_TOKEN // ""'      "$CJ")")"
 # outline is native http (not a subprocess), so it can't inherit the shell env, and
