@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Pull signal-mcp to HEAD, warm its uv venv, and bounce its consumers (Linux only).
 #
-# The Signal MCP is launched with `uv run --directory ~/src/signal-mcp`. The
-# chezmoi external refreshes the clone on a 168h period, but `czu` runs more
-# often than that — so we fetch + ff-only pull here on EVERY apply to get the
-# absolute latest. Then we run `uv sync` to keep the venv in sync with whatever
-# pyproject.toml changed.
+# The Signal MCP is launched with `uv run --directory ~/src/signal-mcp`. This
+# script OWNS that clone — it is deliberately not a chezmoi external, because
+# agents develop here and an external's ff-only pull aborts the whole apply the
+# moment the checkout sits on a branch with no upstream (see
+# .chezmoiexternal.toml). We clone it if missing, refresh it only when it is
+# passively parked on the default branch, and then run `uv sync` to keep the
+# venv in step with whatever pyproject.toml changed.
 #
 # Pulling is not enough on its own: a long-running harness (the Signal channel
 # bot) spawned signal-mcp at startup and keeps the OLD process — and things like
@@ -34,19 +36,31 @@ export PATH="$HOME/.local/bin:$PATH"
 }
 
 heading "💬 Signal MCP"
-[ -d "$repo/.git" ] || { item dim "no local checkout yet — skipping"; exit 0; }
 
-# Aggressively fetch + ff-only pull on every apply. This clone is managed (nothing
-# is developed here), so this is always safe.
-if git -C "$repo" fetch --quiet --prune origin 2>/dev/null; then
-  if git -C "$repo" merge --ff-only --quiet origin/main 2>/dev/null; then
-    head="$(git -C "$repo" rev-parse --short HEAD)"
-    item ok "signal-mcp at ${head}"
+# Clone if missing (this script replaced the chezmoi external as the owner).
+if [ ! -d "$repo/.git" ]; then
+  if ! step "cloning signal-mcp" -- git clone --quiet https://github.com/{{ .githubUser }}/signal-mcp.git "$repo"; then
+    warn "clone failed — skipping signal-mcp setup"
+    exit 0
+  fi
+fi
+
+# Refresh ONLY when the checkout is passively sitting on the default branch.
+# Agents develop here — work branches, and branches whose upstream was deleted
+# when their PR merged, are both normal. Touching them (or failing on them) is
+# how czu used to break the entire apply. Skip quietly instead.
+DEF="$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+DEF="${DEF#origin/}"
+BRANCH="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null || echo detached)"
+if [ "$BRANCH" = "$DEF" ]; then
+  if git -C "$repo" fetch --quiet --prune origin 2>/dev/null \
+     && git -C "$repo" merge --ff-only --quiet "origin/$DEF" 2>/dev/null; then
+    item ok "signal-mcp at $(git -C "$repo" rev-parse --short HEAD)"
   else
-    warn "ff-only merge failed (local commits?) — running from current HEAD"
+    warn "refresh failed (local commits? offline?) — running from current HEAD"
   fi
 else
-  warn "fetch failed — running from current local state"
+  item dim "signal-mcp on work branch '$BRANCH' — leaving it alone"
 fi
 
 # Keep the venv in sync with pyproject.toml after the pull.
@@ -62,10 +76,17 @@ fi
 # records only (no restart) — there is nothing to compare against, and bouncing
 # a possibly-mid-conversation agent for no code change is worse than waiting
 # one cycle.
+#
+# Only fingerprint an upstream HEAD. On a work branch every commit an agent
+# makes would otherwise move HEAD and bounce the live Signal bot onto their
+# WIP mid-conversation. The fingerprint then stays stale until the checkout
+# returns to the default branch, which is exactly when a restart is warranted.
 state="$HOME/.config/dotfiles/.signal-mcp-head"
 new_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
 old_head="$(cat "$state" 2>/dev/null || true)"
-if [ -n "$new_head" ] && [ "$new_head" != "$old_head" ]; then
+if [ "$BRANCH" != "$DEF" ]; then
+  item dim "on a work branch — not fingerprinting or restarting consumers"
+elif [ -n "$new_head" ] && [ "$new_head" != "$old_head" ]; then
   mkdir -p "${state%/*}"
   printf '%s' "$new_head" >"$state"
   if [ -z "$old_head" ]; then

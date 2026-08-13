@@ -53,6 +53,15 @@ _render() {
   [ "$status" -ne 0 ]
 }
 
+@test "chezmoiexternal: src/signal-mcp is NOT a git-repo external" {
+  # Same trap as src/ansible above: agents develop in ~/src/signal-mcp, and an
+  # external's ff-only pull ABORTS the whole apply the moment the checkout sits
+  # on a branch whose upstream is gone (a merged-and-deleted PR branch does it).
+  # run_after_45-signal-mcp-venv.sh owns the clone instead — do not re-add it.
+  run grep -E '^\["src/signal-mcp"\]' "$EXTERNAL"
+  [ "$status" -ne 0 ]
+}
+
 @test "chezmoiexternal: rendered output is valid TOML when the external is present" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
