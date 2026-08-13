@@ -10,6 +10,11 @@
 # Claude Code local settings (machine-specific overrides; not portable)
 .claude/settings.local.json
 
+# Agent worktrees. The agent rules mandate worktree isolation for every
+# code-change task, and Claude Code puts them here — so the path must be
+# invisible to git, or every session offers to commit its own checkout.
+.claude/worktrees/
+
 # chezmoi local state / OS cruft
 .DS_Store
 chezmoistate.boltdb
