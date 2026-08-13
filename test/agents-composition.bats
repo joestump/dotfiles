@@ -175,6 +175,80 @@ setup() {
   echo "$CLAUDE_OUT" | grep -qF "must never be visible to git"
 }
 
+# Worktree isolation is the DEFAULT, not a fallback for busy checkouts: agents
+# share these repos with each other and with Joe, and the checkout they land in
+# is routinely parked mid-work on someone else's dirty branch.
+@test "worktree isolation is mandatory, not advisory" {
+  local rule
+  for rule in \
+    "Every code-change task starts in its own worktree" \
+    "Never commit from the primary checkout" \
+    "Never stash-and-switch" \
+    "One worktree per concern" \
+    "Remove it when the work lands"
+  do
+    echo "$CLAUDE_OUT" | grep -qF "$rule" || { echo "missing worktree rule: $rule"; return 1; }
+  done
+  # The old permissive framing must not survive alongside the strict rule.
+  run grep -cF 'Use a worktree whenever you need a second checkout' <<< "$CLAUDE_OUT"
+  [ "$output" -eq 0 ]
+}
+
+# ────── Gitea/GitHub canonicity ──────
+
+# Which copy is real is discovered from repo METADATA, never from a hardcoded
+# list of repo names — a static table in an agent file rots the moment a repo
+# is added, and the agent has no way to notice it went stale.
+@test "canonical host is discovered from repo topics, not a static list" {
+  local rule
+  for rule in \
+    "canonical-gitea" \
+    "canonical-github" \
+    "downstream-mirror" \
+    "declares it in its own **topics**" \
+    "Topics are **not** replicated by the push mirror" \
+    "You are required to maintain these topics"
+  do
+    echo "$CLAUDE_OUT" | grep -qF "$rule" || { echo "missing canonicity rule: $rule"; return 1; }
+  done
+  # Both hosts need a concrete, non-destructive way to add one topic.
+  echo "$CLAUDE_OUT" | grep -qF 'gh repo edit'
+  echo "$CLAUDE_OUT" | grep -qF '/topics/<topic>'
+}
+
+# The flow is not universally Gitea→GitHub; asserting the direction is
+# per-repo is what stops "it's on GitHub, so GitHub is the mirror".
+@test "canonicity is per-repo, not inferred from the hostname" {
+  echo "$CLAUDE_OUT" | grep -qF "Do not guess from the hostname"
+  echo "$CLAUDE_OUT" | grep -qF "A few repos are GitHub-native"
+}
+
+# A clone made from the mirror looks completely normal; the remote is the only
+# tell, so the check has to happen before the first push.
+@test "agents must read the remote before pushing" {
+  echo "$CLAUDE_OUT" | grep -qF "git remote -v"
+  echo "$CLAUDE_OUT" | grep -qF "git remote set-url origin"
+  echo "$CLAUDE_OUT" | grep -qF "do not push"
+}
+
+# GitHub org names cannot contain dots, so stump.wtf ↔ stump-wtf is a live
+# footgun: the hyphen form silently addresses the throwaway mirror.
+@test "the stump.wtf / stump-wtf spelling trap is called out" {
+  echo "$CLAUDE_OUT" | grep -qF 'GitHub org names cannot contain dots'
+  echo "$CLAUDE_OUT" | grep -qF 'stump-wtf'
+}
+
+@test "repo creation requires the canonical-host topic on both hosts" {
+  echo "$CLAUDE_OUT" | grep -qF "The canonical-host topic — mandatory"
+  echo "$CLAUDE_OUT" | grep -qF "set them on both hosts"
+}
+
+# This repo mandates worktrees and Claude Code puts them inside .claude/, so the
+# path must be ignored here or every session offers to commit its own checkout.
+@test "the harness worktree path is gitignored in this repo" {
+  grep -qF '.claude/worktrees/' "$REPO_ROOT/.gitignore"
+}
+
 @test "stump.wtf is the repo-creation default and is mirrored, not pushed" {
   echo "$CLAUDE_OUT" | grep -qF "stump.wtf"
   echo "$CLAUDE_OUT" | grep -qF "push_mirrors"

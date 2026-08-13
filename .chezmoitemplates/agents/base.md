@@ -72,7 +72,71 @@ You may open pull requests, issues, and fork repos **without asking** in these o
 
 **You MUST NOT open PRs, issues, or any other contributions against ANY other organization or user on GitHub or Gitea without EXPLICIT, prior, per-action approval from Joe.** When in doubt, ASK FIRST — never assume permission.
 
-New shared work converges on `stump.wtf`. Gitea is authoritative for those repos because it runs the CI; GitHub is a **read-only downstream mirror** for public discoverability. Anything pushed to the mirror is overwritten by the next sync, so a PR opened against `stump-wtf` on GitHub is work thrown away.
+### Gitea and GitHub — which way code flows
+
+Most repos exist **twice**, and only one copy is real. Getting this backwards is the single most expensive mistake available here, because the work is not rejected — it is accepted, then silently overwritten.
+
+```
+CANONICAL ──▶ {{ .giteaUrl }}/stump.wtf/foo
+                · git history is authoritative — branch and push here
+                · issues + PRs live here
+                · Gitea Actions is the CI that gates merge
+                      │
+                      │  push mirror: one-way, force-overwrites the far side
+                      ▼
+MIRROR ─────▶ github.com/stump-wtf/foo
+                · git history is a COPY, replaced on every sync
+                · issues + PRs opened here are unread
+                · GitHub Actions publishes public artifacts only
+```
+
+**The rule: branch, push, PR, and file issues on the canonical copy. Never on the mirror.** The mirror is a **read-only downstream mirror** for public discoverability — it exists so people can find the code, not so they can change it. A push to it is reverted by the next sync; a PR opened on it is work thrown away, because the branch it targets gets force-replaced. New shared work converges on `stump.wtf`.
+
+The direction is not always Gitea → GitHub. A few repos are GitHub-native (public-facing ones that were born there), and for those GitHub is canonical and there may be no Gitea copy at all. **Do not guess from the hostname**, and do not rely on a list of repo names — lists rot.
+
+#### Ask the repo which host is canonical
+
+Every repo we own declares it in its own **topics**, so one API call answers the question on either host:
+
+| Topic | Meaning |
+|---|---|
+| `canonical-gitea` | The Gitea copy is the source of truth. Work there. |
+| `canonical-github` | The GitHub copy is the source of truth. Work there. |
+| `downstream-mirror` | **This** copy is a mirror. Do not push, do not open PRs or issues here. Find the twin named by its `canonical-*` topic. |
+
+Both copies carry the same `canonical-*` topic, so you get the same answer wherever you land; the mirror additionally carries `downstream-mirror`. Topics are **not** replicated by the push mirror — they are per-host metadata and must be set on each side.
+
+**You are required to maintain these topics.** Set them when you create a repo (see "Creating and configuring repositories" below), and **when you touch a repo that is missing them, add them in that same session** rather than leaving the next agent to re-derive it:
+
+- **Gitea:** `PUT /repos/<owner>/<repo>/topics/<topic>` adds one without disturbing the others.
+- **GitHub:** `gh repo edit <owner>/<repo> --add-topic <topic>` — it reads and merges, where the raw `PUT /topics` API replaces the whole list.
+
+If a repo genuinely has no topic yet and you cannot set one, fall back to the org table above — Gitea `stump.wtf` / `stumpcloud` / `{{ .githubUser }}` are canonical, GitHub `stump-wtf` is a mirror — and say in your summary that you inferred it.
+
+#### Check which clone you are standing in
+
+Before your first push in any repo, **read the remote** — the working directory tells you nothing, and a clone made from the mirror looks completely normal:
+
+```
+git remote -v
+```
+
+If `origin` points at the mirror host for a repo whose canonical topic names the other one, **do not push**. Re-point the remote at the canonical host and push there:
+
+```
+git remote set-url origin {{ .giteaUrl }}/<owner>/<repo>.git
+```
+
+The same check applies before `gh pr create` or any MCP call that takes an owner/repo — passing the mirror's coordinates opens the PR on the wrong host.
+
+#### The `stump.wtf` / `stump-wtf` trap
+
+GitHub org names cannot contain dots, so the same org is spelled two ways:
+
+- **Gitea:** `stump.wtf` (dot) — canonical.
+- **GitHub:** `stump-wtf` (hyphen) — mirror.
+
+They are the same project. A hyphen where a dot belongs is not a typo you can shrug at — it silently addresses the mirror, so the push or PR lands on the throwaway copy. Read the separator before you act on an owner string, and never "correct" one spelling into the other when copying a URL between hosts.
 
 ### Branching
 
@@ -81,24 +145,34 @@ New shared work converges on `stump.wtf`. Gitea is authoritative for those repos
 3. **Never reuse a merged branch.** Delete it and cut a new one.
 4. **One branch = one concern.** If you cannot describe the branch without "and", it should be two branches.
 
-### Worktrees
+### Worktrees — isolate by default
 
-Use a worktree whenever you need a second checkout — parallel work items, reviewing someone else's branch, or test-merging. Never stash-and-switch, and never test a merge in the branch you are working on.
+**Every code-change task starts in its own worktree.** Not "when you need a second checkout" — always. You are one of several agents and humans sharing these repos, and the checkout you land in is routinely parked mid-work on someone else's branch with a dirty tree. Committing from it silently mixes your change into theirs; switching branches under them destroys their context. A worktree makes both impossible.
 
 ```
-git worktree add <path> -b <branch> origin/main   # new branch
-git worktree add <path> <existing-branch>         # inspect a branch
+git fetch origin
+git worktree add <path> -b <branch> origin/main   # start work — the default
+git worktree add <path> <existing-branch>         # inspect/review a branch
 git worktree list                                 # what is outstanding
 git worktree remove <path>                        # clean up when done
 ```
 
+The rules that follow from this:
+
+1. **Never commit from the primary checkout**, and never leave it on a different branch than you found it on. Treat it as read-only: browse and search it freely, change nothing.
+2. **Never stash-and-switch.** `git stash` to free up a checkout is the exact move a worktree exists to replace — someone else's stash entry is invisible to them and gets lost.
+3. **Never test a merge in the branch you are working on.** Test-merges get a throwaway worktree that you delete afterwards, merged or not.
+4. **One worktree per concern**, cut from a freshly fetched `origin/main` — parallel work items each get their own.
+5. **Remove it when the work lands.** A stale worktree pins refs, confuses the next session, and makes `git worktree list` useless. If you must leave one, say so in your final message.
+
+The only exception: a read-only task that will not produce a commit — answering a question, reading code, running tests you do not intend to fix. If you find yourself editing a file, you needed a worktree; make one before you continue.
+
 **Use your harness's own worktree location rather than inventing one.** Claude Code manages worktrees under `.claude/worktrees/` inside the repo, and its own tooling expects them there. That is fine *because the path is gitignored* — the rule that actually matters is that a worktree must never be visible to git, builds, linters, or `git ls-files` globs. So:
 
 - If the harness has a worktree convention, follow it, and confirm the path is ignored.
-- If it does not, put the worktree outside the repo (a sibling directory).
+- If it is not ignored yet, **add it to `.gitignore` as part of your change** rather than working around it — the next agent in that repo hits the same thing.
+- If the harness has no convention, put the worktree outside the repo (a sibling directory).
 - Either way, **never** create one at an unignored path inside the repo.
-
-Remove worktrees when finished — a stale one pins refs and confuses the next session.
 
 ### Commits
 
@@ -332,6 +406,7 @@ An unlabelled repo is undiscoverable, and a repo with no website link forces eve
 
 - **Description** — one sentence saying what it actually does, not a restatement of the name.
 - **Topics / labels** — the ecosystem and domain tags someone would search for (`go`, `mcp`, `ansible`, `zsh-plugin`, …).
+- **The canonical-host topic — mandatory.** Tag the repo `canonical-gitea` or `canonical-github` per "Gitea and GitHub — which way code flows" above, and tag the mirror copy `downstream-mirror` **in addition to** the same `canonical-*` topic. Topics do not replicate across the mirror, so set them on both hosts. A repo without this topic forces every future agent to guess which copy is real.
 - **Website URL** — point it at the docs, not the source:
   - **Gitea repo → its Gitea Pages site** (e.g. `https://<owner>.pages.stump.rocks/<repo>/`).
   - **GitHub mirror → the public site or GitHub Pages twin** (e.g. `https://{{ .githubUser }}.github.io/<repo>/`).
