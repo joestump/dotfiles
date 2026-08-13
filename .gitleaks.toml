@@ -8,3 +8,12 @@ description = "Example/config files contain no real secrets — they reference b
 paths = [
   '''examples/envrc\.example''',
 ]
+
+# run_after_40-quarantine-dead-aws-credentials.sh.tmpl names the DEACTIVATED
+# key ID it quarantines — revocation bait, not a live secret. Allowlisted by
+# VALUE rather than by path: exempting the whole file would stop gitleaks
+# scanning it for everything else, so a live secret pasted in there later (a
+# newly quarantined key, a debugging copy/paste) would ship unnoticed.
+regexes = [
+  '''AKIA4PUPMZ4S3UJCKLFZ''',
+]
