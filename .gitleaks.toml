@@ -7,4 +7,8 @@ useDefault = true
 description = "Example/config files contain no real secrets — they reference bao kv get at runtime."
 paths = [
   '''examples/envrc\.example''',
+  # run_once_after_40-quarantine-dead-aws-credentials.sh.tmpl matches the
+  # DEACTIVATED key IDs it quarantines by name — they are revocation bait,
+  # not live secrets.
+  '''run_once_after_40-quarantine-dead-aws-credentials\.sh\.tmpl''',
 ]
