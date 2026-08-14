@@ -166,23 +166,17 @@
 [".config/crush/skills-ext/claude-plugin-sdd".pull]
     args = ["--ff-only", "--quiet"]
 
-{{ if ne .chezmoi.os "darwin" -}}
 # ---------- Signal MCP server (Linux only) ----------
 # The Signal MCP (a JSON-RPC client for the signal-cli daemon) is launched with
-# `uv run --directory ~/src/signal-mcp`. On macOS this is Joe's own dev checkout,
-# so chezmoi must NOT manage it there — clone it only on Linux utility nodes.
-# Tracks the default branch (main), which carries the reconciled daemon-rewrite +
-# reactions + trusted-recipients allowlist + Claude Channel mode. ff-only pull
-# keeps the clone clean. The venv warmer script (run_after_45) ALSO fetches +
-# ff-pulls on every apply, so this refreshPeriod is a backstop, not the only
-# update path.
-["src/signal-mcp"]
-    type = "git-repo"
-    url = "https://github.com/{{ .githubUser }}/signal-mcp.git"
-    refreshPeriod = "1h"
-["src/signal-mcp".pull]
-    args = ["--ff-only", "--quiet"]
-{{ end -}}
+# `uv run --directory ~/src/signal-mcp`. Cloned to ~/src/signal-mcp on Linux
+# utility nodes; on macOS it is Joe's own dev checkout and is never touched.
+#
+# It is deliberately NOT a git-repo external, for exactly the reason ansible
+# isn't (below): agents develop in this clone too, and an external's
+# `git pull --ff-only` aborts the ENTIRE apply the moment the checkout sits on
+# a branch whose upstream is gone — a merged-and-deleted PR branch is enough.
+# run_after_45-signal-mcp-venv.sh owns the clone + a branch-aware refresh
+# instead. Do not re-add it here.
 
 # ---------- StumpCloud Ansible (Infrastructure automation) ----------
 # The StumpCloud infrastructure monorepo (stumpcloud/ansible on Gitea) deploys

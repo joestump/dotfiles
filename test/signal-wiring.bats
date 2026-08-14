@@ -264,3 +264,79 @@ VENV_SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_45-signal-mcp-venv.sh.tmpl"
   # agent for no code change is worse than waiting one cycle.
   [[ "$output" == *'restart on next change'* ]]
 }
+
+# ---------------------------------------------------------------------------
+# Branch-aware refresh. Agents develop in ~/src/signal-mcp, so the checkout is
+# routinely parked on a work branch — including one whose upstream was deleted
+# when its PR merged. That state made `git pull --ff-only` exit 1 ("no such ref
+# was fetched") and, while this clone was a chezmoi external, took the ENTIRE
+# apply down with it. The script owns the clone now and must skip quietly.
+# ---------------------------------------------------------------------------
+
+# Build a fixture: a bare origin + a clone at $1/src/signal-mcp, with `uv`
+# stubbed to a no-op so the test stops after the git section.
+_signal_mcp_fixture() {
+  local fh="$1" origin="$1/origin.git" repo="$1/src/signal-mcp"
+  mkdir -p "$fh/src"
+  git init --quiet --bare -b main "$origin"
+  git clone --quiet "$origin" "$repo" 2>/dev/null
+  git -C "$repo" -c user.email=t@t -c user.name=t commit --quiet --allow-empty -m init
+  git -C "$repo" push --quiet -u origin main 2>/dev/null
+  setup_stub_path
+  make_stub uv 'exit 0'
+  # Record every harness invocation so "did it bounce a consumer?" is answered
+  # by what the script actually ran, not by grepping its prose.
+  make_stub harness 'printf "%s\n" "$*" >> "$HOME/.harness-calls"; exit 0'
+}
+
+# Render the Linux body once and run it under a controlled $HOME.
+_run_venv_script() {
+  local fh="$1" script="$BATS_TEST_TMPDIR/venv.sh"
+  _render_tmpl_linux -- "$VENV_SCRIPT" > "$script"
+  HOME="$fh" bash "$script" 2>&1
+}
+
+@test "signal-mcp: a branch whose upstream is GONE does not fail the apply" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local fh="$BATS_TEST_TMPDIR/gone"; mkdir -p "$fh"
+  _signal_mcp_fixture "$fh"
+  local repo="$fh/src/signal-mcp"
+
+  # Park it on a PR branch, then delete that branch upstream — the exact state
+  # a merged-and-deleted PR leaves behind.
+  git -C "$repo" push --quiet -u origin main:feat/merged 2>/dev/null
+  git -C "$repo" checkout --quiet -b feat/merged
+  git -C "$repo" branch --quiet --set-upstream-to=origin/feat/merged 2>/dev/null
+  git -C "$repo" push --quiet origin --delete feat/merged 2>/dev/null
+
+  run _run_venv_script "$fh"
+  [ "$status" -eq 0 ]                        # the apply survives — the whole point
+  [[ "$output" == *"work branch 'feat/merged'"* ]]
+  # And the agent's checkout is untouched: still on their branch.
+  [ "$(git -C "$repo" symbolic-ref --short HEAD)" = "feat/merged" ]
+}
+
+@test "signal-mcp: a work branch is not fingerprinted and bounces no harness" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local fh="$BATS_TEST_TMPDIR/wip"; mkdir -p "$fh"
+  _signal_mcp_fixture "$fh"
+  git -C "$fh/src/signal-mcp" checkout --quiet -b feat/wip
+
+  run _run_venv_script "$fh"
+  [ "$status" -eq 0 ]
+  # Every commit an agent makes moves HEAD; fingerprinting it would bounce the
+  # live Signal bot onto their WIP mid-conversation.
+  [ ! -f "$fh/.config/dotfiles/.signal-mcp-head" ]
+  [ ! -f "$fh/.harness-calls" ]
+}
+
+@test "signal-mcp: the default branch still refreshes and fingerprints" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local fh="$BATS_TEST_TMPDIR/main"; mkdir -p "$fh"
+  _signal_mcp_fixture "$fh"
+
+  run _run_venv_script "$fh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"signal-mcp at"* ]]
+  [ -f "$fh/.config/dotfiles/.signal-mcp-head" ]
+}
