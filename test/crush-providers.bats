@@ -88,17 +88,19 @@ assert p["discover_models"] is True, p
 '
 }
 
-@test "the zai model catalogue survives an empty environment" {
-  # zai is the one provider whose block carries data (.crush.zaiModels) rather
-  # than just a credential — losing it silently would strip every GLM model.
+@test "no provider hardcodes a model catalogue — all models come from discovery" {
+  # Every provider in use (openai, litellm, gemini, zai, hyper) exposes a
+  # /v1/models discovery endpoint, so the catalogue is fetched at runtime. A
+  # "models": [...] block here would be a stale static list that silently
+  # shadows or misses upstream models (and used to need manual price bumps).
   run _render
   [ "$status" -eq 0 ]
   printf '%s' "$output" | python3 -c '
 import json,sys
-z = json.load(sys.stdin)["providers"]["zai"]
-assert z["models"], "zai rendered with no models"
-for m in z["models"]:
-    assert m["id"] and m["name"], m
+providers = json.load(sys.stdin)["providers"]
+for name, p in providers.items():
+    assert p.get("discover_models") is True, "%s: discover_models is not true" % name
+    assert "models" not in p, "%s: hardcoded model catalogue: %r" % (name, p["models"])
 '
 }
 

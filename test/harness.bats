@@ -183,16 +183,6 @@ assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
   [ "$status" -eq 0 ]
 }
 
-@test "harness: pinned models exist in the zai provider catalog" {
-  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  # Guards against a typo'd id, which crush would silently fail to resolve.
-  for id in glm-5.2 glm-4.7-flashx; do
-    run bash -c "chezmoi execute-template --source '$REPO_ROOT' '{{ range .crush.zaiModels }}{{ .id }} {{ end }}'"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"$id"* ]]
-  done
-}
-
 @test "harness: the crush signal MCP renders identity-free" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   # Identity (account, operator, prefix) is resolved by signal-mcp from its

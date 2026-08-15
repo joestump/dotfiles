@@ -64,38 +64,14 @@
       "name": "Z.ai (GLM Coding Plan)",
       "base_url": "$ZAI_BASE_URL",
       "api_key": "$ZAI_API_TOKEN",
-      "discover_models": true,
-      "models": [
-{{- range $index, $model := .crush.zaiModels }}
-        {{ if $index }},{{ end }}{
-          "id": {{ $model.id | quote }},
-          "name": {{ $model.name | quote }},
-          "cost_per_1m_in": {{ $model.costPer1MIn }},
-          "cost_per_1m_out": {{ $model.costPer1MOut }},
-          "cost_per_1m_in_cached": {{ $model.costPer1MInCached }},
-          "cost_per_1m_out_cached": {{ $model.costPer1MOutCached }}
-        }
-{{- end }}
-      ]
+      "discover_models": true
     },
     "hyper": {
       "type": "openai-compat",
       "name": "Hyper (charm.land)",
       "base_url": "https://hyper.charm.land/v1",
       "api_key": "$HYPER_API_KEY",
-      "discover_models": true,
-      {{- /* kimi-k3 is vision-capable (hyper /v1/models reports capabilities.vision
-             true), but a discovered-model entry can lose SupportsImages — the
-             discovery payload carries no capability fields and only user-specified
-             models are guaranteed to keep theirs. Pinning it here (user models win
-             over discovery) keeps image paste available for kimi-k3. */ -}}
-      "models": [
-        {
-          "id": "kimi-k3",
-          "name": "Kimi K3",
-          "supports_attachments": true
-        }
-      ]
+      "discover_models": true
     }
   },
   "lsp": {
