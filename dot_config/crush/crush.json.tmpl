@@ -64,7 +64,17 @@
       "name": "Z.ai (GLM Coding Plan)",
       "base_url": "$ZAI_BASE_URL",
       "api_key": "$ZAI_API_TOKEN",
-      "discover_models": true
+      "discover_models": true,
+      {{- /* glm-5.3 is served by the Z.ai coding plan but missing from its
+             /v4/models discovery list (requests for glm-5.2 are answered by
+             glm-5.3), so it needs this one manual pin to be selectable.
+             Unpriced: the coding plan is subscription-metered, not per-token. */ -}}
+      "models": [
+        {
+          "id": "glm-5.3",
+          "name": "GLM-5.3"
+        }
+      ]
     },
     "hyper": {
       "type": "openai-compat",
