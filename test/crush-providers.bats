@@ -93,14 +93,23 @@ assert p["discover_models"] is True, p
   # /v1/models discovery endpoint, so the catalogue is fetched at runtime. A
   # "models": [...] block here would be a stale static list that silently
   # shadows or misses upstream models (and used to need manual price bumps).
+  # Sole sanctioned exception: a model the endpoint SERVES but never LISTS.
+  # Z.ai's coding plan meters glm-5.2 requests as glm-5.3, yet /v4/models
+  # omits glm-5.3 — without a pin it is unselectable. If Z.ai ever lists it,
+  # drop the pin and this exception together.
   run _render
   [ "$status" -eq 0 ]
   printf '%s' "$output" | python3 -c '
 import json,sys
+SERVED_NOT_LISTED = {
+    "zai": {"glm-5.3"},
+}
 providers = json.load(sys.stdin)["providers"]
 for name, p in providers.items():
     assert p.get("discover_models") is True, "%s: discover_models is not true" % name
-    assert "models" not in p, "%s: hardcoded model catalogue: %r" % (name, p["models"])
+    allowed = SERVED_NOT_LISTED.get(name, set())
+    pinned = {m["id"] for m in p.get("models", [])}
+    assert pinned <= allowed, "%s: hardcoded model catalogue: %r" % (name, sorted(pinned - allowed))
 '
 }
 
