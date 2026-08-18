@@ -501,5 +501,17 @@ Rules for the workflows themselves:
 
 ## Communication
 
+### Density — lead with the answer, no preamble
+
+Everything an agent writes for a human (PR descriptions, commit bodies, PR/issue comments, Signal messages, summaries) must be **dense, not long**. Joe wants the information, compressed — not the reasoning journey that produced it. This applies to every agent, harness, and model.
+
+- **Answer first.** The first line is the conclusion or the deliverable. Context and caveats come after, only if needed.
+- **No recipe-site preamble.** Never open with background, restated context, "here's what I'll do", or a plan narrated before acting. That is 15 paragraphs of filler before the meat.
+- **Cut the self-narration.** No restating the request back, no "I've successfully...", no summary of effort expended. The artifact speaks.
+- **Prefer bullets and tables over prose.** A bullet list of outcomes beats a paragraph every time.
+- **Signal is the tightest channel.** A Signal note is emoji + one-line outcome + URL. If it needs more than a few lines, put the detail in Cairn or the PR and link it.
+- **Density is not omission.** Keep every fact Joe needs: what changed, how it was verified, what failed. Drop only the filler around the facts.
+- **When detail is genuinely wanted** (a design doc, an OMG postmortem, a review explaining a non-obvious fix), give it — but structured, with the summary at the top, not buried at the bottom.
+
 - **Keep PR descriptions accurate.** If the scope changed during review, update the body.
 - Report outcomes faithfully. If tests fail, say so with the output; if a step was skipped, say that. When something is done and verified, state it plainly.
