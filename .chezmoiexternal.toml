@@ -165,6 +165,14 @@
     refreshPeriod = "24h"
 [".config/crush/skills-ext/claude-plugin-sdd".pull]
     args = ["--ff-only", "--quiet"]
+# Gitea URL, not GitHub: the stump-wtf mirror of this repo is still empty, so
+# the plugin only exists on Gitea. PUBLIC repo, no credential guard needed.
+[".config/crush/skills-ext/claude-plugin-harness"]
+    type = "git-repo"
+    url = "https://gitea.stump.rocks/stump.wtf/claude-plugin-harness.git"
+    refreshPeriod = "24h"
+[".config/crush/skills-ext/claude-plugin-harness".pull]
+    args = ["--ff-only", "--quiet"]
 
 # ---------- Signal MCP server (Linux only) ----------
 # The Signal MCP (a JSON-RPC client for the signal-cli daemon) is launched with

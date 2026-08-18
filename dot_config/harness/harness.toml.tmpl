@@ -153,6 +153,67 @@ restart = "always"
 restart_delay = 5
 enabled = false
 
+# Scheduled harnesses
+#
+# One-shot prompt harnesses fired by the daemon's own cron scheduler: the 6h
+# StumpCloud health sweep (formerly the standalone systemd timer / launchd
+# agent, retired by run_onchange_after_52-harness-reload.sh.tmpl) plus the
+# daily PR-feedback sweep and weekly issue/PR grooming (formerly
+# never-actually-scheduled ~/.claude/scheduled-tasks definitions).
+#
+# `schedule` is validated at config load: it requires `prompt`, is mutually
+# exclusive with `enabled = true` and with profile membership, and only allows
+# restart "no"/"on-failure". Instructions live in chezmoi-managed prompt files,
+# so a prompt edit propagates with a normal czu and re-fires the reload script
+# via its embedded hash. The block is gated on the `-agent` login suffix (same
+# gate as .chezmoiignore) — human logins render only the interactive agents.
+#
+# @joestump-agent 08/18/2026 - Added the three scheduled harnesses, replacing
+#   the standalone stumpcloud-sweep timer/launchd pair and the dormant
+#   ~/.claude/scheduled-tasks definitions. All pinned to zai:glm-5.3.
+{{ $schedUser := .agentIdentity | default .chezmoi.username -}}
+{{ if hasSuffix "-agent" $schedUser -}}
+
+# StumpCloud health sweep — the 6h root-cause-anything-degraded run over
+# ~/src/stumpcloud (OMGs at MEDIUM+, always Signals the operator). Was the
+# stumpcloud-sweep.timer / launchd pair before harness grew `schedule`.
+[harness.stumpcloud-sweep]
+prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/stumpcloud-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run. If ~/src/stumpcloud is missing entirely, say so and exit."
+schedule = "0 */6 * * *"
+model = "zai:glm-5.3"
+auto_accept = true
+quiet = true
+workdir = "{{ .chezmoi.homeDir }}"
+description = "StumpCloud health sweep · every 6h · glm-5.3 (Z.ai)"
+restart = "on-failure"
+
+# PR feedback sweep — keep joestump-agent's own open PRs on Gitea + GitHub
+# moving: address new review feedback, push fixes, reply to threads,
+# squash-merge what is approved+green per the two-tier policy.
+[harness.pr-feedback-sweep]
+prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/pr-feedback-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
+schedule = "30 9 * * *"
+model = "zai:glm-5.3"
+auto_accept = true
+quiet = true
+workdir = "{{ .chezmoi.homeDir }}"
+description = "PR feedback sweep (own PRs, both forges) · daily 09:30 · glm-5.3 (Z.ai)"
+restart = "on-failure"
+
+# Issue / PR grooming — weekly conservative tidy-up of stale, duplicate and
+# superseded issues and PRs across the known Gitea + GitHub repos.
+[harness.issue-pr-grooming]
+prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/issue-pr-grooming.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
+schedule = "0 7 * * 1"
+model = "zai:glm-5.3"
+auto_accept = true
+quiet = true
+workdir = "{{ .chezmoi.homeDir }}"
+description = "Issue/PR grooming across forges · Mondays 07:00 · glm-5.3 (Z.ai)"
+restart = "on-failure"
+
+{{ end }}
+
 # ── Profiles ─────────────────────────────────────────────────────────────────
 # Named sets that `harness use-profile <name>` switches between. These existed
 # in the rendered copies on real machines but never in this template, because

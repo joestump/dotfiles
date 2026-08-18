@@ -385,13 +385,40 @@ Joe wants a running record of finished work in Signal — he loses track of what
 
 Worth a note:
 
-- a substantive piece of work finished — a PR opened or merged, a deploy, an incident resolved, a queue worked;
+- a substantive piece of work finished — a deploy, an incident resolved, a queue worked;
+- **any PR lifecycle event: opened, updated with new commits after review, or merged** — always Signal these, in every session including scheduled harness runs (a harness prompt should never need to restate this rule; it inherits it);
 - something blocking that needs him;
 - a scheduled task completing (see the harness rules below for the mandatory cases).
 
 Keep it to emoji + what happened + the URL, following the Signal formatting rules above. The URLs rule applies — link the PR, commit, run, or doc rather than naming it.
 
-Not worth a note: progress inside a live session he is already watching, or narration of work still in flight. One note when it lands beats five while it runs. When genuinely nothing happened — no changes, no replies sent — send nothing; silence is the right output for a no-op.
+Not worth a note: progress inside a live session he is already watching, or narration of work still in flight. One note when it lands beats five while it runs. When genuinely nothing happened — no changes, no replies sent, no PR touched — send nothing; silence is the right output for a no-op.
+
+## Comment style — personal log format
+
+When writing block comments in code, scripts, configs, and templates (file headers, section preamble, function-level context — anywhere you would reach for decorative ASCII banners or `----` divider lines), use this format instead:
+
+````
+# Some Sensible Section Header That Rarely Ever Changes
+#
+# Some TL;DR of a few sentences. No more than 2-3 paragraphs explaining
+# what is going on.
+#
+# @joestump MM/DD/YYYY - Updated the code to support blah blah blah.
+#
+# @joestump-agent MM/DD/YYYY - Added more tests. This can be multiple lines if you want I don't really
+# care as long as it looks reasonably neat. You can even:
+#   * Do lists for
+#   * All
+#   * I care.
+````
+
+Rules:
+
+- **Header, TL;DR, then a dated log.** The header is a stable name for the section; the TL;DR is 2-3 paragraphs MAX of current-state explanation; the log entries are append-only history, newest last or newest first but pick one convention per file.
+- **Every substantive edit gets a log line** attributed to the acting identity (`@{{ $human }}` or `@{{ $agent }}` — the identity you are running as) with the date. Agents sign as `@{{ $agent }}`, Joe signs as `@{{ $human }}`.
+- **No ASCII art, no `----------` dividers, no box-drawing banners.** A blank `#` line separates entries; that's all the structure you get.
+- Existing files: when you touch a section that still carries the old banner style, convert it opportunistically — but don't mass-reformat untouched files in a PR whose concern is something else.
 
 ## Family contacts
 

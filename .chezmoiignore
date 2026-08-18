@@ -37,13 +37,14 @@ Library/
 .config/systemd/
 {{ end -}}
 
-# The scheduled StumpCloud sweep is an AGENT job: only a login carrying the
+# The scheduled harness sweeps are AGENT jobs: only a login carrying the
 # `-agent` suffix (the bot half of the $USER / $USER-agent convention — see
 # the Identity section of .chezmoidata.yaml, overridable via agentIdentity)
-# gets the prompt and its scheduler units. Human logins ignore all of it.
+# gets the sweep prompts. Human logins ignore them — their harness.toml
+# renders without the scheduled block entirely (same gate, in the template).
 {{ $sweepUser := .agentIdentity | default .chezmoi.username -}}
 {{ if not (hasSuffix "-agent" $sweepUser) -}}
 .config/dotfiles/stumpcloud-sweep.prompt.md
-.config/systemd/user/stumpcloud-sweep.*
-Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist
+.config/dotfiles/pr-feedback-sweep.prompt.md
+.config/dotfiles/issue-pr-grooming.prompt.md
 {{ end -}}

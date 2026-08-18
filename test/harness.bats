@@ -71,19 +71,30 @@ _render() {
 @test "harness: rendered harness.toml is valid TOML with all seeded harnesses" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+  # Render as an AGENT login — the scheduled block is identity-gated, and CI
+  # runs as root, where the plain render has none of it.
+  # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
+  # the config format from the extension, so mint the .toml inside a temp dir.
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
 import tomllib,sys
 d = tomllib.load(sys.stdin.buffer)
-assert list(d[\"harness\"]) == [\"crush-signal\", \"claude-code\", \"claude-headless\"], d[\"harness\"]
+assert list(d[\"harness\"]) == [\"crush-signal\", \"claude-code\", \"claude-headless\", \"stumpcloud-sweep\", \"pr-feedback-sweep\", \"issue-pr-grooming\"], d[\"harness\"]
 c = d[\"harness\"][\"crush-signal\"]
 assert c[\"cmd\"].endswith(\"/.local/bin/crush\"), c[\"cmd\"]
 cc = d[\"harness\"][\"claude-code\"]
 assert cc[\"cmd\"].endswith(\"/.local/bin/claude\"), cc[\"cmd\"]
-# All run with permission prompts off, so none may autostart on boot.
+# All run with permission prompts off, so none may autostart on boot. The
+# scheduled entries carry no `enabled` at all (mutually exclusive with
+# schedule); the daemon fires them only on their cron.
 for name, h in d[\"harness\"].items():
-    assert h[\"enabled\"] is False, name
+    if \"schedule\" in h:
+        assert \"enabled\" not in h, name
+    else:
+        assert h[\"enabled\"] is False, name
 '"
-  [ "$status" -eq 0 ]
+  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
 }
 
 @test "harness: every harness pins an explicit restart policy and a non-zero delay" {
@@ -95,14 +106,24 @@ for name, h in d[\"harness\"].items():
   # agent was permanently gone in ~30s with nobody at a desk to notice. The
   # delay must stay wider than that 10s crash window's per-retry spacing, so a
   # transient upstream failure is retried instead of latching.
-  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+  # EXCEPTION — scheduled one-shots: config validation rejects restart=always
+  # (respawning a one-shot after its clean exit makes the schedule meaningless);
+  # they pin on-failure so a crashed run retries, and need no delay.
+  # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
+  # the config format from the extension, so mint the .toml inside a temp dir.
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
 import tomllib,sys
 d = tomllib.load(sys.stdin.buffer)[\"harness\"]
 for name, h in d.items():
-    assert h.get(\"restart\") == \"always\", (name, h.get(\"restart\"))
-    assert h.get(\"restart_delay\", 0) >= 5, (name, h.get(\"restart_delay\"))
+    if \"schedule\" in h:
+        assert h.get(\"restart\") in (\"no\", \"on-failure\"), (name, h.get(\"restart\"))
+    else:
+        assert h.get(\"restart\") == \"always\", (name, h.get(\"restart\"))
+        assert h.get(\"restart_delay\", 0) >= 5, (name, h.get(\"restart_delay\"))
 '"
-  [ "$status" -eq 0 ]
+  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
 }
 
 @test "harness: claude-code is Remote Control + skip-permissions, no Signal wiring" {

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Scheduled harnesses: reload the daemon when harness.toml or a sweep prompt
+# changes, and retire the pre-`schedule` stumpcloud-sweep units it replaces.
+#
+# The daemon does not re-read its config on file change (stump.wtf/harness#98),
+# so a config that arrives via czu needs `harness reload` to take effect. This
+# script is run_onchange_ with the config + prompt hashes embedded below, so
+# any edit to the declared harness set or a scheduled prompt re-fires it.
+#
+# Teardown: the standalone stumpcloud-sweep systemd timer (Linux) and launchd
+# LaunchAgent (macOS) are superseded by [harness.stumpcloud-sweep] in
+# harness.toml. Stop + disable them here (covers machines where the units have
+# already fired once); .chezmoiremove deletes the files.
+#
+#   config hash:  {{ include "dot_config/harness/harness.toml.tmpl" | sha256sum }}
+#   sweep prompt: {{ include "dot_config/dotfiles/stumpcloud-sweep.prompt.md" | sha256sum }}
+#   prfb prompt:  {{ include "dot_config/dotfiles/pr-feedback-sweep.prompt.md.tmpl" | sha256sum }}
+#   groom prompt: {{ include "dot_config/dotfiles/issue-pr-grooming.prompt.md.tmpl" | sha256sum }}
+set -euo pipefail
+
+{{ $reloadUser := .agentIdentity | default .chezmoi.username -}}
+{{ if hasSuffix "-agent" $reloadUser -}}
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
+heading "🕰️ harness scheduled"
+
+# Prefer the run_after_32-install-harness build.
+HARNESS_BIN="$HOME/.local/bin/harness"
+[ -x "$HARNESS_BIN" ] || HARNESS_BIN="${GOBIN:-$HOME/go/bin}/harness"
+[ -x "$HARNESS_BIN" ] || HARNESS_BIN="$(command -v harness 2>/dev/null || true)"
+
+# ---- retire the standalone sweep units the daemon schedule replaces ----
+if [ "$(uname -s)" = "Darwin" ]; then
+  if launchctl print "gui/$(id -u)/rocks.stump.stumpcloud-sweep" >/dev/null 2>&1; then
+    launchctl bootout "gui/$(id -u)/rocks.stump.stumpcloud-sweep" 2>/dev/null || true
+    item ok "booted out the stumpcloud-sweep LaunchAgent (now a scheduled harness)"
+  fi
+else
+  if command -v systemctl >/dev/null 2>&1; then
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if systemctl --user is-enabled stumpcloud-sweep.timer >/dev/null 2>&1 \
+       || systemctl --user is-active stumpcloud-sweep.timer >/dev/null 2>&1; then
+      # STOP BEFORE DISABLE. .chezmoiremove has already deleted the unit files
+      # by the time an after-script runs, so `disable` sees no unit file and may
+      # bail before `--now` ever stops anything — leaving the still-loaded timer
+      # firing the old `claude -p` sweep alongside the new scheduled harness
+      # (the prompt file it reads is still shipped, so both would run).
+      systemctl --user stop stumpcloud-sweep.timer stumpcloud-sweep.service 2>/dev/null || true
+      systemctl --user disable stumpcloud-sweep.timer 2>/dev/null || true
+      # `disable` cannot always clean the enable symlink once the unit file is
+      # gone; a dangling one makes the next daemon-reload re-warn forever.
+      rm -f "$HOME/.config/systemd/user/timers.target.wants/stumpcloud-sweep.timer"
+      systemctl --user reset-failed stumpcloud-sweep.service 2>/dev/null || true
+      systemctl --user daemon-reload 2>/dev/null || true
+      item ok "stopped + disabled stumpcloud-sweep.timer (now a scheduled harness)"
+    fi
+  fi
+fi
+
+# ---- reload the daemon so the new schedule takes effect ----
+if [ -z "$HARNESS_BIN" ]; then
+  warn "harness binary absent — the daemon will pick the config up on its next restart"
+  exit 0
+fi
+if "$HARNESS_BIN" reload >/dev/null 2>&1; then
+  item ok "harness daemon reloaded (scheduled harnesses current)"
+else
+  warn "harness reload failed — the daemon picks the config up on its next restart"
+fi
+{{ else -}}
+# Human login — scheduled harnesses are agent jobs; nothing to do here.
+exit 0
+{{ end -}}

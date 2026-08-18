@@ -48,3 +48,12 @@ Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
 # these; listing them here covers machines where that script has already fired.
 .local/bin/harness-run
 .local/bin/claude-headless.sh
+
+# stumpcloud-sweep standalone schedulers — retired when the sweep moved into a
+# scheduled [harness.stumpcloud-sweep] entry in ~/.config/harness/harness.toml
+# (harness grew native `schedule` support). The units are stopped/disabled by
+# .chezmoiscripts/run_onchange_after_52-harness-reload.sh.tmpl; these entries
+# remove the files from machines that already applied them.
+.config/systemd/user/stumpcloud-sweep.service
+.config/systemd/user/stumpcloud-sweep.timer
+Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist
