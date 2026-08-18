@@ -131,7 +131,7 @@ _agent_render() {
   # them. Same model as the Z.ai coding plan crush pin, on the zai provider.
   run _agent_render "$HARNESS_TOML"
   for name in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
-    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "zai:glm-5.3"' || return 1
+    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "zai/glm-5.3"' || return 1
   done
 }
 
