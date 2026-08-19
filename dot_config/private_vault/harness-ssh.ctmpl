@@ -1,0 +1,31 @@
+{{- /* Consul-Template, rendered by Vault Agent. NOT a chezmoi template.
+       Renders every *_authorized_keys field of secret/users/$USER/harness to
+       ~/.ssh/<field> (0600). The harness bag is the dedicated home for the SSH
+       cockpit's surface: authorized_keys (files, rendered here) and
+       HARNESS_SSH_PORT (env, exported by secrets-static.env.ctmpl like every
+       other non-ssh/aws field, then read by harness.toml.tmpl at apply time).
+
+       Mirrors ssh-keys.ctmpl's safety model: the outer loop ranges the metadata
+       LISTING, so a user with no harness bag never does a fixed-path read (no
+       404 retry-loop) and nothing is written under ~/.ssh (only this manifest)
+       — it can never clobber a key with an empty render. Removing a field from
+       the bag does not delete an already-rendered file; rotate by hand if you
+       retire one. This body (the stanza destination) is a manifest of what was
+       written — key NAMES only, never key material.
+
+       @joestump-agent 08/19/2026 - Added alongside the [server] SSH cockpit in
+         harness.toml: the allow-list lives in bao, not in chezmoi. */ -}}
+# ~/.ssh harness-cockpit allow-lists rendered by Vault Agent from secret/users/$USER/harness. DO NOT EDIT.
+{{- $home := env "HOME" }}
+{{- range secrets (printf "secret/metadata/users/%s/" (env "USER")) -}}
+{{- if eq (. | trimSuffix "/") "harness" -}}
+{{- with secret (printf "secret/data/users/%s/harness" (env "USER")) }}
+{{- range $name, $content := .Data.data }}
+{{- if $name | regexMatch "_authorized_keys$" }}
+{{- writeToFile (printf "%s/.ssh/%s" $home $name) "" "" "0600" $content }}
+{{ $name }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

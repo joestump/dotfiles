@@ -271,3 +271,95 @@ assert \"switchboard\" in mcp, sorted(mcp)
 '"
   [ "$status" -eq 0 ]
 }
+
+@test "harness: [server] SSH cockpit, allow-list and port both from the OpenBao harness bag" {
+  # The SSH cockpit (ADR-0004/0008) is a full-typing surface on every box, so
+  # BOTH knobs are sourced from OpenBao, not from this committed template:
+  #   authorized_keys_file = the path Vault Agent renders from the
+  #     harness_authorized_keys field of secret/users/$USER/harness
+  #     (harness-ssh.ctmpl) — not an inline key, not a hand-edited file;
+  #   listen port = HARNESS_SSH_PORT from the same bag, via
+  #     secrets-static.env, with an UNPRIVILEGED default so a pre-secrets
+  #     bootstrap render is still valid and the user daemon can bind it.
+  # And it renders for EVERY identity, human or agent — Joe attaches too.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
+  # No HARNESS_SSH_PORT in the environment: the default must kick in.
+  run bash -c "env -u HARNESS_SSH_PORT chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+s = tomllib.load(sys.stdin.buffer)[\"server\"]
+assert s[\"enabled\"] is True, s
+port = int(s[\"listen\"].rsplit(\":\", 1)[1])
+assert port > 1024, port
+assert s[\"authorized_keys_file\"].endswith(\"/.ssh/harness_authorized_keys\"), s
+assert \"key\" not in s, \"no inline keys — allow-list comes from Vault Agent only\"
+'"
+  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
+
+  # HARNESS_SSH_PORT set (as Vault Agent exports it from the harness bag): the
+  # listen line must carry it through. A render that IGNORED the env var would
+  # silently move the port away from the one bao declares.
+  run bash -c "HARNESS_SSH_PORT=24680 chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+s = tomllib.load(sys.stdin.buffer)[\"server\"]
+assert s[\"listen\"].endswith(\":24680\"), s[\"listen\"]
+'"
+  [ "$status" -eq 0 ]
+
+  # And the same render for a plain human identity — the cockpit is not
+  # agent-gated.
+  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
+'"
+  [ "$status" -eq 0 ]
+}
+
+@test "harness: the cockpit allow-list is rendered from the dedicated harness bag, not the ssh bag" {
+  # harness-ssh.ctmpl writes every *_authorized_keys field of
+  # secret/users/$USER/harness to ~/.ssh/<field>, mirroring ssh-keys.ctmpl's
+  # metadata-listing guard so a user with no harness bag writes nothing under
+  # ~/.ssh. agent.hcl.tmpl must register it (unconditionally — public keys
+  # only, so the vaultSshKeys blast-radius gate does not apply).
+  Ctmpl="$REPO_ROOT/dot_config/private_vault/harness-ssh.ctmpl"
+  [ -f "$Ctmpl" ]
+  grep -q 'secret/data/users/%s/harness' "$Ctmpl"
+  grep -q 'regexMatch "_authorized_keys' "$Ctmpl"
+  grep -q '"0600"' "$Ctmpl"
+  grep -q 'harness-ssh.ctmpl' "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
+  grep -q 'harness-ssh.manifest' "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
+}
+
+@test "harness: the reload script's human branch uses ui-lib, not a raw echo" {
+  # Both identity branches reload the daemon now (the [server] cockpit is not
+  # agent-only), so the ui-lib source and the HARNESS_BIN lookup are hoisted out
+  # of the branch. A raw `echo` in the middle of an apply is a bug per CLAUDE.md
+  # — czu's output is gum-styled and a bare line breaks the column.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  Reload="$REPO_ROOT/.chezmoiscripts/run_onchange_after_52-harness-reload.sh.tmpl"
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+
+  # Human identity: reloads, and says so through ui-lib.
+  printf '[data]\n    agentIdentity = "ci-human"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$Reload'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'ui-lib.sh'* ]]
+  [[ "$output" == *'"$HARNESS_BIN" reload'* ]]
+  # The only `echo "    - …"` allowed is inside ui-lib's own fallback stub.
+  [[ "$output" == *'item ok "harness daemon reloaded'* ]]
+  [[ "$output" != *'echo "    - harness'* ]]
+
+  # Agent identity: same hoisted preamble, plus the sweep teardown.
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$Reload'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'ui-lib.sh'* ]]
+  [[ "$output" == *'stumpcloud-sweep'* ]]
+  rm -rf "$_cfgdir"
+
+  # `harness reload` cannot bring the [server] listener up (the daemon calls
+  # startRemote once at boot), so both branches must say restart, not reload.
+  grep -q 'daemon RESTART, not a reload' "$Reload"
+}

@@ -232,3 +232,60 @@ autostart = true
 description = "All harnesses running"
 harnesses = ["crush-signal", "claude-code", "claude-headless"]
 autostart = false
+
+# Remote access — the SSH cockpit
+#
+# The daemon can expose its cockpit over SSH (Wish, ADR-0004; public-key only,
+# no password path, ADR-0008) so a thin client on a phone or laptop can attach:
+# `ssh -p <port> <host>` lands in the full TUI dashboard. The username ssh asks
+# for is irrelevant — Wish never checks it; the key is the only credential.
+#
+# BOTH knobs of this surface live in the OpenBao bag secret/users/$USER/harness
+# — never in this committed template:
+#
+#   harness_authorized_keys  the public key(s) allowed to attach. Rendered to
+#                            ~/.ssh/harness_authorized_keys by Vault Agent
+#                            (harness-ssh.ctmpl writes every *_authorized_keys
+#                            field of the bag to ~/.ssh/<field>). Only the
+#                            joestump@ key belongs there — this is a
+#                            full-control (typing) surface on every box. A
+#                            machine whose bag has no such field has no
+#                            allow-list file and the listener accepts no one:
+#                            safe by default.
+#   HARNESS_SSH_PORT         the port, exported as an env var by
+#                            secrets-static.env.ctmpl (every field of every
+#                            non-ssh/aws bag is exported verbatim) and read
+#                            here at apply time.
+#
+#   vault kv put secret/users/$USER/harness \
+#     harness_authorized_keys=@id_ed25519.pub HARNESS_SSH_PORT=23234
+#
+# The default below is NOT env gating — the banned pattern (dotfiles#106) was an
+# if-env block that renders a file EMPTY when the var is absent. This always
+# emits a valid listen line, and the default is upstream's own: unprivileged
+# (>1024), so the user-level daemon binds it with no root.
+#
+# But the default applies on ANY render whose shell lacks the secret env, not
+# just a fresh box mid-bootstrap: czu sources secrets-static.env before
+# applying, a bare `chezmoi apply` from a non-interactive shell (an agent's,
+# say) does not. So if you set HARNESS_SSH_PORT to anything OTHER than the
+# default, the rendered port flaps between the two across applies, re-firing
+# run_onchange_after_52 each time. Keep bao's value equal to the default below
+# unless you have a reason not to, and change both together if you do.
+#
+# Changing the port takes effect on a daemon RESTART, not on the next czu:
+# `harness reload` re-reads harness definitions only, never the [server]
+# listener (see run_onchange_after_52-harness-reload.sh.tmpl).
+#
+# @joestump-agent 08/19/2026 - Enabled the SSH cockpit, allow-list and port
+#   both sourced from the OpenBao secret/users/$USER/harness bag.
+#
+# @joestump 08/19/2026 - Review pass: fixed the mangled `vault kv put` example
+#   (the line-continuation had been replaced with a `#`), and corrected two
+#   wrong claims above — the port default applies on any apply without the
+#   secret env, not only mid-bootstrap, and the listener needs a daemon restart
+#   rather than the reload script.
+[server]
+enabled = true
+listen = "0.0.0.0:{{ env "HARNESS_SSH_PORT" | default "23234" }}"
+authorized_keys_file = "{{ .chezmoi.homeDir }}/.ssh/harness_authorized_keys"
