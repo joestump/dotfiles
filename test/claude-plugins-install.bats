@@ -60,3 +60,70 @@ SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_31-install-claude-plugins.sh.tmpl"
   [ -n "$purge" ] && [ -n "$reinstall" ]
   [ "$purge" -lt "$reinstall" ]
 }
+
+# Third bug (dotfiles#124): `marketplace add` was chained to `marketplace update`
+# with `||`. `add` exits 0 for an already-registered marketplace, so the update
+# never ran and the cached marketplace.json froze at its first-cloned commit —
+# permanently, because a plugin that never installs keeps retaking that branch.
+
+@test "claude-plugins: marketplace add and update are not chained with ||" {
+  # Pins the bug. `add ... || ... update` must never come back.
+  run grep -E 'marketplace add .*\|\|.*marketplace update' "$SCRIPT"
+  [ "$status" -ne 0 ]
+}
+
+@test "claude-plugins: marketplace update runs unconditionally in the install branch" {
+  # Both commands present, each terminated with its own `|| true`.
+  run grep -E 'claude plugin marketplace add "\$src" </dev/null >/dev/null 2>&1 \|\| true' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -E 'claude plugin marketplace update "\$mp" </dev/null >/dev/null 2>&1 \|\| true' "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "claude-plugins: the marketplace refresh precedes the install it feeds" {
+  update=$(grep -n 'claude plugin marketplace update "\$mp"' "$SCRIPT" | head -1 | cut -d: -f1)
+  install=$(grep -n 'step "\$plugin" -- claude plugin install' "$SCRIPT" | head -1 | cut -d: -f1)
+  [ -n "$update" ] && [ -n "$install" ]
+  [ "$update" -lt "$install" ]
+}
+
+@test "claude-plugins: a zero-exit 'add' still lets the update run" {
+  # Behavioural, against the REAL rendered script — not a hand-written copy of
+  # the fixed lines. The previous version of this test stubbed `claude` and then
+  # asserted two commands it had just written inline, so it passed whether or not
+  # $SCRIPT still contained the `||` chain, i.e. it could not fail for the bug it
+  # was named after.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+
+  home="$BATS_TEST_TMPDIR/home"; bin="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$home/.config/dotfiles" "$bin"
+  # A REMOTE marketplace: no local .git, so `head` stays empty and the entry
+  # takes the install branch — the branch the fix lives in.
+  printf 'https://example.invalid/mp.git\tdemo@mp\n' >"$home/.config/dotfiles/claude-plugins.tsv"
+
+  # `add` exits 0 (already registered) — precisely the case the `||` chain ate.
+  cat >"$bin/claude" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$BATS_TEST_TMPDIR/calls"
+case "\$*" in
+  "plugin list") exit 0 ;;
+  "plugin marketplace add"*) exit 0 ;;
+  "plugin marketplace update"*) exit 0 ;;
+  "plugin install"*) exit 0 ;;
+esac
+exit 0
+STUB
+  chmod +x "$bin/claude"
+
+  chezmoi execute-template --source "$REPO_ROOT" <"$SCRIPT" >"$BATS_TEST_TMPDIR/rendered.sh"
+  run env HOME="$home" PATH="$bin:$PATH" bash "$BATS_TEST_TMPDIR/rendered.sh"
+  [ "$status" -eq 0 ]
+
+  # The whole point: the update ran even though add returned 0.
+  run grep -qE '^plugin marketplace update mp$' "$BATS_TEST_TMPDIR/calls"
+  [ "$status" -eq 0 ]
+  # And it ran before the install it feeds.
+  u=$(grep -n '^plugin marketplace update mp$' "$BATS_TEST_TMPDIR/calls" | head -1 | cut -d: -f1)
+  i=$(grep -n '^plugin install demo@mp$' "$BATS_TEST_TMPDIR/calls" | head -1 | cut -d: -f1)
+  [ -n "$u" ] && [ -n "$i" ] && [ "$u" -lt "$i" ]
+}

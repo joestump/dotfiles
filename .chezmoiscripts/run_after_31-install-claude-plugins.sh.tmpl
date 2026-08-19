@@ -12,7 +12,11 @@
 #     because authors don't always bump the plugin `version`, and
 #     `claude plugin update` is a no-op when the version is unchanged (that's
 #     exactly why a freshly-added skill silently failed to appear).
-#   • REMOTE (GitHub) marketplaces: install-once; update with `claude plugin update`.
+#   • REMOTE marketplaces (GitHub, or a Gitea URL): install-once. Their cache
+#     is refreshed with `marketplace update` before every install attempt, so a
+#     marketplace whose entry was broken when we first cloned it can recover on
+#     a later run. An already-installed remote plugin is left alone — upgrading
+#     one is still a manual `claude plugin update`.
 #
 # The clone itself is refreshed by the chezmoi external (refreshPeriod). For an
 # immediate pull+propagate after pushing skills: `chezmoi apply --refresh-externals`.
@@ -67,7 +71,18 @@ while read -r src plugin _rest <&3 || [ -n "${src:-}" ]; do
   # grep -F would substring-match (e.g. qmd@qmd inside my-qmd@qmd). Anchor with
   # -x so the WHOLE line must equal the plugin name (dotfiles#19).
   if ! grep -qxF "$plugin" <<<"$installed"; then
-    claude plugin marketplace add "$src" </dev/null >/dev/null 2>&1 || claude plugin marketplace update "$mp" </dev/null >/dev/null 2>&1 || true
+    # `marketplace add` and `marketplace update` must BOTH run, unconditionally.
+    # They used to be chained with `||`, but `add` exits 0 for an
+    # already-registered marketplace, so the update never fired and the cached
+    # marketplace.json froze at whatever commit it was first cloned at. When
+    # that first clone carried a broken entry the failure was permanent and
+    # self-perpetuating: install fails -> plugin never appears in `plugin list`
+    # -> we take this branch again -> `add` succeeds -> still no update. That is
+    # exactly how harness@claude-plugin-harness stayed uninstallable for three
+    # months against a marketplace whose main had been fixed 28 minutes after
+    # the bad clone (dotfiles#124).
+    claude plugin marketplace add "$src" </dev/null >/dev/null 2>&1 || true
+    claude plugin marketplace update "$mp" </dev/null >/dev/null 2>&1 || true
     if step "$plugin" -- claude plugin install "$plugin" </dev/null; then printf '%s' "$head" >"$sentinel"; else warn "install $plugin failed"; fi
   elif [ -n "$head" ] && [ "$head" != "$(cat "$sentinel" 2>/dev/null || true)" ]; then
     claude plugin marketplace update "$mp" </dev/null >/dev/null 2>&1 || true
