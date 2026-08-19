@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 7
 title: Signal
 ---
 
@@ -39,7 +39,8 @@ The daemon is supervised **per-OS, as you, no sudo**:
 | MCP repo | `~/src/signal-mcp` (**your dev checkout**) | `~/src/signal-mcp` (chezmoi external, tracks `main`) |
 
 Everything except the device link is provisioned by `chezmoi apply`: on Linux it
-installs the JRE (apt `openjdk-21-jre-headless`), `uv`, `signal-cli` (pinned
+installs the JRE (apt `openjdk-25-jre-headless` — signal-cli 0.14.5 needs Java 25;
+21 throws `UnsupportedClassVersionError`), `uv`, `signal-cli` (pinned
 release), clones the MCP repo, warms its `uv` venv, and writes the systemd unit.
 
 The daemon uses signal-cli's **default data dir** (no `-d`): `~/.local/share/signal-cli`
@@ -131,3 +132,14 @@ daemon itself runs in multi-account mode (no `-a`), so these env vars scope the
 signal-mcp client only.
 
 > Signal renders **no markdown** — plain text, emoji, and bare `https://` URLs only.
+
+## Driving an agent from Signal
+
+The `crush-signal` [harness](./harness) opts the `signal` MCP into the fork's
+**channel** feature (`--channels signal`), so inbound messages arrive as live
+events mid-session rather than only when a tool is polled. That's what makes an
+agent you text from your phone feel responsive.
+
+Only one agent per box should own the Signal channel. `claude-code` is
+deliberately *not* Signal-driven — a second channel agent would answer the very
+same messages, and the human would get two replies to everything.

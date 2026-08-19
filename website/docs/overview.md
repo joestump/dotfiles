@@ -20,22 +20,24 @@ Linux spokes provisioned from it.
 flowchart TD
     src["gitea.stump.rocks/joestump/dotfiles<br/>(the source)"]
     src -->|"chezmoi init --apply"| mother["HUB (the mothership)<br/>macOS · Homebrew · required"]
-    src -->|"czinit / chezmoi init --apply"| nodes["SPOKES<br/>ie01, ie02, … · Ubuntu / apt"]
+    src -->|"czinit"| nodes["SPOKES<br/>ie01, ie02, … · Ubuntu / apt"]
     mother -->|"provisions (czinit)"| nodes
     mother --> omz["Oh My Zsh + helpers + tooling"]
     nodes --> omz
     omz --> bao["OpenBao + Vault Agent<br/>secrets → env/files · never in the repo"]
+    omz --> agents["harness → Crush · Claude Code<br/>supervised agent sessions"]
 ```
 
 ## The pieces
 
 | Layer | Tool | What it does |
 | --- | --- | --- |
-| **Dotfile management** | [chezmoi](https://chezmoi.io) | Source of truth at `~/src/dotfiles`, pushed to Gitea. Renders `~/.zshrc` + `~/.oh-my-zsh/custom/` and a few configs. |
+| **Dotfile management** | [chezmoi](https://chezmoi.io) | Two checkouts: a **production** clone chezmoi renders `$HOME` from, and a **workbench** you edit. See [Editing](workflow). |
 | **Shell** | Oh My Zsh | Curated plugins, helper functions auto-loaded from `$ZSH_CUSTOM`, spaceship prompt. |
-| **Secrets** | OpenBao + Vault Agent | A launchd agent renders every `secret/users/<you>/*` to env files + SSH keys on a schedule. Nothing secret is committed. |
-| **Packages** | Homebrew (macOS) / apt (Linux) | A `Brewfile` and an apt list, installed by `run_onchange_` scripts. |
-| **AI tooling** | Claude Code + Desktop | MCP servers and plugins managed declaratively (shared list, OpenBao-sourced tokens). |
+| **Secrets** | OpenBao + Vault Agent | A supervised agent renders every `secret/users/<you>/*` to env files, an AWS credentials file, a `.netrc` and SSH keys, on a schedule. Nothing secret is committed. |
+| **Packages** | Homebrew (macOS) / apt (Linux) | A `Brewfile`, an apt list and a Go tools list, installed by `run_onchange_` scripts. |
+| **AI tooling** | Claude Code · Claude Desktop · Crush | MCP servers, plugins and **agent rules** managed declaratively from one source. |
+| **Agent supervision** | [harness](claude/harness) | A daemon that keeps agent sessions alive, exposes them over SSH, and runs their cron schedules. |
 | **CI / this site** | Gitea Actions + Garage Pages | BATS + lint on every push; this site builds and ships to Garage S3. |
 
 ## Two kinds of machine
@@ -50,8 +52,24 @@ flowchart TD
 
 ## The golden rule
 
-> Edit the **source**, not the live files. `chezmoi edit ~/.zshrc` (not `~/.zshrc`
-> directly), commit, push. Pull anywhere with `chezmoi update`.
+> **Edit the workbench (`~/src/dotfiles`) — never the live files, and never
+> `chezmoi edit`.** Branch, PR, merge to `main`; then `czu` on every box.
+
+`chezmoi edit` and `chezmoi cd` open the *production* clone, which `czu` resets to
+upstream `main` on every run — so anything written there is discarded, and
+anything *committed* there wedges that machine's sync. The full model, and how to
+test a change before it merges, is on [Editing](workflow).
 
 Secrets are the one thing that never lives in the repo — they come from
 [OpenBao at runtime](secrets). Everything else is reproducible from `git`.
+
+## Where to go next
+
+| If you want to… | Read |
+| --- | --- |
+| Set up a machine | [The Hub](install/mothership) · [A Spoke](install/nodes) |
+| Know what commands exist | [Command reference](commands) |
+| Change something | [Editing](workflow) · [Maintenance](maintenance) |
+| Understand secrets | [Secrets](secrets) |
+| Run agents | [Harness](claude/harness) · [Crush](claude/crush) · [Claude](claude/) |
+| Know what runs in the background | [Services & schedules](services) |

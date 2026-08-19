@@ -70,3 +70,18 @@ jobs:
       - name: yamllint — workflows
         run: |
           yamllint -d "{extends: relaxed, rules: {truthy: disable, line-length: disable, document-start: disable}}" .gitea/workflows
+
+      - name: Docs — no legacy admonition syntax
+        # The site sets `future: {v4: true}`, which turns off
+        # markdown.mdx1Compat.admonitions. Under that flag the MDX v1 form
+        # `:::warning Title` is NOT parsed — it renders as literal ":::warning
+        # Title" text in the page, silently, with no build warning. Only the
+        # untitled `:::warning` and the directive-label `:::warning[Title]`
+        # forms work. Every titled admonition on the site was broken this way
+        # before it was noticed, so this is a check rather than a convention.
+        run: |
+          if grep -rnE '^:::(note|tip|info|warning|danger|caution) +[^[]' website/docs; then
+            echo "::error::Legacy MDX v1 admonition syntax found — use :::type[Title] instead."
+            exit 1
+          fi
+          echo "OK — no legacy admonition syntax"

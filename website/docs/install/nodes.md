@@ -40,9 +40,16 @@ chezmoi ssh <host> https://gitea.stump.rocks/joestump/dotfiles.git
 ## On the box directly
 
 ```bash
-sh -c "$(curl -fsLS get.chezmoi.io)" -- \
-  init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
 ```
+
+:::danger[No `--source`]
+A bare `init` clones into chezmoi's default source dir — which **is** the
+production clone under the two-checkout model. A fresh spoke gets no
+`~/src/dotfiles` at all; that path is the development workbench, and it only
+exists where someone develops. Passing `--source` leaves the rendered config and
+the clone pointing at different places. See [Editing](../workflow).
+:::
 
 ### What's different from the hub
 
@@ -51,24 +58,37 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- \
 - **Packages via apt.** `run_onchange_after_10-install-packages.sh` installs from
   `~/.config/dotfiles/apt-packages.txt`, plus `gh` and `vault` from their official
   apt repos. The `Brewfile` is ignored on Linux.
-- **No desktop apps.** The macOS-only pieces (Claude Desktop, launchd services)
+- **No desktop apps.** The macOS-only pieces (Claude Desktop, the msgbrowse cask)
   simply don't apply here — that's why the [hub must be macOS](mothership.md).
+- **Services are `systemd --user`,** not launchd: `vault-agent.service`,
+  `signal-daemon.service`, `harness.service`, plus the `czu`, qmd and
+  stale-detector timers. See [Services](../services).
 - Uses `sudo` for apt — passwordless or interactive sudo required.
 
 ## Then, secrets
 
-Same as the hub — the Vault Agent talks to OpenBao directly, so it works on a
-node as long as it can reach `vault.stump.rocks`:
+`czinit` already does this. Doing it by hand, from your **laptop** — the node
+needs a machine identity, not an interactive login:
 
 ```bash
-vault login -method=oidc      # over SSH? see the tunnel note in Secrets
-vault-agent start
+czapprole joestump@ie02.stump.rocks   # mints a secret_id and ships it to the node
 ```
+
+That gives the node's Vault Agent an AppRole it renews itself, so it never dies
+at a token max-TTL. The OIDC path is the fallback, and it needs a tunnel back to
+your laptop's browser:
+
+```bash
+vault-login joestump@ie02.stump.rocks   # opens the tunnel AND logs in there
+```
+
+The agent talks to OpenBao directly, so once the node has an identity everything
+renders without a tunnel. See [Secrets](../secrets).
 
 > 💡 **Re-installing a spoke** — if a node gets into a weird state, nuke chezmoi's
 > cache and re-run; it re-clones HEAD cleanly:
 
 > ```bash
-> rm -rf ~/src/dotfiles ~/.local/share/chezmoi ~/.config/chezmoi ~/.cache/chezmoi
-> sh -c "$(curl -fsLS get.chezmoi.io)" -- init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
+> rm -rf ~/.local/share/chezmoi ~/.config/chezmoi ~/.cache/chezmoi
+> sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
 > ```

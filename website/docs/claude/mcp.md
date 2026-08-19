@@ -70,34 +70,32 @@ That means there is nothing to bake in and nothing to rotate here: it uses the
 standard boto credential chain, so it picks up whatever is already in the
 environment. Rotating the underlying key changes nothing in this repo.
 
-:::warning Which launch contexts actually have credentials
+:::tip[This used to be broken everywhere but an interactive shell]
+`secrets-aws.env` is sourced by `00-secrets.zsh`, an Oh My Zsh custom file — so
+it only ever reached **interactive zsh**. Claude Desktop (a GUI app) and every
+harness-launched agent (systemd/launchd) got no AWS credentials at all and failed
+on the first tool call. `~/.aws` wasn't a fallback either: the `[default]`
+profile on the Mac held a dead 2025-era key, and a Linux agent box had no
+`~/.aws` at all.
 
-The boto chain only helps if something put the credentials there, and **that is
-not true in every launch context today**:
+Fixed in `dotfiles#136` by giving the non-interactive contexts a credential
+source they can actually read. Vault Agent now renders a second template,
+`secrets-aws.credentials.ctmpl`, to `~/.config/aws/credentials` in INI form with
+two profiles:
 
-| Launched from | Gets `secrets-aws.env`? | Result |
+| Profile | From | For |
 | --- | --- | --- |
-| Claude Code / Crush started from an interactive shell | yes | works |
-| **Claude Desktop** (GUI) | **no** | auth failure on first tool call |
-| **A harness-launched agent** (systemd/launchd) | **no** | auth failure on first tool call |
+| `[default]` | `secret/users/<you>/aws` | Joe's admin key — CLI use |
+| `[agent-readonly]` | `secret/users/<you>/aws-readonly` | The read-only agent identity — MCP servers and harness-launched agents |
 
-`secrets-aws.env` is sourced by `00-secrets.zsh`, an Oh My Zsh custom file, so
-it reaches **interactive zsh only**. The non-interactive bags do not carry AWS —
-`secrets-static.env.ctmpl` deliberately excludes the `aws` category, and neither
-`secrets-static.env` nor `secrets-static.systemd.env` contains
-`AWS_ACCESS_KEY_ID`. Both harness launchers load only the static bag.
+The server entry points `AWS_SHARED_CREDENTIALS_FILE` at that file and selects
+the profile with `AWS_PROFILE`, so the boto chain resolves identically from a
+login shell, from Claude Desktop, and from a systemd-supervised agent.
 
-`~/.aws` is not a working fallback either: the `[default]` profile on this Mac
-holds a static key from April 2025 that is both a different key from the
-OpenBao-rendered one and dead (`aws sts get-caller-identity` → `InvalidClientTokenId`).
-On a Linux agent box with no `~/.aws` at all, the failure is `NoCredentialsError`.
-
-Making this work everywhere needs a credential source the non-interactive
-contexts can read — most likely a second Vault Agent template rendering the same
-OpenBao bag in INI form to `~/.config/aws/credentials`, with
-`AWS_SHARED_CREDENTIALS_FILE` set on the server entry. That is a change to the
-secrets flow rather than to this server, so it is tracked separately.
-
+Note the shape of the guard in that template: it ranges the KV **metadata**
+listing and only reads a bag that's actually present. A fixed `with secret` read
+404-loops for a user without the bag *and* leaves a stale file in place; ranging
+the metadata means such a user renders cleanly to an empty file.
 :::
 
 Two things worth knowing:
@@ -135,13 +133,20 @@ A server only connects if its launcher is present on the box:
 ## Add or change a server
 
 ```bash
-chezmoi edit ~/.config/dotfiles/mcp-servers.json    # edit the non-secret defs
-vault kv put secret/users/<you>/<svc> <FIELD>=…        # only if it needs a secret (ref it as secret/users/<you>/<svc>:<FIELD>)
-chezmoi apply                                        # re-merges BOTH apps
+$EDITOR ~/src/dotfiles/dot_config/dotfiles/mcp-servers.json   # the non-secret defs
+vault kv put secret/users/<you>/<svc> <FIELD>=…               # only if it needs a secret
+chezmoi apply --source ~/src/dotfiles ~/.claude.json          # try it before merging
 ```
+
+Reference a secret as `secret/users/<you>/<svc>:<FIELD>` — the KV path, a colon,
+then the field name. Merge the change and `czu` to propagate it; the apply
+re-merges **both** apps.
 
 Then **restart Claude Code / Desktop** to reload. Check what's live with
 `claude mcp list` (shows ✔ connected / ✘ failed per server).
+
+Crush does **not** read this file — it has its own MCP block in `crush.json`.
+See [Crush](./crush).
 
 > **Five servers aren't in `mcp-servers.json`** — the merge scripts inject them
 > because their shape varies per app or per OS: `github`, `outline`, `cairn` and

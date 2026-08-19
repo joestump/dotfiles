@@ -1,20 +1,34 @@
 ---
-sidebar_position: 6
+sidebar_position: 8
 title: Maintenance
 ---
 
 # Maintaining the setup
 
-Everything below is "edit a managed file, `chezmoi apply`, push." Pull on other
-machines with `chezmoi update`.
+Everything below follows the same shape: **edit the source in the workbench, test
+it with a scoped apply, merge, then `czu`.** If you haven't read
+[Editing](workflow) yet, start there — the two-checkout model is what makes the
+commands on this page different from the ones in chezmoi's own documentation.
+
+```bash
+cd ~/src/dotfiles && git fetch origin && git switch -c feat/thing origin/main
+# …edit…
+chezmoi apply --source ~/src/dotfiles <target>   # try it here, before merging
+bats test/
+git commit -am "feat: thing" && git push -u origin HEAD   # PR → merge → czu
+```
 
 ## Add a shell helper
 
+One function per file — Oh My Zsh auto-sources everything in `custom/`, so there
+are no `source` lines to add.
+
 ```bash
-$EDITOR ~/.oh-my-zsh/custom/my-helper.zsh     # one function per file; OMZ auto-loads
-chezmoi add ~/.oh-my-zsh/custom/my-helper.zsh
-chezmoi cd && git add -A && git commit -m "Add my-helper" && git push && exit
+$EDITOR ~/src/dotfiles/dot_oh-my-zsh/custom/my-helper.zsh
+chezmoi apply --source ~/src/dotfiles ~/.oh-my-zsh/custom/my-helper.zsh
 ```
+
+Add a case to `test/helpers.bats` while you're there — CI runs it.
 
 ## Add a secret
 
@@ -26,9 +40,13 @@ vault-agent restart && exec zsh        # auto-discovered, no template edits
 ## Add a tool
 
 ```bash
-chezmoi edit ~/.Brewfile               # (or ~/.config/dotfiles/apt-packages.txt)
-chezmoi apply
+$EDITOR ~/src/dotfiles/dot_Brewfile                         # macOS
+$EDITOR ~/src/dotfiles/dot_config/dotfiles/apt-packages.txt # Linux
+$EDITOR ~/src/dotfiles/dot_config/dotfiles/go-tools.txt     # Go
 ```
+
+The installer is `run_onchange_`, so it re-fires on the first `czu` after the
+manifest's hash changes. Details: [Packages](packages).
 
 ## Add an SSH host
 
@@ -57,7 +75,8 @@ ssh:
         User: "joestump"
 ```
 
-Then `chezmoi apply && ssh -G <host>` to confirm what ssh actually resolves.
+Then `chezmoi apply --source ~/src/dotfiles ~/.ssh/config && ssh -G <host>` to
+confirm what ssh actually resolves.
 
 Order is load-bearing: ssh is first-match-wins per keyword, and the template emits
 `ssh.hosts` → `ssh.jump.hosts` → `ssh.multiplex`. So an entry in `ssh.hosts` always
@@ -80,9 +99,26 @@ rather than appending to it.
 
 ## Add a Claude MCP server or plugin
 
-Edit `~/.config/dotfiles/mcp-servers.json` (+ its OpenBao secret) or
-`claude-plugins.tsv`, then `chezmoi apply`. Full reference:
-[MCP servers](claude/mcp).
+Edit `dot_config/dotfiles/mcp-servers.json` (+ its OpenBao secret) or
+`claude-plugins.tsv.tmpl`, then apply. Full reference:
+[MCP servers](claude/mcp) · [Plugins](claude/plugins).
+
+Crush has its **own** MCP block in `crush.json` and discovers skills through
+`skills-ext/`, so adding a Claude plugin does not give it to Crush — see
+[Crush](claude/crush).
+
+## Add or change a supervised agent
+
+Declare it in `dot_config/harness/harness.toml.tmpl`. **Not** in the harness TUI —
+its new-harness form rewrites the file wholesale and `czu` reverts it on the next
+run. See [Harness](claude/harness).
+
+## Change an agent rule
+
+Rules live in `.chezmoitemplates/agents/`. A rule that applies to every agent goes
+in `base.md`; only a genuine capability difference belongs in a `harness-*.md`
+overlay. Writing it inline in `CLAUDE.md.tmpl` or `CRUSH.md.tmpl` silently applies
+it to that harness alone — see [Agent rules & identity](claude/agents).
 
 ## Link Signal on a new node
 
@@ -96,74 +132,85 @@ Details (daemon control, troubleshooting): [Signal](claude/signal).
 
 ## Add a prompt glyph
 
-Edit `PROMPT_GLYPHS` in `~/.zshrc`. Awkward to type? Use the codepoint:
-`$''` is a heart.
+Edit `PROMPT_GLYPHS` in `dot_zshrc` — the pool the spaceship prompt re-rolls
+from on every shell. They're Nerd Font private-use codepoints, so they're
+awkward to type directly; use the escape form instead, e.g. `$'\uf004'`.
 
 ## Search `~/src` with qmd
 
-If `~/src` exists, apply indexes each **top-level repo** into its own
-[qmd](https://github.com/tobil/qmd) collection (named after the directory) for
-local hybrid markdown search — so agents can `qmd query -c <repo>` per project.
-The logic lives in one place, `~/.config/dotfiles/qmd-index-src.zsh`, and is driven
-three ways:
-
-```bash
-dot           # → "🔎 Re-index ~/src (qmd)"  (re-run any time)
-status        # → the 🔎 qmd row: collection count, doc total, embed state
-chezmoi apply # runs the same indexer (a run_onchange_after_ hook)
-```
-
-It also re-indexes **on its own, daily** (launchd on macOS, a systemd --user
-timer on Linux — the same mechanism as scheduled `czu`), so markdown that lands
-in `~/src` without a `chezmoi apply` still gets picked up. The scheduled run logs
-to `~/.cache/qmd-index-src.log` and, being idempotent, is safe to overlap with a
-manual re-index.
-
-Dirs with **no markdown** are skipped (no empty collections), and re-indexing is
-idempotent — existing collections are refreshed incrementally, not recreated. Only
-the BM25 (keyword) index is built automatically; the ~2GB embedding models are
-**opt-in** (exactly like the qmd install), so semantic search needs a manual
-`qmd embed` — that's the "embed pending" note the `status` panel shows.
+Each top-level repo under `~/src` is indexed into its own qmd collection, so
+agents can `qmd query -c <repo>` per project. Re-index any time with `dot` →
+🔎, or check the index from `status`. It also re-indexes daily on its own —
+full detail on [Services](services#qmd-re-indexing).
 
 ## Update everything
 
-> 💡 **One step: `czu`** — brings this machine fully current in a single command: it
-> runs `chezmoi update` (git pull + apply), then `vault-agent restart` (re-render
-> secrets from OpenBao **now** instead of waiting ~5 min), then `exec zsh` to reload
-> the shell so new config + secrets take effect. Extra args pass straight through, so
-> **`czu --refresh-externals`** also re-pulls themes, plugins, marketplaces, and the
-> `signal-mcp` clone.
+> 💡 **One step: `czu`.** It syncs the production clone to `origin/main`,
+> re-asserts any target an app has rewritten, applies, restarts the Vault Agent
+> so secrets re-render *now* rather than in ~5 min, and `exec zsh` so the new
+> config and secrets take effect. Extra args pass straight through, so
+> **`czu --refresh-externals`** also re-pulls themes, plugins, marketplaces and
+> the Crush/harness source clones.
 >
-> Installing a *fresh* spoke instead? `czinit <host>` does the whole thing over SSH
-> — see [Install a Spoke](install/nodes).
+> Installing a *fresh* spoke instead? `czinit <host>` does the whole thing over
+> SSH — see [Install a Spoke](install/nodes).
 >
-> `czu` also runs **on its own, every 6 hours** (launchd on macOS, a systemd --user
-> timer on Linux) — every box stays current without you typing anything. It stays
-> silent on success; a failed scheduled run sends a Signal note-to-self once (not
-> every retry), and another once it recovers.
+> `czu` also runs **on its own, every 6 hours** — every box stays current without
+> you typing anything. It's silent on success; a failed scheduled run sends one
+> Signal note-to-self (not one per retry), and another once it recovers. See
+> [Services](services).
 
 ![czu bringing a machine fully up to date, with per-phase checked sections](/img/screenshots/czu.png)
 
-Under the hood, or to run the pieces by hand:
+### What czu actually does
 
-```bash
-chezmoi update                         # git pull + apply (re-runs changed run_onchange_ scripts)
-chezmoi apply --refresh-externals      # also re-pull themes/plugins/marketplaces + signal-mcp
-brew bundle --global                   # macOS tools
-```
+1. **Sync** — fast-forwards the production clone (`~/.local/share/chezmoi`) onto
+   `origin/main`, refusing to proceed if it's dirty, parked or ahead. A missing
+   clone is created; no network degrades to "apply what we have" rather than
+   failing.
+2. **Source the environment** — reads `secrets-static.env` *and* `env.zsh`, so
+   templates that derive values (Crush's providers, for one) render populated
+   even when the apply runs outside a login shell.
+3. **Re-assert** — force-applies the handful of targets an application also
+   writes (`crush.json`, `harness.toml`, `~/.gitconfig`) before the main apply,
+   so chezmoi's changed-since-last-write guard never prompts and never silently
+   skips them.
+4. **Apply** — `chezmoi apply --source <production>`.
+5. **Secrets** — `vault-agent restart`.
+
+Running a piece by hand is fine, but note that plain `chezmoi update` operates on
+**production** and skips steps 2 and 3 — so prefer `czu` unless you're debugging
+one specific stage.
 
 Claude **plugins** update themselves — the `run_after_` script reinstalls the
 local-path marketplace and updates remotes on every apply. There's no bulk
-`claude plugin update`; to force one by hand it's `claude plugin update
-<plugin>@<marketplace>` (e.g. `qmd@qmd`). See [Plugins](claude/plugins).
+`claude plugin update`; to force one by hand it's
+`claude plugin update <plugin>@<marketplace>` (e.g. `qmd@qmd`). See
+[Plugins](claude/plugins).
 
 ## CI
 
-Every push runs **Gitea Actions** (`.gitea/workflows/ci.yml`):
+Three **Gitea Actions** workflows gate `main`:
 
-- **bats** — the BATS test suite.
-- **lint** — shellcheck (incl. rendered `*.tmpl`), `zsh -n`, JSON, TOML, YAML, and
-  a gitleaks secret scan.
+| Workflow | Jobs |
+| --- | --- |
+| `ci.yml` | **bats** — the full BATS suite. **lint** — ShellCheck on plain scripts *and* on rendered `*.sh.tmpl`, `zsh -n` on the shell config, plus JSON, TOML and yamllint validation |
+| `gitleaks.yaml` | A verbose git-history secret scan via the shared `stumpcloud/gitleaks-action`, using this repo's `.gitleaks.toml` |
+| `aibot.yml` | The AI review bot on pull requests |
 
-Run the tests locally with `bats test/`. This docs site ships from a separate
-`pages` workflow to [Garage Pages](https://joestump.pages.stump.rocks/dotfiles/).
+Run the same suite locally:
+
+```bash
+bats test/
+```
+
+Shellcheck is worth calling out: CI's apt build is older than a Homebrew one and
+disagrees on some info/style checks, so a clean local run isn't proof. If CI
+flags something you can't reproduce, run `shellcheck --enable=all` locally.
+
+This docs site ships from a separate `pages` workflow. It builds once and
+deploys twice — to [Garage Pages](https://joestump.pages.stump.rocks/dotfiles/)
+(canonical) from Gitea, and to the [GitHub Pages
+mirror](https://joestump.github.io/dotfiles/) from `.github/workflows/pages.yml`,
+which sets `SITE_URL` to re-point the canonical URL. Only the host differs; the
+content is one source.
