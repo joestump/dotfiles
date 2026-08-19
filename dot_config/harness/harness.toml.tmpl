@@ -237,25 +237,39 @@ autostart = false
 #
 # The daemon can expose its cockpit over SSH (Wish, ADR-0004; public-key only,
 # no password path, ADR-0008) so a thin client on a phone or laptop can attach:
-# `ssh -p 23234 <host>` lands in the full TUI dashboard. The username ssh asks
+# `ssh -p <port> <host>` lands in the full TUI dashboard. The username ssh asks
 # for is irrelevant — Wish never checks it; the key is the only credential.
 #
-# authorized_keys_file is rendered by Vault Agent, NOT by chezmoi: the field
-# `harness_authorized_keys` in the OpenBao bag secret/users/$USER/ssh lands at
-# ~/.ssh/harness_authorized_keys automatically (ssh-keys.ctmpl writes every
-# field of that bag to ~/.ssh/<field>):
+# BOTH knobs of this surface live in the OpenBao bag secret/users/$USER/harness
+# — never in this committed template:
 #
-#   vault kv patch secret/users/$USER/ssh harness_authorized_keys=@id_ed25519.pub
+#   harness_authorized_keys  the public key(s) allowed to attach. Rendered to
+#                            ~/.ssh/harness_authorized_keys by Vault Agent
+#                            (harness-ssh.ctmpl writes every *_authorized_keys
+#                            field of the bag to ~/.ssh/<field>). Only the
+#                            joestump@ key belongs there — this is a
+#                            full-control (typing) surface on every box. A
+#                            machine whose bag has no such field has no
+#                            allow-list file and the listener accepts no one:
+#                            safe by default.
+#   HARNESS_SSH_PORT         the port, exported as an env var by
+#                            secrets-static.env.ctmpl (every field of every
+#                            non-ssh/aws bag is exported verbatim) and read
+#                            here at apply time.
 #
-# Only the joestump@ public key belongs in that field — this is a full-control
-# (typing) surface on every agent box. A machine whose bag has no such field
-# has no authorized_keys file and the listener accepts no one: safe by default.
-# Port 23234 is upstream's default — unprivileged (>1024), so the user-level
-# daemon can bind it with no root.
+#   vault kv put secret/users/$USER/harness #     harness_authorized_keys=@id_ed25519.pub HARNESS_SSH_PORT=23234
 #
-# @joestump-agent 08/19/2026 - Enabled the SSH cockpit, gated on a
-#   Vault-Agent-rendered authorized_keys file (Joe's key only).
+# The default below is NOT env gating — the banned pattern (dotfiles#106) was an
+# if-env block that renders a file EMPTY when the var is absent. This
+# always emits a valid listen line; the default only matters on a render that
+# runs before secrets-static.env exists (a fresh box mid-bootstrap), and it is
+# upstream's own default: unprivileged (>1024), so the user-level daemon binds
+# it with no root. Changing the port in bao takes effect on the next czu (the
+# reload script below restarts the listener's config) — not on a running one.
+#
+# @joestump-agent 08/19/2026 - Enabled the SSH cockpit, allow-list and port
+#   both sourced from the OpenBao secret/users/$USER/harness bag.
 [server]
 enabled = true
-listen = "0.0.0.0:23234"
+listen = "0.0.0.0:{{ env "HARNESS_SSH_PORT" | default "23234" }}"
 authorized_keys_file = "{{ .chezmoi.homeDir }}/.ssh/harness_authorized_keys"

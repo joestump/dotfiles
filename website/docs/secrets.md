@@ -36,13 +36,16 @@ flowchart TD
   format. `harness.service` consumes it (`EnvironmentFile=-…`), which is how
   supervised agents get their secrets on Linux without a login shell in the loop.
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
-  `secret/users/<you>/ssh`. Every field of that bag lands as `~/.ssh/<field>`:
-  the `harness_authorized_keys` field is the harness daemon's SSH-cockpit
-  allow-list (`~/.ssh/harness_authorized_keys`; the only key in it is the
-  `joestump@` public key, since it grants full typing control of every
-  harness on the box):
+  `secret/users/<you>/ssh`.
+- **Harness SSH cockpit** — a dedicated bag, `secret/users/<you>/harness`, holds
+  both knobs of the daemon's remote-access surface: `harness_authorized_keys`
+  (rendered to `~/.ssh/harness_authorized_keys` — the only key in it is the
+  `joestump@` public key, since it grants full typing control of every harness
+  on the box) and `HARNESS_SSH_PORT` (exported as an env var and read by
+  harness.toml at apply time; defaults to 23234 when absent):
   ```sh
-  vault kv patch secret/users/<you>/ssh harness_authorized_keys=@id_ed25519.pub
+  vault kv put secret/users/<you>/harness \
+    harness_authorized_keys=@id_ed25519.pub HARNESS_SSH_PORT=23234
   ```
 
 ## Add a secret

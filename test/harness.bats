@@ -272,19 +272,22 @@ assert \"switchboard\" in mcp, sorted(mcp)
   [ "$status" -eq 0 ]
 }
 
-@test "harness: [server] SSH cockpit is enabled on an unprivileged port with a Vault-rendered allow-list" {
+@test "harness: [server] SSH cockpit, allow-list and port both from the OpenBao harness bag" {
   # The SSH cockpit (ADR-0004/0008) is a full-typing surface on every box, so
-  # three couplings must hold: (1) authorized_keys_file is the path Vault
-  # Agent renders from the harness_authorized_keys field of
-  # secret/users/$USER/ssh (ssh-keys.ctmpl) — not an inline key, not a
-  # hand-edited file; (2) the port is unprivileged (>1024) so the user-level
-  # daemon can bind it; (3) it renders for EVERY identity, human or agent —
-  # Joe attaches from his laptop too.
+  # BOTH knobs are sourced from OpenBao, not from this committed template:
+  #   authorized_keys_file = the path Vault Agent renders from the
+  #     harness_authorized_keys field of secret/users/$USER/harness
+  #     (harness-ssh.ctmpl) — not an inline key, not a hand-edited file;
+  #   listen port = HARNESS_SSH_PORT from the same bag, via
+  #     secrets-static.env, with an UNPRIVILEGED default so a pre-secrets
+  #     bootstrap render is still valid and the user daemon can bind it.
+  # And it renders for EVERY identity, human or agent — Joe attaches too.
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
   printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
-  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+  # No HARNESS_SSH_PORT in the environment: the default must kick in.
+  run bash -c "env -u HARNESS_SSH_PORT chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
 import tomllib,sys
 s = tomllib.load(sys.stdin.buffer)[\"server\"]
 assert s[\"enabled\"] is True, s
@@ -295,13 +298,36 @@ assert \"key\" not in s, \"no inline keys — allow-list comes from Vault Agent 
 '"
   rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
 
+  # HARNESS_SSH_PORT set (as Vault Agent exports it from the harness bag): the
+  # listen line must carry it through. A render that IGNORED the env var would
+  # silently move the port away from the one bao declares.
+  run bash -c "HARNESS_SSH_PORT=24680 chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+s = tomllib.load(sys.stdin.buffer)[\"server\"]
+assert s[\"listen\"].endswith(\":24680\"), s[\"listen\"]
+'"
+  [ "$status" -eq 0 ]
+
   # And the same render for a plain human identity — the cockpit is not
   # agent-gated.
-  _cfg2dir="$(mktemp -d)"; _cfg2="$_cfg2dir/chezmoi.toml"
-  printf '[data]\n    chezmoi.username = \"joestump\"\n' >"$_cfg2"
-  run bash -c "chezmoi execute-template --config '$_cfg2' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
 import tomllib,sys
 assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
 '"
-  rm -rf "$_cfg2dir"; [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ]
+}
+
+@test "harness: the cockpit allow-list is rendered from the dedicated harness bag, not the ssh bag" {
+  # harness-ssh.ctmpl writes every *_authorized_keys field of
+  # secret/users/$USER/harness to ~/.ssh/<field>, mirroring ssh-keys.ctmpl's
+  # metadata-listing guard so a user with no harness bag writes nothing under
+  # ~/.ssh. agent.hcl.tmpl must register it (unconditionally — public keys
+  # only, so the vaultSshKeys blast-radius gate does not apply).
+  Ctmpl="$REPO_ROOT/dot_config/private_vault/harness-ssh.ctmpl"
+  [ -f "$Ctmpl" ]
+  grep -q 'secret/data/users/%s/harness' "$Ctmpl"
+  grep -q 'regexMatch "_authorized_keys' "$Ctmpl"
+  grep -q '"0600"' "$Ctmpl"
+  grep -q 'harness-ssh.ctmpl' "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
+  grep -q 'harness-ssh.manifest' "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
 }
