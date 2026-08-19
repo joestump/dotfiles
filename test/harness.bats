@@ -271,3 +271,37 @@ assert \"switchboard\" in mcp, sorted(mcp)
 '"
   [ "$status" -eq 0 ]
 }
+
+@test "harness: [server] SSH cockpit is enabled on an unprivileged port with a Vault-rendered allow-list" {
+  # The SSH cockpit (ADR-0004/0008) is a full-typing surface on every box, so
+  # three couplings must hold: (1) authorized_keys_file is the path Vault
+  # Agent renders from the harness_authorized_keys field of
+  # secret/users/$USER/ssh (ssh-keys.ctmpl) — not an inline key, not a
+  # hand-edited file; (2) the port is unprivileged (>1024) so the user-level
+  # daemon can bind it; (3) it renders for EVERY identity, human or agent —
+  # Joe attaches from his laptop too.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+s = tomllib.load(sys.stdin.buffer)[\"server\"]
+assert s[\"enabled\"] is True, s
+port = int(s[\"listen\"].rsplit(\":\", 1)[1])
+assert port > 1024, port
+assert s[\"authorized_keys_file\"].endswith(\"/.ssh/harness_authorized_keys\"), s
+assert \"key\" not in s, \"no inline keys — allow-list comes from Vault Agent only\"
+'"
+  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
+
+  # And the same render for a plain human identity — the cockpit is not
+  # agent-gated.
+  _cfg2dir="$(mktemp -d)"; _cfg2="$_cfg2dir/chezmoi.toml"
+  printf '[data]\n    chezmoi.username = \"joestump\"\n' >"$_cfg2"
+  run bash -c "chezmoi execute-template --config '$_cfg2' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import tomllib,sys
+assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
+'"
+  rm -rf "$_cfg2dir"; [ "$status" -eq 0 ]
+}

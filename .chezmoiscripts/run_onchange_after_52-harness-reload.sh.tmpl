@@ -73,6 +73,14 @@ else
   warn "harness reload failed — the daemon picks the config up on its next restart"
 fi
 {{ else -}}
-# Human login — scheduled harnesses are agent jobs; nothing to do here.
-exit 0
+# Human login — the sweep teardown above is agent-machine business, but the
+# reload is not: harness.toml also carries the [server] SSH cockpit and other
+# config a human box wants. run_onchange_ means this only fires when the
+# template actually changed, so reload here too.
+HARNESS_BIN="$HOME/.local/bin/harness"
+[ -x "$HARNESS_BIN" ] || HARNESS_BIN="${GOBIN:-$HOME/go/bin}/harness"
+[ -x "$HARNESS_BIN" ] || HARNESS_BIN="$(command -v harness 2>/dev/null || true)"
+if [ -n "$HARNESS_BIN" ] && "$HARNESS_BIN" reload >/dev/null 2>&1; then
+  echo "    - harness daemon reloaded (harness.toml changed)"
+fi
 {{ end -}}
