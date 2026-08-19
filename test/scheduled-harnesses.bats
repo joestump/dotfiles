@@ -1,15 +1,16 @@
 #!/usr/bin/env bats
-# The scheduled harnesses: three one-shot prompt harnesses in harness.toml
-# (stumpcloud-sweep every 6h, pr-feedback-sweep daily, issue-pr-grooming
-# weekly), agent logins only, replacing the retired standalone
-# stumpcloud-sweep systemd timer / launchd agent. These tests pin the
-# couplings: every scheduled entry points at a prompt file that actually
-# ships, the old units are gone from source AND listed in .chezmoiremove, and
-# the reload script re-fires on config/prompt changes (daemon doesn't re-read
-# config itself).
+# The scheduled harnesses: three one-shot prompt harnesses, one drop-in file
+# each in dot_config/harness/harness.d/*.toml (stumpcloud-sweep every 6h,
+# pr-feedback-sweep daily, issue-pr-grooming weekly), agent logins only,
+# replacing the retired standalone stumpcloud-sweep systemd timer / launchd
+# agent. These tests pin the couplings: every scheduled entry points at a
+# prompt file that actually ships, the old units are gone from source AND
+# listed in .chezmoiremove, and the reload script re-fires on config/prompt
+# changes (daemon doesn't re-read config itself).
 load test_helper
 
 HARNESS_TOML="$REPO_ROOT/dot_config/harness/harness.toml.tmpl"
+HARNESS_D="$REPO_ROOT/dot_config/harness/harness.d"
 PROMPTS_DIR="$REPO_ROOT/dot_config/dotfiles"
 RELOAD_SCRIPT="$REPO_ROOT/.chezmoiscripts/run_onchange_after_52-harness-reload.sh.tmpl"
 REMOVE="$REPO_ROOT/.chezmoiremove"
@@ -39,8 +40,19 @@ _agent_render() {
   return $rc
 }
 
+# Render the full declared set — main config plus every harness.d drop-in —
+# as an agent login, concatenated. The scheduled tables live only in the
+# drop-ins, so tests asserting on them must render the whole set.
+_agent_render_all() {
+  local f
+  _agent_render "$HARNESS_TOML" || return 1
+  for f in "$HARNESS_D"/*.toml.tmpl; do
+    _agent_render "$f" || return 1
+  done
+}
+
 @test "scheduled: three scheduled harnesses declared with prompt + cron" {
-  run _agent_render "$HARNESS_TOML"
+  run _agent_render_all
   [ "$status" -eq 0 ]
   for name in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
     grep -qE "^\[harness\.$name\]" <<<"$output" || return 1
@@ -55,14 +67,14 @@ _agent_render() {
 }
 
 @test "scheduled: cadences — sweep 6h, pr-feedback daily, grooming weekly" {
-  run _agent_render "$HARNESS_TOML"
+  run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
   grep -A8 '^\[harness\.pr-feedback-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
   grep -A8 '^\[harness\.issue-pr-grooming\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
 }
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
-  run _agent_render "$HARNESS_TOML"
+  run _agent_render_all
   for f in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
     grep -q "$f.prompt.md" <<<"$output" || return 1
     # pr-feedback/grooming are templates (identity vars); the sweep prompt is
@@ -109,6 +121,9 @@ _agent_render() {
   # only re-fires when the rendered script text changes, so the hashes of
   # everything the schedule depends on must be embedded in it.
   for f in dot_config/harness/harness.toml.tmpl \
+           dot_config/harness/harness.d/stumpcloud-sweep.toml.tmpl \
+           dot_config/harness/harness.d/pr-feedback-sweep.toml.tmpl \
+           dot_config/harness/harness.d/issue-pr-grooming.toml.tmpl \
            dot_config/dotfiles/stumpcloud-sweep.prompt.md \
            dot_config/dotfiles/pr-feedback-sweep.prompt.md.tmpl \
            dot_config/dotfiles/issue-pr-grooming.prompt.md.tmpl; do
@@ -118,18 +133,21 @@ _agent_render() {
 }
 
 @test "scheduled: human logins get none of it" {
-  # .chezmoiignore keeps the prompts off human logins; the harness.toml
-  # template itself gates the scheduled block on the -agent suffix.
+  # .chezmoiignore keeps the prompts off human logins; each harness.d drop-in
+  # gates its table on the -agent suffix (the main config no longer carries
+  # the scheduled block at all).
   grep -q 'pr-feedback-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
   grep -q 'issue-pr-grooming.prompt.md' "$REPO_ROOT/.chezmoiignore"
-  grep -q 'hasSuffix "-agent"' "$HARNESS_TOML"
+  for f in "$HARNESS_D"/*.toml.tmpl; do
+    grep -q 'hasSuffix "-agent"' "$f" || return 1
+  done
 }
 
 @test "scheduled: every sweep is pinned to glm-5.3 on Z.ai" {
   # Unattended permission-free runs — the model is pinned per entry (harness
   # appends --model), so a config-wide model change can never silently retarget
   # them. Same model as the Z.ai coding plan crush pin, on the zai provider.
-  run _agent_render "$HARNESS_TOML"
+  run _agent_render_all
   for name in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "zai/glm-5.3"' || return 1
   done

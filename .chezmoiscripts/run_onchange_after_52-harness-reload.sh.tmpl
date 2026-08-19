@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Scheduled harnesses: reload the daemon when harness.toml or a sweep prompt
-# changes, and retire the pre-`schedule` stumpcloud-sweep units it replaces.
+# Scheduled harnesses: reload the daemon when harness.toml, a harness.d
+# drop-in, or a sweep prompt changes, and retire the pre-`schedule`
+# stumpcloud-sweep units it replaces.
 #
 # The daemon does not re-read its config on file change (stump.wtf/harness#98),
 # so a config that arrives via czu needs `harness reload` to take effect. This
-# script is run_onchange_ with the config + prompt hashes embedded below, so
-# any edit to the declared harness set or a scheduled prompt re-fires it.
+# script is run_onchange_ with the config + drop-in + prompt hashes embedded
+# below, so any edit to the declared harness set (main config OR one of the
+# harness.d/*.toml drop-ins) or a scheduled prompt re-fires it.
 #
 # What `reload` does NOT cover: the [server] SSH cockpit. The daemon calls
 # startRemote() exactly once at boot (harness cmd/harness/daemon.go) and
@@ -23,6 +25,9 @@
 # already fired once); .chezmoiremove deletes the files.
 #
 #   config hash:  {{ include "dot_config/harness/harness.toml.tmpl" | sha256sum }}
+#   drop-in sweep: {{ include "dot_config/harness/harness.d/stumpcloud-sweep.toml.tmpl" | sha256sum }}
+#   drop-in prfb:  {{ include "dot_config/harness/harness.d/pr-feedback-sweep.toml.tmpl" | sha256sum }}
+#   drop-in groom: {{ include "dot_config/harness/harness.d/issue-pr-grooming.toml.tmpl" | sha256sum }}
 #   sweep prompt: {{ include "dot_config/dotfiles/stumpcloud-sweep.prompt.md" | sha256sum }}
 #   prfb prompt:  {{ include "dot_config/dotfiles/pr-feedback-sweep.prompt.md.tmpl" | sha256sum }}
 #   groom prompt: {{ include "dot_config/dotfiles/issue-pr-grooming.prompt.md.tmpl" | sha256sum }}

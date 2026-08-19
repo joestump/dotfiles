@@ -154,69 +154,38 @@ restart = "always"
 restart_delay = 5
 enabled = false
 
-# Scheduled harnesses
+# Scheduled harnesses — one drop-in file each in harness.d/
 #
-# One-shot prompt harnesses fired by the daemon's own cron scheduler: the 6h
-# StumpCloud health sweep (formerly the standalone systemd timer / launchd
-# agent, retired by run_onchange_after_52-harness-reload.sh.tmpl) plus the
-# daily PR-feedback sweep and weekly issue/PR grooming (formerly
-# never-actually-scheduled ~/.claude/scheduled-tasks definitions).
+# One-shot prompt harnesses fired by the daemon's own cron scheduler live in
+# ~/.config/harness/harness.d/*.toml (see [server] harness_d below, wired by
+# stump.wtf/harness PR #227): the 6h StumpCloud health sweep (formerly the
+# standalone systemd timer / launchd agent, retired by
+# run_onchange_after_52-harness-reload.sh.tmpl) plus the daily PR-feedback
+# sweep and weekly issue/PR grooming (formerly never-actually-scheduled
+# ~/.claude/scheduled-tasks definitions).
+#
+# Drop-in rules: a harness.d file may contain ONLY [harness.*] tables —
+# [server], [profile.*] and [daemon] are rejected with source-located errors
+# — duplicate names across files or with this config are rejected, non-.toml
+# files are skipped, and files load in lexicographic order. So the set of
+# scheduled tasks is exactly the set of files in harness.d/: add or retire a
+# schedule by adding or deleting one file, never by editing this template.
 #
 # `schedule` is validated at config load: it requires `prompt`, is mutually
 # exclusive with `enabled = true` and with profile membership, and only allows
 # restart "no"/"on-failure". Instructions live in chezmoi-managed prompt files,
 # so a prompt edit propagates with a normal czu and re-fires the reload script
-# via its embedded hash. The block is gated on the `-agent` login suffix (same
-# gate as .chezmoiignore) — human logins render only the interactive agents.
+# via its embedded hash (which now hashes the drop-ins too). Each drop-in is
+# gated on the `-agent` login suffix (the same gate the old inline block here
+# carried) — human logins render the drop-ins EMPTY, which is valid TOML and
+# contributes nothing, so only agent boxes run sweeps.
 #
-# @joestump-agent 08/18/2026 - Added the three scheduled harnesses, replacing
-#   the standalone stumpcloud-sweep timer/launchd pair and the dormant
-#   ~/.claude/scheduled-tasks definitions. All pinned to zai/glm-5.3.
-{{ $schedUser := .agentIdentity | default .chezmoi.username -}}
-{{ if hasSuffix "-agent" $schedUser -}}
-
-# StumpCloud health sweep — the 6h root-cause-anything-degraded run over
-# ~/src/stumpcloud (OMGs at MEDIUM+, always Signals the operator). Was the
-# stumpcloud-sweep.timer / launchd pair before harness grew `schedule`.
-[harness.stumpcloud-sweep]
-harness = "crush"
-prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/stumpcloud-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run. If ~/src/stumpcloud is missing entirely, say so and exit."
-schedule = "0 */6 * * *"
-model = "zai/glm-5.3"
-auto_accept = true
-quiet = true
-workdir = "{{ .chezmoi.homeDir }}"
-description = "StumpCloud health sweep · every 6h · glm-5.3 (Z.ai)"
-restart = "on-failure"
-
-# PR feedback sweep — keep joestump-agent's own open PRs on Gitea + GitHub
-# moving: address new review feedback, push fixes, reply to threads,
-# squash-merge what is approved+green per the two-tier policy.
-[harness.pr-feedback-sweep]
-harness = "crush"
-prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/pr-feedback-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
-schedule = "30 9 * * *"
-model = "zai/glm-5.3"
-auto_accept = true
-quiet = true
-workdir = "{{ .chezmoi.homeDir }}"
-description = "PR feedback sweep (own PRs, both forges) · daily 09:30 · glm-5.3 (Z.ai)"
-restart = "on-failure"
-
-# Issue / PR grooming — weekly conservative tidy-up of stale, duplicate and
-# superseded issues and PRs across the known Gitea + GitHub repos.
-[harness.issue-pr-grooming]
-harness = "crush"
-prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/issue-pr-grooming.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
-schedule = "0 7 * * 1"
-model = "zai/glm-5.3"
-auto_accept = true
-quiet = true
-workdir = "{{ .chezmoi.homeDir }}"
-description = "Issue/PR grooming across forges · Mondays 07:00 · glm-5.3 (Z.ai)"
-restart = "on-failure"
-
-{{ end }}
+# @joestump-agent 08/18/2026 - Added the three scheduled harnesses inline
+#   here, replacing the standalone stumpcloud-sweep timer/launchd pair and
+#   the dormant ~/.claude/scheduled-tasks definitions.
+#
+# @joestump-agent 08/19/2026 - Moved them out to harness.d/ drop-ins per the
+#   harness_d pattern; schedules and prompts unchanged.
 
 # ── Profiles ─────────────────────────────────────────────────────────────────
 # Named sets that `harness use-profile <name>` switches between. These existed
@@ -293,3 +262,10 @@ autostart = false
 enabled = true
 listen = "0.0.0.0:{{ env "HARNESS_SSH_PORT" | default "23234" }}"
 authorized_keys_file = "{{ .chezmoi.homeDir }}/.ssh/harness_authorized_keys"
+# Drop-in directory for [harness.*] definitions (stump.wtf/harness PR #227):
+# every *.toml in it loads after this file and its harness tables merge in.
+# The scheduled one-shots live there — one file per schedule — so the set of
+# scheduled tasks is managed file-by-file, not by editing this template.
+# Like the rest of [server], a change here takes effect on daemon RESTART,
+# not via `harness reload`.
+harness_d = "{{ .chezmoi.homeDir }}/.config/harness/harness.d"

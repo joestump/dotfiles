@@ -68,62 +68,114 @@ _render() {
   esac
 }
 
-@test "harness: rendered harness.toml is valid TOML with all seeded harnesses" {
+@test "harness: rendered harness.toml + drop-ins are valid TOML with all seeded harnesses" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # Render as an AGENT login — the scheduled block is identity-gated, and CI
-  # runs as root, where the plain render has none of it.
+  # Render as an AGENT login - the scheduled drop-ins are identity-gated, and
+  # CI runs as root, where the plain render has none of it. The main config
+  # declares the interactive harnesses plus [server].harness_d; the scheduled
+  # one-shots live one file each in harness.d/*.toml (stump.wtf/harness PR
+  # #227), so the seeded set is the UNION of the main doc and the drop-ins.
   # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
   # the config format from the extension, so mint the .toml inside a temp dir.
-  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
-  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
-  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
-import tomllib,sys
-d = tomllib.load(sys.stdin.buffer)
-assert list(d[\"harness\"]) == [\"crush-signal\", \"claude-code\", \"claude-headless\", \"stumpcloud-sweep\", \"pr-feedback-sweep\", \"issue-pr-grooming\"], d[\"harness\"]
-c = d[\"harness\"][\"crush-signal\"]
-assert c[\"harness\"] == \"crush\", c
-cc = d[\"harness\"][\"claude-code\"]
-assert cc[\"harness\"] == \"claude-code\", cc
+  _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
+  printf '[data]
+    agentIdentity = "ci-agent"
+' >"$_cfg"
+  _render_all() {
+    chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
+    for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
+      _n="$(basename "$_f" .toml.tmpl)"
+      chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"         < "$_f" > "$_cfgdir/$_n.toml" || return 1
+    done
+  }
+  run _render_all
+  [ "$status" -eq 0 ]
+  run bash -c "python3 - '$_cfgdir' <<'PY'
+import glob, os, sys, tomllib
+cfgdir = sys.argv[1]
+docs = {os.path.basename(p): tomllib.load(open(p, 'rb')) for p in sorted(glob.glob(cfgdir + '/*.toml'))}
+d = docs.pop('00-main.toml')
+names = set(d['harness'])
+for fname, dd in docs.items():
+    # A drop-in may carry ONLY harness tables - [server]/[profile.*]/[daemon]
+    # in one is a config-load error upstream, so catch it here.
+    assert set(dd) == {'harness'}, (fname, 'drop-in carries a non-harness table', set(dd))
+    over = set(dd['harness']) & names
+    assert not over, (fname, 'duplicate harness across config+drop-ins', over)
+    names |= set(dd['harness'])
+assert names == {'crush-signal', 'claude-code', 'claude-headless',
+                 'stumpcloud-sweep', 'pr-feedback-sweep', 'issue-pr-grooming'}, sorted(names)
+assert d['harness']['crush-signal']['harness'] == 'crush'
+assert d['harness']['claude-code']['harness'] == 'claude-code'
+# The drop-in directory is wired: without [server].harness_d the daemon never
+# reads harness.d and every scheduled task silently stops existing.
+assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['server']
 # All run with permission prompts off, so none may autostart on boot. The
-# scheduled entries carry no `enabled` at all (mutually exclusive with
-# schedule); the daemon fires them only on their cron.
-for name, h in d[\"harness\"].items():
-    if \"schedule\" in h:
-        assert \"enabled\" not in h, name
-    else:
-        assert h[\"enabled\"] is False, name
-'"
-  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
+# scheduled entries carry no enabled key at all (mutually exclusive with
+# schedule); the daemon fires them only on their cron. The interactive three
+# live in the main doc; a scheduled name may never appear there.
+interactive = {'crush-signal', 'claude-code', 'claude-headless'}
+assert set(d['harness']) == interactive, sorted(d['harness'])
+for name in interactive:
+    assert d['harness'][name]['enabled'] is False, name
+PY"
+  rm -rf "$_cfgdir" "$_cfgdir2"; [ "$status" -eq 0 ]
+}
+
+@test "harness: drop-ins render EMPTY on human logins (sweeps are agent-only)" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # Same gate the old inline scheduled block carried: on a human login every
+  # drop-in must render to a valid, EMPTY TOML doc - comments only, no tables -
+  # or the human box would run the sweeps too and Signal would double-report.
+  for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
+    run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$_f' | grep -c '^\[harness\.' || true"
+    [ "$output" -eq 0 ]
+  done
 }
 
 @test "harness: every harness pins an explicit restart policy and a non-zero delay" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # Both keys used to be omitted, and the default restart_delay is 0 — an
+  # Both keys used to be omitted, and the default restart_delay is 0 - an
   # instant respawn. The daemon gives up after 3 exits in a 10s window plus 5
   # backoff attempts and latches FAILED, which is terminal, so a fast-failing
   # agent was permanently gone in ~30s with nobody at a desk to notice. The
   # delay must stay wider than that 10s crash window's per-retry spacing, so a
   # transient upstream failure is retried instead of latching.
-  # EXCEPTION — scheduled one-shots: config validation rejects restart=always
+  # EXCEPTION - scheduled one-shots: config validation rejects restart=always
   # (respawning a one-shot after its clean exit makes the schedule meaningless);
-  # they pin on-failure so a crashed run retries, and need no delay.
+  # they pin on-failure so a crashed run retries, and need no delay. They live
+  # in the harness.d drop-ins now, so the check walks the concatenated render.
   # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
   # the config format from the extension, so mint the .toml inside a temp dir.
-  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
-  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
-  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
-import tomllib,sys
-d = tomllib.load(sys.stdin.buffer)[\"harness\"]
-for name, h in d.items():
-    if \"schedule\" in h:
-        assert h.get(\"restart\") in (\"no\", \"on-failure\"), (name, h.get(\"restart\"))
+  _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
+  printf '[data]
+    agentIdentity = "ci-agent"
+' >"$_cfg"
+  _render_all() {
+    chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
+    for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
+      _n="$(basename "$_f" .toml.tmpl)"
+      chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"         < "$_f" > "$_cfgdir/$_n.toml" || return 1
+    done
+  }
+  run _render_all
+  [ "$status" -eq 0 ]
+  run bash -c "python3 - '$_cfgdir' <<'PY'
+import glob, os, sys, tomllib
+cfgdir = sys.argv[1]
+harnesses = {}
+for p in sorted(glob.glob(cfgdir + '/*.toml')):
+    harnesses.update(tomllib.load(open(p, 'rb'))['harness'])
+for name, h in harnesses.items():
+    if 'schedule' in h:
+        assert h.get('restart') in ('no', 'on-failure'), (name, h.get('restart'))
     else:
-        assert h.get(\"restart\") == \"always\", (name, h.get(\"restart\"))
-        assert h.get(\"restart_delay\", 0) >= 5, (name, h.get(\"restart_delay\"))
-'"
-  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
+        assert h.get('restart') == 'always', (name, h.get('restart'))
+        assert h.get('restart_delay', 0) >= 5, (name, h.get('restart_delay'))
+PY"
+  rm -rf "$_cfgdir" "$_cfgdir2"; [ "$status" -eq 0 ]
 }
 
 @test "harness: claude-code is Remote Control + skip-permissions, no Signal wiring" {
@@ -294,7 +346,7 @@ assert \"switchboard\" in mcp, sorted(mcp)
   # And it renders for EVERY identity, human or agent — Joe attaches too.
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
   printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
   # No HARNESS_SSH_PORT in the environment: the default must kick in.
   run bash -c "env -u HARNESS_SSH_PORT chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
@@ -306,7 +358,7 @@ assert port > 1024, port
 assert s[\"authorized_keys_file\"].endswith(\"/.ssh/harness_authorized_keys\"), s
 assert \"key\" not in s, \"no inline keys — allow-list comes from Vault Agent only\"
 '"
-  rm -rf "$_cfgdir"; [ "$status" -eq 0 ]
+  rm -rf "$_cfgdir" "$_cfgdir2"; [ "$status" -eq 0 ]
 
   # HARNESS_SSH_PORT set (as Vault Agent exports it from the harness bag): the
   # listen line must carry it through. A render that IGNORED the env var would
@@ -349,7 +401,7 @@ assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
   # — czu's output is gum-styled and a bare line breaks the column.
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   Reload="$REPO_ROOT/.chezmoiscripts/run_onchange_after_52-harness-reload.sh.tmpl"
-  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
 
   # Human identity: reloads, and says so through ui-lib.
   printf '[data]\n    agentIdentity = "ci-human"\n' >"$_cfg"

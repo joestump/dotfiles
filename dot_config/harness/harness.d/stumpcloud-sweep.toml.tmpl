@@ -1,0 +1,31 @@
+# Scheduled harness drop-in — StumpCloud health sweep
+#
+# One drop-in file per scheduled harness, loaded by the daemon from the
+# [server] harness_d directory (stump.wtf/harness PR #227). Drop-ins may
+# contain ONLY [harness.*] tables — [server], [profile.*] and [daemon] are
+# rejected — and duplicate names across files are an error, so the name in
+# the table header below is the single source of truth for this schedule.
+#
+# The whole table is gated on the `-agent` login suffix (same gate the old
+# inline block in harness.toml carried): human logins render this file EMPTY,
+# which is valid TOML and contributes nothing — only agent boxes run sweeps.
+#
+# @joestump-agent 08/18/2026 - Added as one of the three scheduled harnesses
+#   in harness.toml, replacing the standalone stumpcloud-sweep timer/launchd
+#   pair and the dormant ~/.claude/scheduled-tasks definitions.
+#
+# @joestump-agent 08/19/2026 - Moved out of harness.toml into this drop-in
+#   per the harness_d refactor; schedule and prompt unchanged.
+{{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
+{{ if hasSuffix "-agent" $dropinUser -}}
+[harness.stumpcloud-sweep]
+harness = "crush"
+prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/stumpcloud-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run. If ~/src/stumpcloud is missing entirely, say so and exit."
+schedule = "0 */6 * * *"
+model = "zai/glm-5.3"
+auto_accept = true
+quiet = true
+workdir = "{{ .chezmoi.homeDir }}"
+description = "StumpCloud health sweep · every 6h · glm-5.3 (Z.ai)"
+restart = "on-failure"
+{{ end -}}
