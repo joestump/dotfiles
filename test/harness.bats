@@ -82,9 +82,9 @@ import tomllib,sys
 d = tomllib.load(sys.stdin.buffer)
 assert list(d[\"harness\"]) == [\"crush-signal\", \"claude-code\", \"claude-headless\", \"stumpcloud-sweep\", \"pr-feedback-sweep\", \"issue-pr-grooming\"], d[\"harness\"]
 c = d[\"harness\"][\"crush-signal\"]
-assert c[\"cmd\"].endswith(\"/.local/bin/crush\"), c[\"cmd\"]
+assert c[\"harness\"] == \"crush\", c
 cc = d[\"harness\"][\"claude-code\"]
-assert cc[\"cmd\"].endswith(\"/.local/bin/claude\"), cc[\"cmd\"]
+assert cc[\"harness\"] == \"claude-code\", cc
 # All run with permission prompts off, so none may autostart on boot. The
 # scheduled entries carry no `enabled` at all (mutually exclusive with
 # schedule); the daemon fires them only on their cron.
@@ -164,16 +164,26 @@ assert \"env_file\" not in h, h
   [[ "$output" == *'"--channels", "switchboard"'* ]]
 }
 
-@test "harness: cmd is an absolute path (harness does not expandHome it)" {
+@test "harness: every harness declares a kind from the enum (no cmd, no default)" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   run _render "$HARNESS_TOML"
   [ "$status" -eq 0 ]
-  # spawn.go expands ~ for workdir and env_file only — a "~/..." cmd would not exec.
-  # Every cmd, not just the first: count the absolute ones against the total.
-  total="$(printf '%s\n' "$output" | grep -c '^cmd = ')"
-  absolute="$(printf '%s\n' "$output" | grep -c '^cmd = "/')"
-  [ "$total" -ge 2 ]
-  [ "$absolute" -eq "$total" ]
+  # `harness` is required upstream and has no default, so a table that omits it
+  # fails config load outright — and `cmd` is rejected as a removed key. Each
+  # table must therefore carry exactly one kind, and no cmd may come back.
+  tables="$(printf '%s\n' "$output" | grep -c '^\[harness\.')"
+  kinds="$(printf '%s\n' "$output" | grep -cE '^harness = "(crush|claude-code|codex|generic)"')"
+  [ "$tables" -ge 3 ]
+  [ "$kinds" -eq "$tables" ]
+  ! printf '%s\n' "$output" | grep -q '^cmd = '
+}
+
+@test "harness: the agent CLIs resolve on the daemon's PATH, not an absolute cmd" {
+  # The enum runs a bare `crush` / `claude`, so ~/.local/bin must lead the PATH
+  # both service units hand the daemon — that is what keeps pointing at the
+  # claude shim (and its self-updates) working now that cmd is gone.
+  grep -q 'PATH=%h/.local/bin' "$REPO_ROOT/dot_config/systemd/user/harness.service.tmpl"
+  grep -q '.local/bin:' "$REPO_ROOT/Library/LaunchAgents/rocks.stump.harness.plist.tmpl"
 }
 
 @test "harness: env_file repoints CRUSH_GLOBAL_DATA at the model-pin dir" {

@@ -92,7 +92,7 @@
 # env_file last (spawn.go buildEnv) and later duplicates shadow earlier ones, so
 # an env_file line beats anything Vault Agent renders.
 [harness.crush-signal]
-cmd = "{{ .chezmoi.homeDir }}/.local/bin/crush"
+harness = "crush"
 args = ["--yolo", "--channels", "signal", "--channels", "switchboard"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
@@ -123,11 +123,12 @@ enabled = false
 # --dangerously-skip-permissions is the claude equivalent of crush's --yolo, and
 # carries the same consequence: `enabled = false`, start it by hand.
 #
-# cmd is the ~/.local/bin/claude shim (a symlink into
-# ~/.local/share/claude/versions/<v>), so a claude self-update is picked up on the
-# next restart without editing this file.
+# harness = "claude-code" runs a bare `claude`, resolved against the daemon's
+# PATH — and both service units put ~/.local/bin first, so this lands on the
+# claude shim (a symlink into ~/.local/share/claude/versions/<v>) and a claude
+# self-update is still picked up on the next restart without editing anything.
 [harness.claude-code]
-cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
+harness = "claude-code"
 args = ["--remote-control", "--dangerously-skip-permissions"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 description = "Claude Code · ~/src · Remote Control · skip-permissions"
@@ -145,7 +146,7 @@ enabled = false
 # queue. Same --dangerously-skip-permissions consequence as its siblings:
 # `enabled = false`, start it deliberately with `harness start claude-headless`.
 [harness.claude-headless]
-cmd = "{{ .chezmoi.homeDir }}/.local/bin/claude"
+harness = "claude-code"
 args = ["--dangerously-skip-permissions"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 description = "Claude Code · ~/src · headless queue worker · skip-permissions"
@@ -178,6 +179,7 @@ enabled = false
 # ~/src/stumpcloud (OMGs at MEDIUM+, always Signals the operator). Was the
 # stumpcloud-sweep.timer / launchd pair before harness grew `schedule`.
 [harness.stumpcloud-sweep]
+harness = "crush"
 prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/stumpcloud-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run. If ~/src/stumpcloud is missing entirely, say so and exit."
 schedule = "0 */6 * * *"
 model = "zai/glm-5.3"
@@ -191,6 +193,7 @@ restart = "on-failure"
 # moving: address new review feedback, push fixes, reply to threads,
 # squash-merge what is approved+green per the two-tier policy.
 [harness.pr-feedback-sweep]
+harness = "crush"
 prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/pr-feedback-sweep.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
 schedule = "30 9 * * *"
 model = "zai/glm-5.3"
@@ -203,6 +206,7 @@ restart = "on-failure"
 # Issue / PR grooming — weekly conservative tidy-up of stale, duplicate and
 # superseded issues and PRs across the known Gitea + GitHub repos.
 [harness.issue-pr-grooming]
+harness = "crush"
 prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/issue-pr-grooming.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
 schedule = "0 7 * * 1"
 model = "zai/glm-5.3"
