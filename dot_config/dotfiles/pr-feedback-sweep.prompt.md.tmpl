@@ -13,7 +13,9 @@ NEW review feedback since you last touched it, address actionable feedback with
 real code changes, push those changes to the PR branch, reply to each
 comment/thread explaining what you did, and squash-merge the PRs that are ready
 per the merge policy below. This is a maintenance sweep — you are keeping the
-operator's own open PRs moving, not reviewing other people's work.
+operator's own open PRs moving, plus reviewing and approving the sibling
+identity's PRs (Step 4b) so neither identity is ever blocked on its own
+merges, not reviewing the outside world's work.
 
 ## Identity, auth, and workflow context
 
@@ -153,6 +155,35 @@ Guardrails:
   it exactly like the 403 case — record it and leave the merge for Joe. Do NOT
   route around it via git CLI merge+push.
 
+## Step 4b: unblock the sibling identity (cross-approval)
+
+Neither identity may merge its OWN PR without an approval, and the two
+identities exist precisely to unblock each other:
+
+- `@joestump-agent` reviews and approves PRs authored by `@joestump`.
+- `@joestump` reviews and approves PRs authored by `@joestump-agent`.
+
+So after handling your own PRs, enumerate the OPEN PRs authored by the
+OPPOSITE identity on both forges (same enumeration as Step 1, author flipped:
+`joestump` when you are `joestump-agent`, `joestump-agent` when you are
+`joestump` - shared repos like `joestump/dotfiles` always qualify). For each:
+if the diff matches its stated purpose, CI on the head is green, and there is
+no outstanding CHANGES_REQUESTED, leave an APPROVED review with a real
+one-line summary of what you checked - never a rubber-stamp "LGTM". Post it
+with the attribution footer. If you find real problems, leave
+COMMENT/REQUEST_CHANGES with specifics instead; a wrong approval is worse
+than a delayed merge.
+
+Never approve a PR authored by your OWN identity - that is the self-merge
+this whole arrangement exists to prevent. Do NOT merge the sibling's PR
+yourself after approving: their sweep (or auto-merge) lands it.
+
+When you OPEN a PR from either identity, enable auto-merge (squash) if the
+forge offers it - GitHub: `gh pr merge --auto --squash` right after creating
+it. Gitea has no native auto-merge; there, the sibling's next sweep approves
+and merges it. The point either way: a PR should never sit green+approved
+waiting for someone to press the button.
+
 ## Step 5: Signal summary
 
 The base agent rules already mandate Signaling every PR opened, updated, or
@@ -168,4 +199,4 @@ Success criteria: every open PR the identity authored has been checked; all
 actionable, not-yet-addressed feedback has a code fix pushed and a reply
 carrying the attribution footer; every PR that satisfies its tier's merge
 policy has been squash-merged (with `czu` run for dotfiles merges and fork
-`main` re-synced where applicable); nothing ineligible merged, nothing closed.
+`main` re-synced where applicable); nothing ineligible merged, nothing closed; every eligible sibling-identity PR carries your APPROVED review (or a specific CHANGES_REQUESTED).

@@ -95,6 +95,15 @@ _agent_render_all() {
   grep -q 'SIGNAL_MCP_OPERATOR' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
 }
 
+@test "scheduled: pr-feedback prompt pins the cross-identity approval rule" {
+  # Neither identity may merge its own PR; the two identities unblock each
+  # other - the sweep must APPROVE the opposite identity's eligible PRs and
+  # never its own.
+  grep -q 'reviews and approves PRs authored by' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -qi 'Never approve a PR authored by your OWN identity' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -qi 'auto-merge' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+}
+
 @test "scheduled: grooming prompt keeps the repo lists + comment-before-close rule" {
   grep -q 'stumpcloud' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
   grep -q 'joestump/signal-mcp' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"

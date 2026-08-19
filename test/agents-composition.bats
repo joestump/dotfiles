@@ -129,6 +129,13 @@ setup() {
 
 # Overlays are for capability deltas only. A fat overlay means policy leaked in,
 # which is exactly how the old CLAUDE.md/CRUSH.md pair drifted apart.
+@test "base policy mandates auto-merge on every PR" {
+  # All PRs are submitted with auto-merge enabled by default - a green,
+  # approved PR must never sit waiting for a button press. Pinned here so a
+  # careless edit to the PR section cannot drop it.
+  grep -q 'Enable auto-merge when you open the PR'     "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+}
+
 @test "harness overlays stay thin (policy belongs in base.md)" {
   local f n
   for f in "$REPO_ROOT"/.chezmoitemplates/agents/harness-*.md; do

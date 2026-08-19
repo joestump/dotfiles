@@ -201,7 +201,8 @@ Force-pushing after a rebase is expected and fine — `--force-with-lease`, neve
 3. **Label it** `feature`, `bug`, or `toil` to match the branch prefix.
 4. **The body states what changed and why, and how you verified it.** If scope changed during review, update the body — a stale description is a lie the next reader believes.
 5. **Watch CI after pushing.** Do not walk away; confirm it goes green. CI must be green before merge, and a failure gets fixed in the same branch.
-6. **Keep the merge style consistent with the repo.** Prefer a linear result: rebase or squash unless the repo says otherwise.
+6. **Enable auto-merge when you open the PR — always, by default.** A PR that passes its checks and approval should merge itself; nothing should sit green waiting for someone to press the button. Use the repo's squash/rebase style in the auto-merge settings (GitHub: `gh pr merge --auto --squash` immediately after creating it). Gitea has no native auto-merge — there, the cross-identity approval flow covers it: the sibling identity (`@joestump-agent` approves `@joestump`'s PRs and vice versa) reviews, approves, and merges per its sweep's merge policy.
+7. **Keep the merge style consistent with the repo.** Prefer a linear result: rebase or squash unless the repo says otherwise.
 
 ### Migrating work between repos
 
