@@ -4,10 +4,24 @@ import Link from '@docusaurus/Link';
 import styles from './index.module.css';
 
 const FEATURES = [
-  {k: 'chezmoi', t: 'chezmoi', d: 'One source of truth. dot_zshrc, custom helpers, configs — applied byte-for-byte on any machine.'},
-  {k: 'openbao', t: 'OpenBao + Vault Agent', d: 'Secrets never touch the repo. A launchd agent renders them from OpenBao on a schedule; the shell just sources them.'},
-  {k: 'omz', t: 'Oh My Zsh', d: 'Curated plugins, a random cute prompt glyph, spaceship + Ghostty, helpers auto-loaded from $ZSH_CUSTOM.'},
-  {k: 'pages', t: 'Garage Pages CI', d: 'BATS + shellcheck on every push; this very site builds and ships to Garage S3 from Gitea Actions.'},
+  {k: 'chezmoi', t: 'chezmoi', to: '/docs/workflow',
+   d: 'Two checkouts, two roles: a production clone pinned to upstream main that renders $HOME, and a workbench you actually edit.'},
+  {k: 'openbao', t: 'OpenBao + Vault Agent', to: '/docs/secrets',
+   d: 'Secrets never touch the repo. A supervised agent renders env files, AWS credentials, a .netrc and SSH keys from OpenBao on a schedule.'},
+  {k: 'harness', t: 'harness', to: '/docs/claude/harness',
+   d: 'systemctl for your agents. Supervises Crush and Claude Code sessions, runs their cron schedules, and hands you the whole cockpit over SSH.'},
+  {k: 'agents', t: 'One set of rules', to: '/docs/claude/agents',
+   d: 'Claude Code, Claude Desktop and Crush compose their rules from the same partials — and every identity value is derived, never stored.'},
+  {k: 'omz', t: 'Oh My Zsh', to: '/docs/terminal',
+   d: 'Curated plugins, a random cute prompt glyph, spaceship + Ghostty, helpers auto-loaded from $ZSH_CUSTOM.'},
+  {k: 'czu', t: 'czu', to: '/docs/commands',
+   d: 'One command syncs, applies, re-renders secrets and reloads the shell — and runs itself every 6h, silent unless something breaks.'},
+  {k: 'packages', t: 'Declarative tooling', to: '/docs/packages',
+   d: 'A Brewfile, an apt list and a Go tools list. Add a line, merge, done — plus three things built from source on apply.'},
+  {k: 'services', t: 'Services & schedules', to: '/docs/services',
+   d: 'Daemons and timers, systemd --user on Linux and launchd on macOS, from one source — including a detector for the secret outage you would never otherwise notice.'},
+  {k: 'pages', t: 'Garage Pages CI', to: '/docs/architecture',
+   d: 'BATS, shellcheck and gitleaks on every push; this very site builds once and ships to both Garage S3 and GitHub Pages.'},
 ];
 
 function Term() {
@@ -97,7 +111,7 @@ export default function Home() {
 
       <main className={styles.grid}>
         {FEATURES.map((f) => (
-          <Link key={f.k} className={styles.card} to="/docs/overview">
+          <Link key={f.k} className={styles.card} to={f.to}>
             <div className={styles.cardTag}>{f.k}</div>
             <h3 className={styles.cardTitle}>{f.t}</h3>
             <p className={styles.cardDesc}>{f.d}</p>

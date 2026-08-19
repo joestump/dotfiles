@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 5
 title: Secrets
 ---
 
@@ -18,9 +18,9 @@ shell sources the result.
 flowchart TD
     bao["OpenBao<br/>KV: secret/users/<you>/*"]
     agent["Vault Agent (launchd: rocks.stump.vault-agent)<br/>AppRole auth (role_id + secret_id) · self-renewing periodic token · renders every ~5 min"]
-    files["~/.config/vault/secrets-*.env (0600)<br/>~/.ssh/id_rsa + id_rsa.pub"]
-    shell["~/.oh-my-zsh/custom/00-secrets.zsh"]
-    bao --> agent --> files -->|source| shell
+    files["~/.config/vault/secrets-*.env (0600)<br/>~/.config/aws/credentials · ~/.netrc<br/>~/.ssh/id_rsa · harness_authorized_keys"]
+    shell["login shells · systemd/launchd units · boto · git"]
+    bao --> agent --> files --> shell
 ```
 
 - **Env secrets** — the static template **dynamically** exports *every* field of
@@ -37,6 +37,12 @@ flowchart TD
   supervised agents get their secrets on Linux without a login shell in the loop.
 - **SSH keys** — rendered to `~/.ssh/id_rsa` (0600) and `id_rsa.pub` (0644) from
   `secret/users/<you>/ssh`.
+- **AWS credentials** — an INI-format `~/.config/aws/credentials` with a
+  `[default]` (admin) and `[agent-readonly]` profile, so the boto chain resolves
+  in GUI apps and supervised agents, not just interactive shells. See
+  [MCP servers](claude/mcp#aws--the-one-with-no-token).
+- **`~/.netrc`** — the GitHub and Gitea tokens for the acting identity, so `git`,
+  `go get` and `curl` authenticate without a credential prompt.
 - **Harness SSH cockpit** — a dedicated bag, `secret/users/<you>/harness`, holds
   both knobs of the daemon's remote-access surface: `harness_authorized_keys`
   (rendered to `~/.ssh/harness_authorized_keys` — the only key in it is the
@@ -67,7 +73,19 @@ That's it — no template edits. The agent discovers it.
 | See what it rendered | `vault-agent env` |
 | Tail its log | `vault-agent log` |
 | Force a re-render | `vault-agent restart` |
-| Re-auth (agent down) | `czapprole --local` (re-provisions AppRole) or `vault login -method=oidc` (fallback) |
+| Re-render **now** and reload the shell | `vsr` |
+| Re-auth (agent down) | `czapprole --local` (re-provisions AppRole) or `vault-oidc-login` (fallback) |
+| Everything, in one step | `czu` |
+
+`vault-agent restart` returns *before* the render finishes, so reloading straight
+after it lands you on the previous values. `vsr` waits for the rendered file to
+actually change first — use it rather than restart-then-`exec zsh`.
+
+A **stale-secret detector** runs every 15 minutes and Signals you the moment the
+agent can no longer authenticate. It exists because that failure is otherwise
+invisible: already-rendered files persist at their last-good values, so nothing
+looks wrong until an unrelated command fails hours later. See
+[Services](services#the-stale-secret-detector).
 
 ## Blast radius (per-host AppRoles)
 
@@ -118,8 +136,22 @@ works on the remote-side helper: `vault-oidc-login admin`.
 The agent itself talks to OpenBao directly, so once you're logged in, everything
 renders without a tunnel.
 
+## Whose secrets?
+
+The bag is keyed by `whoami`, which makes every path on this page per-identity by
+construction — `secret/users/joestump/*` and `secret/users/joestump-agent/*` are
+different bags on the same box. That's also why no username, email or phone
+number appears anywhere in this repo. See
+[Agent rules & identity](claude/agents#identity--derived-never-stored).
+
 ## The rules
 
 - Secrets **never** in the repo, `.envrc`, or `~/.zprofile`.
-- A `gitleaks` pre-commit hook + CI scan block accidental commits.
-- Non-secret config (hosts, ports, regions) goes in a project `.envrc` (direnv).
+- A `gitleaks` pre-commit hook + a CI scan block accidental commits. If the hook
+  fires, find the secret — never `--no-verify`.
+- Non-secret config (hosts, ports, regions) goes in a project `.envrc` (direnv);
+  shared non-secret config goes in `.chezmoidata.yaml`.
+- **Never print a secret to a terminal.** Fingerprint it instead
+  (`printf %s "$TOKEN" | shasum -a 256 | cut -c1-12`), or check length, vendor
+  prefix, or equality. Anything printed is in a transcript, and a transcript is
+  not a safe place for a credential.

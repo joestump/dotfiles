@@ -12,9 +12,15 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Daily use',
+      collapsed: false,
+      items: ['commands', 'workflow', 'maintenance'],
+    },
+    {
+      type: 'category',
       label: 'Systems',
       collapsed: false,
-      items: ['secrets', 'packages', 'terminal'],
+      items: ['secrets', 'packages', 'services', 'terminal'],
     },
     {
       type: 'category',
@@ -97,12 +103,18 @@ const sidebars = {
     },
     {
       type: 'category',
-      label: 'Claude',
+      label: 'AI & Agents',
       collapsed: false,
       link: {type: 'doc', id: 'claude/index'},
-      items: ['claude/mcp', 'claude/plugins', 'claude/signal'],
+      items: [
+        'claude/mcp',
+        'claude/plugins',
+        'claude/harness',
+        'claude/crush',
+        'claude/agents',
+        'claude/signal',
+      ],
     },
-    'maintenance',
     'architecture',
   ],
 };

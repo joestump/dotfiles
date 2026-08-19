@@ -15,7 +15,8 @@ const config = {
 
   organizationName: 'joestump',
   projectName: 'dotfiles',
-  onBrokenLinks: 'warn',
+  onBrokenLinks: 'throw',
+  onBrokenAnchors: 'throw',
   markdown: {mermaid: true, hooks: {onBrokenMarkdownLinks: 'warn'}},
   themes: ['@docusaurus/theme-mermaid'],
 
@@ -49,7 +50,8 @@ const config = {
         items: [
           {type: 'docSidebar', sidebarId: 'main', position: 'left', label: 'Docs'},
           {to: '/docs/install/mothership', label: 'Install', position: 'left'},
-          {to: '/docs/maintenance', label: 'Maintain', position: 'left'},
+          {to: '/docs/commands', label: 'Commands', position: 'left'},
+          {to: '/docs/claude/harness', label: 'Agents', position: 'left'},
           {href: 'https://gitea.stump.rocks/joestump/dotfiles', label: 'Gitea', position: 'right'},
         ],
       },
@@ -57,11 +59,13 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: 'Install',
+            title: 'Start here',
             items: [
               {label: 'Overview', to: '/docs/overview'},
               {label: 'The Hub (macOS)', to: '/docs/install/mothership'},
               {label: 'Spokes (Linux)', to: '/docs/install/nodes'},
+              {label: 'Command reference', to: '/docs/commands'},
+              {label: 'Editing', to: '/docs/workflow'},
             ],
           },
           {
@@ -69,13 +73,24 @@ const config = {
             items: [
               {label: 'Secrets', to: '/docs/secrets'},
               {label: 'Packages', to: '/docs/packages'},
+              {label: 'Services & schedules', to: '/docs/services'},
               {label: 'Terminal', to: '/docs/terminal'},
+            ],
+          },
+          {
+            title: 'AI & Agents',
+            items: [
+              {label: 'Harness', to: '/docs/claude/harness'},
+              {label: 'Crush', to: '/docs/claude/crush'},
+              {label: 'MCP servers', to: '/docs/claude/mcp'},
+              {label: 'Agent rules', to: '/docs/claude/agents'},
             ],
           },
           {
             title: 'Source',
             items: [
               {label: 'Gitea repo', href: 'https://gitea.stump.rocks/joestump/dotfiles'},
+              {label: 'GitHub mirror', href: 'https://github.com/joestump/dotfiles'},
               {label: 'OpenBao', href: 'https://vault.stump.rocks'},
             ],
           },

@@ -22,21 +22,28 @@ Full docs at the **[published website](https://joestump.pages.stump.rocks/dotfil
 The reader-facing docs live on the **[published site](https://joestump.pages.stump.rocks/dotfiles/)**
 (`website/docs/` is the canonical source; the stubs under `docs/` just point here):
 
-- **[Day-to-day usage](https://joestump.pages.stump.rocks/dotfiles/docs/overview)** — add helpers, swap themes, plugins, direnv.
-- **[Packages & tooling](https://joestump.pages.stump.rocks/dotfiles/docs/packages)** — declarative tooling (Brewfile, Go tools) on macOS + Ubuntu.
+- **[Overview](https://joestump.pages.stump.rocks/dotfiles/docs/overview)** — how the whole thing fits together.
+- **[Command reference](https://joestump.pages.stump.rocks/dotfiles/docs/commands)** — every helper this repo puts on your PATH.
+- **[Editing](https://joestump.pages.stump.rocks/dotfiles/docs/workflow)** — the two-checkout model. **Read this before changing anything.**
+- **[Packages & tooling](https://joestump.pages.stump.rocks/dotfiles/docs/packages)** — declarative tooling (Brewfile, apt, Go, from-source) on macOS + Ubuntu.
 - **[Secrets](https://joestump.pages.stump.rocks/dotfiles/docs/secrets)** — OpenBao + Vault Agent: how secrets reach your shell.
+- **[Services & schedules](https://joestump.pages.stump.rocks/dotfiles/docs/services)** — every daemon and timer this installs.
+- **[Harness](https://joestump.pages.stump.rocks/dotfiles/docs/claude/harness)** — supervised Crush / Claude Code sessions.
 - **[Bootstrap a new machine](https://joestump.pages.stump.rocks/dotfiles/docs/install/mothership)** — one-command setup on any machine.
 - **[Architecture.md](Architecture.md)** — design rationale and decisions (repo-local).
 
 ## Set up on a new machine (one command)
 
 ```sh
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --source ~/src/dotfiles --apply https://gitea.stump.rocks/joestump/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply https://gitea.stump.rocks/joestump/dotfiles.git
 ```
 
 Installs Homebrew + tools + Oh My Zsh, clones themes/plugins, and applies
-everything. To bootstrap a **remote** box (ie01/ie02) from your laptop in one
-step: `chezmoi ssh <host> https://gitea.stump.rocks/joestump/dotfiles.git`.
+everything. **No `--source`** — a bare init clones into chezmoi's default source
+dir, which *is* the production clone under the two-checkout model; passing
+`--source` leaves the rendered config and the clone pointing at different places.
+
+To bootstrap a **remote** box from your laptop in one step: `czinit joestump@<host>`.
 See the [install docs](https://joestump.pages.stump.rocks/dotfiles/docs/install/mothership).
 
 ## Separation of concerns

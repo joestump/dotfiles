@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 7
 title: Terminal & Prompt
 ---
 
@@ -26,17 +26,34 @@ PROMPT_GLYPHS=(
 )
 ```
 
-`~/.oh-my-zsh/custom/spaceship.zsh` picks one at random. Swap the theme by changing
-`ZSH_THEME` (spaceship, powerlevel10k, quantum, comfyline are all installed via
-chezmoi externals).
+`~/.oh-my-zsh/custom/spaceship.zsh` picks one at random.
+
+### Swapping the theme
+
+```bash
+theme     # pick from the installed set; reloads the shell
+```
+
+The choice is written to `~/.config/dotfiles/zsh-theme`, a local file that is
+**not** chezmoi-managed — so it survives `chezmoi apply` and can differ per box.
+`~/.zshrc` reads it and falls back to spaceship when it's absent.
+
+Installed via chezmoi externals: `spaceship-prompt/spaceship` (default),
+`powerlevel10k/powerlevel10k`, `quantum-zsh/quantum`, `comfyline_prompt/comfyline`,
+plus the OMZ built-in `robbyrussell`.
 
 ## Plugins
 
-Curated OMZ set — `git`, `gh`, `aws`, `kubectl`, `docker`, `colorize`,
-`git-auto-fetch`, `zsh-autosuggestions`, `zsh-syntax-highlighting`, plus
-`zsh-ai` (type `# describe a command` + Enter) and quality-of-life picks like
-`history-substring-search`, `eza`, `sudo`, and `alias-finder`. External plugins
-clone via chezmoi externals. `Tab` accepts the autosuggestion.
+Thirty-three curated OMZ plugins — `git`, `gh`, `aws`, `terraform`, `kubectl`,
+`kubectx`, `helm`, `docker`, `colorize`, `git-auto-fetch`,
+`zsh-autosuggestions`, `zsh-syntax-highlighting`, plus `zsh-ai` (type
+`# describe a command` and hit Enter) and quality-of-life picks like
+`history-substring-search`, `sudo`, and `alias-finder`. External plugins clone
+via chezmoi externals. `Tab` accepts the autosuggestion.
+
+`eza` is added **conditionally**, only when the binary is present — otherwise
+every interactive shell on a Linux box without it would print
+"eza not found. Please install eza…".
 
 Full roster, load-order rules, and per-plugin pro tips: [Zsh Plugins](zsh-plugins/index.md).
 
