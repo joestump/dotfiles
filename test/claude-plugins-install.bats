@@ -88,19 +88,42 @@ SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_31-install-claude-plugins.sh.tmpl"
 }
 
 @test "claude-plugins: a zero-exit 'add' still lets the update run" {
-  # Behavioural proof of the fix against stubs: the old `||` form skipped the
-  # update whenever add succeeded; the new form must always reach it.
-  tmp="$BATS_TEST_TMPDIR/marker"
-  run bash -c '
-    claude() {
-      case "$2 $3" in
-        "marketplace add") return 0 ;;                      # already registered
-        "marketplace update") echo updated >>"'"$tmp"'" ;;
-      esac
-    }
-    claude plugin marketplace add https://example/x >/dev/null 2>&1 || true
-    claude plugin marketplace update x >/dev/null 2>&1 || true
-  '
+  # Behavioural, against the REAL rendered script — not a hand-written copy of
+  # the fixed lines. The previous version of this test stubbed `claude` and then
+  # asserted two commands it had just written inline, so it passed whether or not
+  # $SCRIPT still contained the `||` chain, i.e. it could not fail for the bug it
+  # was named after.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+
+  home="$BATS_TEST_TMPDIR/home"; bin="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$home/.config/dotfiles" "$bin"
+  # A REMOTE marketplace: no local .git, so `head` stays empty and the entry
+  # takes the install branch — the branch the fix lives in.
+  printf 'https://example.invalid/mp.git\tdemo@mp\n' >"$home/.config/dotfiles/claude-plugins.tsv"
+
+  # `add` exits 0 (already registered) — precisely the case the `||` chain ate.
+  cat >"$bin/claude" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$BATS_TEST_TMPDIR/calls"
+case "\$*" in
+  "plugin list") exit 0 ;;
+  "plugin marketplace add"*) exit 0 ;;
+  "plugin marketplace update"*) exit 0 ;;
+  "plugin install"*) exit 0 ;;
+esac
+exit 0
+STUB
+  chmod +x "$bin/claude"
+
+  chezmoi execute-template --source "$REPO_ROOT" <"$SCRIPT" >"$BATS_TEST_TMPDIR/rendered.sh"
+  run env HOME="$home" PATH="$bin:$PATH" bash "$BATS_TEST_TMPDIR/rendered.sh"
   [ "$status" -eq 0 ]
-  [ -s "$tmp" ]
+
+  # The whole point: the update ran even though add returned 0.
+  run grep -qE '^plugin marketplace update mp$' "$BATS_TEST_TMPDIR/calls"
+  [ "$status" -eq 0 ]
+  # And it ran before the install it feeds.
+  u=$(grep -n '^plugin marketplace update mp$' "$BATS_TEST_TMPDIR/calls" | head -1 | cut -d: -f1)
+  i=$(grep -n '^plugin install demo@mp$' "$BATS_TEST_TMPDIR/calls" | head -1 | cut -d: -f1)
+  [ -n "$u" ] && [ -n "$i" ] && [ "$u" -lt "$i" ]
 }
