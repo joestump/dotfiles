@@ -1,5 +1,5 @@
 name: pages
-# Deploy action: gitea.stump.rocks/stumpcloud/garage-pages-deploy@v1
+# Deploy action: gitea.stump.rocks/stumpcloud/garage-pages-deploy@v2
 # Secrets PAGES_ACCESS_KEY_ID / PAGES_SECRET_ACCESS_KEY come from OpenBao secret/pages/joestump
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           npm run build -- --out-dir ../dist
 
       - name: Deploy to Garage Pages
-        uses: https://gitea.stump.rocks/stumpcloud/garage-pages-deploy@v1
+        uses: https://gitea.stump.rocks/stumpcloud/garage-pages-deploy@v2
         with:
           source_dir: dist
           access_key_id: ${{ secrets.PAGES_ACCESS_KEY_ID }}
