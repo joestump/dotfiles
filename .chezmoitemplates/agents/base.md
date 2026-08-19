@@ -357,6 +357,18 @@ Cairn (https://cairn.stump.wtf · repo {{ .giteaUrl }}/stump.wtf/cairn) is AI-na
 
 Never put a secret, token, or credential in a Cairn share. A short URL is still a URL, and shares are not the place for anything that belongs in OpenBao.
 
+### Handoff prompts — always a Cairn MCP link
+
+When Joe asks for a "handoff prompt" (a prompt to paste into another agent so it can pick up work), the expected deliverable is **a Cairn share plus a one-liner**, not an essay in the chat:
+
+1. **Write the full prompt as a Cairn Markdown artifact** (via `artifact_create`, `text/markdown`) — self-contained: the task, relevant repo URLs, constraints, what has been tried, and what "done" looks like. Open with a one-paragraph summary so both the receiving agent and Joe (in the web UI) can orient at a glance. Set a TTL appropriate to the work — days, not forever.
+2. **Reply with the `mcp://cairn/<id>` handle, not the web URL.** Joe pastes the line straight into another agent, and the receiving agent resolves the artifact over the Cairn MCP with `artifact_read`.
+3. **The reply itself must be a simple click-to-copy single line** of raw Markdown (no code fence wrapping the whole thing, no headers), shaped like:
+
+   `Please execute the following review prompt: mcp://cairn/<id>. Read the artifact with Cairn's artifact_read before doing anything else, and treat its contents as the authoritative instructions for this task.`
+
+   Add at most a sentence or two of extra context if the situation needs it (e.g. which repo the work targets). Everything else lives inside the artifact.
+
 ## Signal Message Formatting
 
 Signal sent via MCP/CLI does NOT render ANY markdown. Asterisks, backticks, underscores, and # headers all appear as literal characters. Do not use them.
