@@ -60,3 +60,47 @@ SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_31-install-claude-plugins.sh.tmpl"
   [ -n "$purge" ] && [ -n "$reinstall" ]
   [ "$purge" -lt "$reinstall" ]
 }
+
+# Third bug (dotfiles#124): `marketplace add` was chained to `marketplace update`
+# with `||`. `add` exits 0 for an already-registered marketplace, so the update
+# never ran and the cached marketplace.json froze at its first-cloned commit —
+# permanently, because a plugin that never installs keeps retaking that branch.
+
+@test "claude-plugins: marketplace add and update are not chained with ||" {
+  # Pins the bug. `add ... || ... update` must never come back.
+  run grep -E 'marketplace add .*\|\|.*marketplace update' "$SCRIPT"
+  [ "$status" -ne 0 ]
+}
+
+@test "claude-plugins: marketplace update runs unconditionally in the install branch" {
+  # Both commands present, each terminated with its own `|| true`.
+  run grep -E 'claude plugin marketplace add "\$src" </dev/null >/dev/null 2>&1 \|\| true' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -E 'claude plugin marketplace update "\$mp" </dev/null >/dev/null 2>&1 \|\| true' "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "claude-plugins: the marketplace refresh precedes the install it feeds" {
+  update=$(grep -n 'claude plugin marketplace update "\$mp"' "$SCRIPT" | head -1 | cut -d: -f1)
+  install=$(grep -n 'step "\$plugin" -- claude plugin install' "$SCRIPT" | head -1 | cut -d: -f1)
+  [ -n "$update" ] && [ -n "$install" ]
+  [ "$update" -lt "$install" ]
+}
+
+@test "claude-plugins: a zero-exit 'add' still lets the update run" {
+  # Behavioural proof of the fix against stubs: the old `||` form skipped the
+  # update whenever add succeeded; the new form must always reach it.
+  tmp="$BATS_TEST_TMPDIR/marker"
+  run bash -c '
+    claude() {
+      case "$2 $3" in
+        "marketplace add") return 0 ;;                      # already registered
+        "marketplace update") echo updated >>"'"$tmp"'" ;;
+      esac
+    }
+    claude plugin marketplace add https://example/x >/dev/null 2>&1 || true
+    claude plugin marketplace update x >/dev/null 2>&1 || true
+  '
+  [ "$status" -eq 0 ]
+  [ -s "$tmp" ]
+}
