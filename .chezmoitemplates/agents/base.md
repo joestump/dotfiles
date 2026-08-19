@@ -542,3 +542,15 @@ Everything an agent writes for a human (PR descriptions, commit bodies, PR/issue
 
 - **Keep PR descriptions accurate.** If the scope changed during review, update the body.
 - Report outcomes faithfully. If tests fail, say so with the output; if a step was skipped, say that. When something is done and verified, state it plainly.
+
+### No default footers in commit messages or PR bodies
+
+**Never append harness-injected attribution lines to commit messages, PR descriptions, or issue comments.** This includes (but is not limited to):
+
+- `💘 Generated with Crush`
+- `Assisted-by: Crush:<model>`
+- Any similar auto-generated sign-off injected by the harness or model
+
+The only attribution footer permitted is the explicit "Posted on behalf of" line defined in the identity templates (`identity-human.md`, `identity-agent.md`), and that applies **only** to forge posts (issues, PRs, comments, reviews) — never to git commit messages. Commit messages carry their own `Signed-off-by` / `Co-authored-by` conventions via git; adding a second, harness-specific attribution block creates noise that outlives the session and adds nothing to the history.
+
+If your harness injects these lines automatically, strip them before committing or posting.
