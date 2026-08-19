@@ -257,18 +257,34 @@ autostart = false
 #                            non-ssh/aws bag is exported verbatim) and read
 #                            here at apply time.
 #
-#   vault kv put secret/users/$USER/harness #     harness_authorized_keys=@id_ed25519.pub HARNESS_SSH_PORT=23234
+#   vault kv put secret/users/$USER/harness \
+#     harness_authorized_keys=@id_ed25519.pub HARNESS_SSH_PORT=23234
 #
 # The default below is NOT env gating — the banned pattern (dotfiles#106) was an
-# if-env block that renders a file EMPTY when the var is absent. This
-# always emits a valid listen line; the default only matters on a render that
-# runs before secrets-static.env exists (a fresh box mid-bootstrap), and it is
-# upstream's own default: unprivileged (>1024), so the user-level daemon binds
-# it with no root. Changing the port in bao takes effect on the next czu (the
-# reload script below restarts the listener's config) — not on a running one.
+# if-env block that renders a file EMPTY when the var is absent. This always
+# emits a valid listen line, and the default is upstream's own: unprivileged
+# (>1024), so the user-level daemon binds it with no root.
+#
+# But the default applies on ANY render whose shell lacks the secret env, not
+# just a fresh box mid-bootstrap: czu sources secrets-static.env before
+# applying, a bare `chezmoi apply` from a non-interactive shell (an agent's,
+# say) does not. So if you set HARNESS_SSH_PORT to anything OTHER than the
+# default, the rendered port flaps between the two across applies, re-firing
+# run_onchange_after_52 each time. Keep bao's value equal to the default below
+# unless you have a reason not to, and change both together if you do.
+#
+# Changing the port takes effect on a daemon RESTART, not on the next czu:
+# `harness reload` re-reads harness definitions only, never the [server]
+# listener (see run_onchange_after_52-harness-reload.sh.tmpl).
 #
 # @joestump-agent 08/19/2026 - Enabled the SSH cockpit, allow-list and port
 #   both sourced from the OpenBao secret/users/$USER/harness bag.
+#
+# @joestump 08/19/2026 - Review pass: fixed the mangled `vault kv put` example
+#   (the line-continuation had been replaced with a `#`), and corrected two
+#   wrong claims above — the port default applies on any apply without the
+#   secret env, not only mid-bootstrap, and the listener needs a daemon restart
+#   rather than the reload script.
 [server]
 enabled = true
 listen = "0.0.0.0:{{ env "HARNESS_SSH_PORT" | default "23234" }}"

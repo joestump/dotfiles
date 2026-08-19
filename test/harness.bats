@@ -331,3 +331,35 @@ assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
   grep -q 'harness-ssh.ctmpl' "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
   grep -q 'harness-ssh.manifest' "$REPO_ROOT/dot_config/private_vault/agent.hcl.tmpl"
 }
+
+@test "harness: the reload script's human branch uses ui-lib, not a raw echo" {
+  # Both identity branches reload the daemon now (the [server] cockpit is not
+  # agent-only), so the ui-lib source and the HARNESS_BIN lookup are hoisted out
+  # of the branch. A raw `echo` in the middle of an apply is a bug per CLAUDE.md
+  # — czu's output is gum-styled and a bare line breaks the column.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  Reload="$REPO_ROOT/.chezmoiscripts/run_onchange_after_52-harness-reload.sh.tmpl"
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+
+  # Human identity: reloads, and says so through ui-lib.
+  printf '[data]\n    agentIdentity = "ci-human"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$Reload'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'ui-lib.sh'* ]]
+  [[ "$output" == *'"$HARNESS_BIN" reload'* ]]
+  # The only `echo "    - …"` allowed is inside ui-lib's own fallback stub.
+  [[ "$output" == *'item ok "harness daemon reloaded'* ]]
+  [[ "$output" != *'echo "    - harness'* ]]
+
+  # Agent identity: same hoisted preamble, plus the sweep teardown.
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$_cfg"
+  run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$Reload'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'ui-lib.sh'* ]]
+  [[ "$output" == *'stumpcloud-sweep'* ]]
+  rm -rf "$_cfgdir"
+
+  # `harness reload` cannot bring the [server] listener up (the daemon calls
+  # startRemote once at boot), so both branches must say restart, not reload.
+  grep -q 'daemon RESTART, not a reload' "$Reload"
+}

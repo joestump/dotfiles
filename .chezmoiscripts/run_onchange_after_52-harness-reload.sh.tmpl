@@ -7,6 +7,16 @@
 # script is run_onchange_ with the config + prompt hashes embedded below, so
 # any edit to the declared harness set or a scheduled prompt re-fires it.
 #
+# What `reload` does NOT cover: the [server] SSH cockpit. The daemon calls
+# startRemote() exactly once at boot (harness cmd/harness/daemon.go) and
+# Manager.Reload only re-applies harness definitions — so enabling [server], or
+# moving its port, needs a daemon RESTART. This script deliberately does not do
+# that: a restart tears down every running harness (the Signal channel, the
+# Remote Control session), which is far too destructive to trigger from an
+# apply. It prints the caveat instead; restart on your own schedule with
+# `systemctl --user restart harness` / `launchctl kickstart -k
+# gui/$(id -u)/rocks.stump.harness`.
+#
 # Teardown: the standalone stumpcloud-sweep systemd timer (Linux) and launchd
 # LaunchAgent (macOS) are superseded by [harness.stumpcloud-sweep] in
 # harness.toml. Stop + disable them here (covers machines where the units have
@@ -18,8 +28,8 @@
 #   groom prompt: {{ include "dot_config/dotfiles/issue-pr-grooming.prompt.md.tmpl" | sha256sum }}
 set -euo pipefail
 
-{{ $reloadUser := .agentIdentity | default .chezmoi.username -}}
-{{ if hasSuffix "-agent" $reloadUser -}}
+# Both identity branches below reload the daemon, so the ui-lib source and the
+# binary lookup are hoisted out of the branch rather than duplicated in it.
 . "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
   heading() { printf '\n== %s ==\n' "$*"; }
   item() { shift; echo "    - $*"; }
@@ -27,12 +37,14 @@ set -euo pipefail
   say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
 }
 
-heading "🕰️ harness scheduled"
-
 # Prefer the run_after_32-install-harness build.
 HARNESS_BIN="$HOME/.local/bin/harness"
 [ -x "$HARNESS_BIN" ] || HARNESS_BIN="${GOBIN:-$HOME/go/bin}/harness"
 [ -x "$HARNESS_BIN" ] || HARNESS_BIN="$(command -v harness 2>/dev/null || true)"
+
+{{ $reloadUser := .agentIdentity | default .chezmoi.username -}}
+{{ if hasSuffix "-agent" $reloadUser -}}
+heading "🕰️ harness scheduled"
 
 # ---- retire the standalone sweep units the daemon schedule replaces ----
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -69,6 +81,7 @@ if [ -z "$HARNESS_BIN" ]; then
 fi
 if "$HARNESS_BIN" reload >/dev/null 2>&1; then
   item ok "harness daemon reloaded (scheduled harnesses current)"
+  item dim "[server] SSH cockpit changes need a daemon RESTART, not a reload"
 else
   warn "harness reload failed — the daemon picks the config up on its next restart"
 fi
@@ -77,10 +90,9 @@ fi
 # reload is not: harness.toml also carries the [server] SSH cockpit and other
 # config a human box wants. run_onchange_ means this only fires when the
 # template actually changed, so reload here too.
-HARNESS_BIN="$HOME/.local/bin/harness"
-[ -x "$HARNESS_BIN" ] || HARNESS_BIN="${GOBIN:-$HOME/go/bin}/harness"
-[ -x "$HARNESS_BIN" ] || HARNESS_BIN="$(command -v harness 2>/dev/null || true)"
 if [ -n "$HARNESS_BIN" ] && "$HARNESS_BIN" reload >/dev/null 2>&1; then
-  echo "    - harness daemon reloaded (harness.toml changed)"
+  heading "🕰️ harness"
+  item ok "harness daemon reloaded (harness.toml changed)"
+  item dim "[server] SSH cockpit changes need a daemon RESTART, not a reload"
 fi
 {{ end -}}
