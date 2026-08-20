@@ -266,6 +266,14 @@ authorized_keys_file = "{{ .chezmoi.homeDir }}/.ssh/harness_authorized_keys"
 # every *.toml in it loads after this file and its harness tables merge in.
 # The scheduled one-shots live there — one file per schedule — so the set of
 # scheduled tasks is managed file-by-file, not by editing this template.
-# Like the rest of [server], a change here takes effect on daemon RESTART,
-# not via `harness reload`.
+# Unlike the SSH listener above, this one does NOT need a daemon restart:
+# the drop-in load happens inside config.Parse, so every `harness reload`
+# re-reads both this path and the whole directory. Adding, editing or deleting
+# a drop-in takes effect on the next reload — which is what
+# run_onchange_after_52-harness-reload.sh.tmpl already fires.
+#
+# The directory must EXIST, though: harness_d pointing at a missing directory
+# is a hard config-load error that takes the whole file down. It exists because
+# every drop-in renders its comment header unconditionally, so chezmoi always
+# writes the files (a template rendering to nothing is REMOVED, not written).
 harness_d = "{{ .chezmoi.homeDir }}/.config/harness/harness.d"

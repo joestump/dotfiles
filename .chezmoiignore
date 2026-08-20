@@ -40,8 +40,10 @@ Library/
 # The scheduled harness sweeps are AGENT jobs: only a login carrying the
 # `-agent` suffix (the bot half of the $USER / $USER-agent convention — see
 # the Identity section of .chezmoidata.yaml, overridable via agentIdentity)
-# gets the sweep prompts. Human logins ignore them — their harness.toml
-# renders without the scheduled block entirely (same gate, in the template).
+# gets the sweep prompts. Human logins ignore them — the harness.d drop-ins
+# that declare the sweeps carry the same gate, so they render with no
+# [harness.*] table at all (comments only, which keeps the file — and so the
+# harness.d directory — on disk for [server] harness_d).
 {{ $sweepUser := .agentIdentity | default .chezmoi.username -}}
 {{ if not (hasSuffix "-agent" $sweepUser) -}}
 .config/dotfiles/stumpcloud-sweep.prompt.md

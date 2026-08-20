@@ -123,15 +123,50 @@ PY"
   rm -rf "$_cfgdir" "$_cfgdir2"; [ "$status" -eq 0 ]
 }
 
-@test "harness: drop-ins render EMPTY on human logins (sweeps are agent-only)" {
+@test "harness: drop-ins declare no harness on human logins (sweeps are agent-only)" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   # Same gate the old inline scheduled block carried: on a human login every
-  # drop-in must render to a valid, EMPTY TOML doc - comments only, no tables -
-  # or the human box would run the sweeps too and Signal would double-report.
+  # drop-in must render with NO [harness.*] table, or the human box would run
+  # the sweeps too and Signal would double-report.
+  #
+  # The identity has to be PINNED, exactly like the agent cases pin ci-agent.
+  # Without --config this renders as whoever runs the suite, so it asserted the
+  # human gate while rendering as an agent on any -agent login - passing only
+  # because CI happens to run as root. It failed for real on an agent box.
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  printf '[data]
+    agentIdentity = "ci"
+' >"$_cfg"
   for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
-    run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$_f' | grep -c '^\[harness\.' || true"
+    run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$_f' | grep -c '^\[harness\.' || true"
     [ "$output" -eq 0 ]
   done
+  rm -rf "$_cfgdir"
+}
+
+@test "harness: a human-login drop-in still renders NON-empty (chezmoi keeps the file)" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # This is the landmine under the gate above, and it is why the drop-ins carry
+  # their comment header OUTSIDE the {{ if }}.
+  #
+  # chezmoi does not write a file whose template renders to nothing - it
+  # removes it. If all three drop-ins ever rendered truly empty, human boxes
+  # would end up with no harness.d directory at all, and [server] harness_d
+  # pointing at a missing directory is a HARD config-load error upstream
+  # ("[server] harness_d ...: no such file or directory") - it takes down the
+  # whole harness config, not just the sweeps.
+  #
+  # So the comment header is load-bearing, not decoration. Pin it.
+  _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
+  printf '[data]
+    agentIdentity = "ci"
+' >"$_cfg"
+  for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
+    run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$_f' | wc -c"
+    [ "$status" -eq 0 ]
+    [ "$output" -gt 0 ]
+  done
+  rm -rf "$_cfgdir"
 }
 
 @test "harness: every harness pins an explicit restart policy and a non-zero delay" {
