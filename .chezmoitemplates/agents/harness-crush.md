@@ -12,3 +12,5 @@
 **Skills** come from `options.skills_paths` in `dot_config/crush/crush.json.tmpl`, pruned via `disabled_skills` — a different mechanism from Claude Code's plugin marketplace. A skill added for Claude Code is **not** automatically available to you.
 
 **Crush reads `AGENTS.md`, `CRUSH.md`, and `CLAUDE.md`** from its config dir and the working directory, concatenating all of them. A repo-local `AGENTS.md` therefore stacks on top of these rules rather than replacing them; if the two genuinely conflict, the repo-local file wins for that repo and you should say so out loud.
+
+**Scheduling: use CronCreate, never bash sleep/wait loops.** Crush has native `CronCreate`, `CronList`, and `CronDelete` tools for deferred and recurring work. Use them instead of `bash` with `sleep`, `wait`, polling loops, or backgrounded timers. Cron tasks survive session restarts (with `durable: true`), fire at minute precision, and are inspectable via `CronList`. A bash sleep loop wastes context, dies with the session, and cannot be audited or cancelled cleanly.
