@@ -149,6 +149,38 @@ setup() {
   grep -q 'Do not enable it anywhere else'             "$REPO_ROOT/.chezmoitemplates/agents/base.md"
 }
 
+@test "base policy mandates a cross-identity reviewer request, scoped" {
+  # Rule 8's genuinely new contribution is that the reviewer is requested when
+  # the PR is opened, instead of the scheduled sweep discovering it later. Pin
+  # the mandate and BOTH directions.
+  grep -q 'Request review from the opposite identity'  "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'opens a PR, request review from `@{{ \$agent }}`'  "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'opens a PR, request review from `@{{ \$human }}`'  "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+
+  # It must say REVIEWER REQUEST, not "assign". In Gitea those are different
+  # fields, and the earlier wording ("Assign the opposite identity") made an
+  # agent set both the assignee and the reviewer on four PRs because the rule
+  # did not say which it meant. The review queue keys off the request.
+  grep -q 'not an assignee' "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+
+  # The scope must stop short of {{ $agent }}-owned repos, and must NOT forbid
+  # self-merge. This is the half a future edit will drop, and dropping it puts
+  # rule 8 straight back into contradiction with rule 6 (which mandates
+  # auto-merge on repos the acting identity owns, naming joestump-agent/crush
+  # as unprotected) and with identity-agent.md, whose no-self-merge list
+  # deliberately omits the agent's own repos.
+  local rule8
+  rule8="$(grep -F 'Request review from the opposite identity' "$REPO_ROOT/.chezmoitemplates/agents/base.md")"
+  run grep -c 'self-merging without cross-review is not allowed' <<< "$rule8"
+  [ "$output" -eq 0 ]
+  run grep -cF 'or `{{ $agent }}`' <<< "$rule8"
+  [ "$output" -eq 0 ]
+
+  # And the scope it DOES name must match identity-agent.md's list exactly.
+  grep -q 'mandatory on repos owned by `{{ \$human }}`, `stump.wtf`, or `stumpcloud`' \
+    "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+}
+
 @test "harness overlays stay thin (policy belongs in base.md)" {
   local f n
   for f in "$REPO_ROOT"/.chezmoitemplates/agents/harness-*.md; do
