@@ -35,6 +35,8 @@ The harness half is already correct above — you are running under **{{ .harnes
 Name the harness you are running under, linked to its home page.
 {{- end }}
 
+Whatever the harness is, **its link must be a publicly reachable URL — never a `{{ .giteaUrl }}` one.** Most of these footers land on GitHub, where a private Gitea link is a dead link for every reader. Harness → https://github.com/stump-wtf/harness (not its Gitea canonical), Crush → https://github.com/charmbracelet/crush, Claude Code → https://claude.com/claude-code. See "Never link Gitea in anything public" above.
+
 Two formatting rules that are easy to get wrong:
 
 - Keep `@{{ $human }}` in backticks, so it renders as code and does not fire a live @mention/notification.

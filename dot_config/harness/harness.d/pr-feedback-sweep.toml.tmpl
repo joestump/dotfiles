@@ -24,6 +24,17 @@
 #   2026-08-19 and the quota reset. Hyper auto-tops-up, so a busy week degrades to a
 #   larger bill rather than to silence. See stumpcloud/stumpcloud#333.
 #
+# ATTRIBUTION LINKS ARE PUBLIC. Every post this run makes carries the footer
+# `Executed via scheduled [Harness](...)`, and it lands on GitHub PRs and issues
+# that anyone can read. That link MUST be the public GitHub mirror
+# ({{ .harnessPublicUrl }}), never the Gitea canonical — gitea.stump.rocks is
+# private, so a Gitea URL is a dead link for the reader and names internal
+# infrastructure for no benefit. The footer form lives in the prompt file this
+# harness reads; keep both ends pointing at GitHub.
+#
+# @joestump-agent 08/22/2026 - Repointed the Harness attribution link from
+#   Gitea to the GitHub mirror and recorded the rule here.
+#
 # @joestump-agent 08/23/2026 - Split the sweep into two explicit hats: author
 #   mode for the acting identity's OWN PRs (respond, unconflict, re-green,
 #   merge) and reviewer mode for the SIBLING identity's PRs (via the pr-review

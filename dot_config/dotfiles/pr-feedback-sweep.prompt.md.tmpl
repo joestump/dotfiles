@@ -206,9 +206,16 @@ The FORM is fixed; the model and harness you name must be the ones you are
 ACTUALLY running as (check the model pin in your harness drop-in and your own
 session — don't blindly copy an example). Examples of the form:
 
-    Executed via scheduled [Harness](https://gitea.stump.rocks/stump.wtf/harness) using [glm-5.2](https://openrouter.ai/z-ai/glm-5.2) in [Crush](https://github.com/charmbracelet/crush)
+    Executed via scheduled [Harness]({{ .harnessPublicUrl }}) using [glm-5.2](https://openrouter.ai/z-ai/glm-5.2) in [Crush](https://github.com/charmbracelet/crush)
 
-    Executed via scheduled [Harness](https://gitea.stump.rocks/stump.wtf/harness) using [claude-opus-5](https://openrouter.ai/anthropic/claude-opus-5) in [Claude Code](https://claude.com/claude-code)
+    Executed via scheduled [Harness]({{ .harnessPublicUrl }}) using [claude-opus-5](https://openrouter.ai/anthropic/claude-opus-5) in [Claude Code](https://claude.com/claude-code)
+
+Every URL in that footer must be one the reader can actually open. `Harness`
+links to its **public GitHub mirror**, {{ .harnessPublicUrl }} — NEVER to
+gitea.stump.rocks, which is private, so a Gitea link is a dead link for every
+reader of a GitHub PR or issue and needlessly names internal infrastructure.
+Same rule for anything else you cite in a public post: link the GitHub copy or
+the public docs site, not the Gitea canonical.
 
 ## Step 4 (author mode): merge your PRs that are ready (SQUASH)
 

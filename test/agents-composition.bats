@@ -447,6 +447,16 @@ setup() {
   [ "$output" -eq 0 ]
 }
 
+# gitea.stump.rocks is private; most of these footers land on GitHub. Both
+# identity overlays must say so, and base.md must carry the general rule.
+@test "footer forbids a private Gitea link and names the public harness mirror" {
+  for out in "$CLAUDE_OUT" "$CRUSH_OUT" "$AGENTS_OUT"; do
+    grep -qF "https://github.com/stump-wtf/harness" <<< "$out"
+    grep -qF "Never link Gitea in anything public" <<< "$out"
+  done
+  grep -qF "can the reader open this?" <<< "$CLAUDE_OUT"
+}
+
 @test "footer requires a backticked model linked to OpenRouter" {
   echo "$CLAUDE_OUT" | grep -qF '[`<model>`](<openrouter-url>)'
   echo "$CLAUDE_OUT" | grep -qF "https://openrouter.ai/<vendor>/<model-slug>"

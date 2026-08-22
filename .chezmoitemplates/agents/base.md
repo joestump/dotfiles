@@ -138,6 +138,20 @@ GitHub org names cannot contain dots, so the same org is spelled two ways:
 
 They are the same project. A hyphen where a dot belongs is not a typo you can shrug at — it silently addresses the mirror, so the push or PR lands on the throwaway copy. Read the separator before you act on an owner string, and never "correct" one spelling into the other when copying a URL between hosts.
 
+#### Never link Gitea in anything public
+
+Canonical is about **where the work goes**. It says nothing about **which URL you print**, and the two rules pull in opposite directions: `{{ .giteaUrl }}` is a private, self-hosted instance behind auth that most readers cannot open at all. A Gitea link in a public post is a dead link plus a small disclosure of internal infrastructure.
+
+**So: any link that will be read outside the private Gitea MUST point at the GitHub copy** — `github.com/stump-wtf/<repo>` for a `stump.wtf` project, `github.com/{{ .githubUser }}/<repo>` for a personal one — or at the project's public docs site. That covers, at minimum:
+
+- **Attribution footers** (the "Posted on behalf of" / "posted autonomously" / "Executed via scheduled Harness" lines below) — these get posted on GitHub PRs and issues where anyone can read them.
+- Anything posted on **GitHub** at all: issue and PR bodies, review comments, release notes.
+- **Public docs sites, READMEs on the mirror, blog posts**, and any artifact shared with someone outside the household.
+
+Gitea URLs are still correct — and still preferred — on the **internal** surfaces: a comment on a Gitea issue or PR, a Signal note to Joe, an Outline doc, a Cairn share, a commit message in a Gitea-canonical repo. The test is not "which host is canonical", it is **"can the reader open this?"** If the answer is no, link the mirror.
+
+If a repo genuinely has no GitHub mirror, name it in plain text and say the source is private — do not paste the Gitea URL and hope.
+
 ### Branching
 
 1. **Cut from a freshly fetched base.** `git fetch origin && git switch -c <branch> origin/main`. Do not branch from whatever the working tree happens to be on — that is how a branch silently inherits someone else's unmerged work.

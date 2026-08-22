@@ -117,6 +117,16 @@ crushRepo: "https://github.com/joestump-agent/crush.git"
 # both the .chezmoiexternal.toml clone URL and the build script's remote guard.
 harnessRepo: "https://gitea.stump.rocks/stump.wtf/harness.git"
 
+# harness, the PUBLIC face. harnessRepo above is the CLONE url and points at the
+# canonical Gitea copy — correct for git, wrong for anything a human reads,
+# because gitea.stump.rocks is private and a link to it is a dead link for
+# everyone outside this household. Every public-facing mention of harness (the
+# attribution footers the scheduled sweeps post on GitHub PRs and issues, docs,
+# READMEs) links THIS url instead — the downstream GitHub mirror. Never publish
+# the Gitea one. See .chezmoitemplates/agents/base.md, "Never link Gitea in
+# anything public".
+harnessPublicUrl: "https://github.com/stump-wtf/harness"
+
 # OpenBao / Vault server address. Single source of truth for the agent config
 # (agent.hcl), the systemd units + launchd plists that run it, and the czu updater.
 # Referenced as {{ .vaultAddr }} in those *.tmpl files; the Consul-Template *.ctmpl

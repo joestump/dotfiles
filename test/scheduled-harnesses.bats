@@ -259,6 +259,26 @@ _agent_render_all() {
   ! grep -qE '\+1[0-9]{9,}' "$PROMPTS_DIR/stumpcloud-sweep.prompt.md"
 }
 
+# The footer lands on PUBLIC GitHub PRs and issues, where a gitea.stump.rocks
+# link is unopenable. Assert on the RENDERED prompt so a stale .chezmoidata
+# value or a hardcoded Gitea URL both fail here.
+@test "scheduled: the Harness attribution link is the public GitHub mirror, never Gitea" {
+  for f in pr-feedback-sweep issue-pr-grooming; do
+    local out
+    out="$(chezmoi execute-template --source "$REPO_ROOT" < "$PROMPTS_DIR/$f.prompt.md.tmpl")"
+    grep -qF '[Harness](https://github.com/stump-wtf/harness)' <<< "$out"
+    ! grep -q 'gitea\.stump\.rocks/stump\.wtf/harness' <<< "$out"
+  done
+}
+
+# The drop-ins are where a future editor adds the next scheduled sweep, so the
+# rule has to be visible there too, not only in the prompt files.
+@test "scheduled: drop-ins record the public-link rule for the attribution footer" {
+  for f in pr-feedback-sweep issue-pr-grooming stumpcloud-sweep; do
+    grep -q 'ATTRIBUTION LINKS ARE PUBLIC' "$REPO_ROOT/dot_config/harness/harness.d/$f.toml.tmpl"
+  done
+}
+
 @test "harness-config skill: loads in Crush (external + skills path)" {
   grep -q 'claude-plugin-harness' "$EXTERNALS"
   grep -q 'gitea.stump.rocks/stump.wtf/claude-plugin-harness' "$EXTERNALS"

@@ -17,10 +17,17 @@ session instead of forcing verdicts.
 Every comment and close MUST end with the attribution footer (blank line before
 it, no horizontal rule):
 
-    Executed via scheduled [Harness](https://gitea.stump.rocks/stump.wtf/harness) using [glm-5.3](https://openrouter.ai/z-ai/glm-5.3) in [Crush](https://github.com/charmbracelet/crush)
+    Executed via scheduled [Harness]({{ .harnessPublicUrl }}) using [glm-5.3](https://openrouter.ai/z-ai/glm-5.3) in [Crush](https://github.com/charmbracelet/crush)
 
 (If the run is not on glm-5.3/Crush, use the model and harness you are actually
 running as, linked the same way.)
+
+Every URL in that footer must be one the reader can actually open. `Harness`
+links to its **public GitHub mirror**, {{ .harnessPublicUrl }} — NEVER to
+gitea.stump.rocks, which is private, so a Gitea link is a dead link for every
+reader of a GitHub PR or issue and needlessly names internal infrastructure.
+Same rule for anything else you cite in a public post: link the GitHub copy or
+the public docs site, not the Gitea canonical.
 
 ## Scope clamp — this session grooms issues and PRs, and nothing else
 
