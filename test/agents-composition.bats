@@ -102,12 +102,19 @@ setup() {
   local who
   who="$(chezmoi execute-template --source "$REPO_ROOT" \
     '{{ $u := .agentIdentity | default .chezmoi.username }}{{ hasSuffix "-agent" $u | ternary "agent" "human" }}')"
+  # Match the FOOTER, not the bare phrase. base.md's "No default footers"
+  # section discusses the rule in prose and contains the words "Posted on
+  # behalf of" verbatim, and base.md composes into every render - so a bare
+  # substring grep asserts the agent overlay is absent while actually matching
+  # policy prose, and fails on every -agent login. It passed in CI only because
+  # the runner is root, which resolves to the human role and takes the else
+  # branch. The real footer always starts a line with the robot emoji.
   if [ "$who" = "agent" ]; then
     echo "$CLAUDE_OUT" | grep -qF "your **own** accounts"
-    ! echo "$CLAUDE_OUT" | grep -qF "Posted on behalf of"
+    ! echo "$CLAUDE_OUT" | grep -qE '^🤖 Posted on behalf of'
   else
-    echo "$CLAUDE_OUT" | grep -qF "Posted on behalf of"
-    echo "$CRUSH_OUT"  | grep -qF "Posted on behalf of"
+    echo "$CLAUDE_OUT" | grep -qE '^🤖 Posted on behalf of'
+    echo "$CRUSH_OUT"  | grep -qE '^🤖 Posted on behalf of'
   fi
 }
 
