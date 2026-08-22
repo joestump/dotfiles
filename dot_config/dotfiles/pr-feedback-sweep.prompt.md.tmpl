@@ -178,11 +178,21 @@ Never approve a PR authored by your OWN identity - that is the self-merge
 this whole arrangement exists to prevent. Do NOT merge the sibling's PR
 yourself after approving: their sweep (or auto-merge) lands it.
 
-When you OPEN a PR from either identity, enable auto-merge (squash) if the
-forge offers it - GitHub: `gh pr merge --auto --squash` right after creating
-it. Gitea has no native auto-merge; there, the sibling's next sweep approves
-and merges it. The point either way: a PR should never sit green+approved
-waiting for someone to press the button.
+Be aware the automation only runs ONE way. Only `-agent` logins carry the
+scheduled sweeps, so `@joestump-agent` approving `@joestump`'s PRs happens on
+a cron, while the reverse happens whenever Joe sits down and runs a review.
+Do not assume a PR you opened will be approved on a schedule - if you are the
+agent, your PRs wait for a human.
+
+When you OPEN a PR, enable auto-merge (squash) ONLY on a **Tier A** repo -
+one the acting identity owns - via `gh pr merge --auto --squash` right after
+creating it. On Tier B repos, do NOT: auto-merge is enforced by branch
+protection, which knows nothing about the tiers above, and several of these
+repos require zero approvals - so enabling it there would land the PR with no
+review at all, which is exactly what Tier B forbids. There, the sibling's next
+sweep approves and merges it. Gitea has no native auto-merge in any case. The
+point either way: a PR should never sit green+approved waiting for someone to
+press the button.
 
 ## Step 5: Signal summary
 
