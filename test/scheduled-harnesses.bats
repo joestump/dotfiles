@@ -66,6 +66,19 @@ _agent_render_all() {
   done
 }
 
+# Z.ai's coding plan is subscription-metered with a hard weekly/monthly cap. When
+# it ran out, every scheduled run died at stream-open and `restart = "on-failure"`
+# relaunched them thousands of times -- 4417 on the StumpCloud sweep -- so no
+# health sweep ran for four days and nothing said so. Hyper auto-tops-up, which
+# turns that silent stall into a bigger bill. Guard the regression: a scheduled
+# harness must never be pinned back to a hard-capped provider without a
+# deliberate change here.
+@test "scheduled: no scheduled harness is pinned to the hard-capped Z.ai plan" {
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  ! grep -q '^model = "zai/' <<<"$output"
+}
+
 @test "scheduled: cadences — sweep 6h, pr-feedback daily, grooming weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
@@ -152,13 +165,13 @@ _agent_render_all() {
   done
 }
 
-@test "scheduled: every sweep is pinned to glm-5.3 on Z.ai" {
+@test "scheduled: every sweep is pinned to glm-5.2 on Hyper" {
   # Unattended permission-free runs — the model is pinned per entry (harness
   # appends --model), so a config-wide model change can never silently retarget
-  # them. Same model as the Z.ai coding plan crush pin, on the zai provider.
+  # them.
   run _agent_render_all
   for name in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
-    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "zai/glm-5.3"' || return 1
+    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "hyper/glm-5.2"' || return 1
   done
 }
 
