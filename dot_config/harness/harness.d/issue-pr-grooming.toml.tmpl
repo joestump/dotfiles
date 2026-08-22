@@ -16,16 +16,24 @@
 #
 # @joestump-agent 08/19/2026 - Moved out of harness.toml into this drop-in
 #   per the harness_d refactor; schedule and prompt unchanged.
+# @joestump-agent 08/22/2026 - Moved from zai/glm-5.3 to hyper/glm-5.2. The Z.ai
+#   coding plan is subscription-metered with a hard weekly/monthly cap, and when it
+#   ran out every scheduled run died at stream-open with "Weekly/Monthly Limit
+#   Exhausted". restart = on-failure then relaunched them: 4417 restarts on the
+#   StumpCloud sweep, 1795 on the PR feedback sweep, and no health sweep ran between
+#   2026-08-19 and the quota reset. Hyper auto-tops-up, so a busy week degrades to a
+#   larger bill rather than to silence. See stumpcloud/stumpcloud#333.
+#
 {{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
 {{ if hasSuffix "-agent" $dropinUser -}}
 [harness.issue-pr-grooming]
 harness = "crush"
 prompt = "Read {{ .chezmoi.homeDir }}/.config/dotfiles/issue-pr-grooming.prompt.md and execute its instructions verbatim — that file IS the complete specification for this run."
 schedule = "0 7 * * 1"
-model = "zai/glm-5.3"
+model = "hyper/glm-5.2"
 auto_accept = true
 quiet = true
 workdir = "{{ .chezmoi.homeDir }}"
-description = "Issue/PR grooming across forges · Mondays 07:00 · glm-5.3 (Z.ai)"
+description = "Issue/PR grooming across forges · Mondays 07:00 · glm-5.2 (Hyper)"
 restart = "on-failure"
 {{ end -}}
