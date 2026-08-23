@@ -4,7 +4,7 @@ title: shlink
 
 # shlink
 
-Home-grown plugin ([joestump/shlink-zsh](https://gitea.stump.rocks/joestump/shlink-zsh))
+Home-grown plugin (`joestump/shlink-zsh` — private source, no public mirror)
 that wraps the [Shlink](https://shlink.io/) REST API at https://u.stu.mp.
 Requires `curl` + `jq` and a personal `SHLINK_API_KEY` in the environment.
 

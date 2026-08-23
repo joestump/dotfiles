@@ -19,8 +19,8 @@ the background, so completions always match the installed `gh` version.
 - **`gh run watch`** live-tails a GitHub Actions run in the terminal; pair it
   with `gh run list` completion to grab the run. Beats refreshing the Actions
   tab while waiting on CI for OSS repos.
-- **Scope check**: `gh` is for github.com work only. StumpCloud repos live on
-  https://gitea.stump.rocks — use `tea` or the Gitea MCP there. If `gh` says
+- **Scope check**: `gh` is for github.com work only. StumpCloud repos live on a
+  private Gitea instance at `gitea.stump.rocks` — use `tea` or the Gitea MCP there. If `gh` says
   "not a GitHub repository", you're probably standing in a Gitea-remoted
   clone.
 - Completions also cover `gh api` paths and `gh extension` subcommands, so
