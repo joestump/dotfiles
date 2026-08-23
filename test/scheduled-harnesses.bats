@@ -129,7 +129,9 @@ _agent_render_all() {
   # author mode owns conflicts and red CI, not just replies
   grep -qi 'Resolve merge conflicts' "$f"
   grep -qi 'Get CI back to green' "$f"
-  grep -q 'force-with-lease' "$f"
+  # Author mode still owns the conflict case; it just cannot force-push its way
+  # out of one any more. Pin the replacement route rather than the retired flag.
+  grep -qi 'open a replacement PR' "$f"
 }
 
 @test "scheduled: reviewer mode delegates to the pr-review skill with hard gates" {
@@ -189,6 +191,24 @@ _agent_render_all() {
   [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 3 ]
   [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 3 ]
   [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 3 ]
+}
+
+# The base agent rules ban force-pushing outright, but the sweep prompts are a
+# separate surface that a reader never diffs against base.md. #176 quietly grew
+# two `--force-with-lease` instructions here while the ban was in review, so pin
+# it: no scheduled prompt may hand the agent permission the base rules revoke.
+@test "scheduled: no sweep prompt permits a force-push" {
+  local f
+  for f in "$PROMPTS_DIR"/*.prompt.md.tmpl "$PROMPTS_DIR"/*.prompt.md; do
+    [ -e "$f" ] || continue
+    ! grep -q -- '--force-with-lease' "$f" \
+      || { echo "$f still permits --force-with-lease"; return 1; }
+    ! grep -qi 'force-push outside' "$f" \
+      || { echo "$f still carves out a force-push exception"; return 1; }
+  done
+  # ...and the replacement route is spelled out where the conflict case lives.
+  grep -q 'replay this PR' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  return 0
 }
 
 @test "scheduled: grooming prompt keeps the repo lists + comment-before-close rule" {
