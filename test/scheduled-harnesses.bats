@@ -117,6 +117,80 @@ _agent_render_all() {
   grep -qi 'auto-merge' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
 }
 
+@test "scheduled: pr-feedback prompt splits author mode from reviewer mode" {
+  # The sweep wears exactly two hats, chosen by PR author: it responds to and
+  # merges its OWN PRs, and it REVIEWS the sibling identity's. A PR authored by
+  # anyone else is out of scope entirely - dropping that third row is how the
+  # sweep starts reviewing the outside world's work.
+  local f="$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -qi 'Author mode' "$f"
+  grep -qi 'Reviewer mode' "$f"
+  grep -qi 'Leave it completely alone' "$f"
+  # author mode owns conflicts and red CI, not just replies
+  grep -qi 'Resolve merge conflicts' "$f"
+  grep -qi 'Get CI back to green' "$f"
+  grep -q 'force-with-lease' "$f"
+}
+
+@test "scheduled: reviewer mode delegates to the pr-review skill with hard gates" {
+  # Reviewer mode is not a second inline review checklist - it loads the
+  # pr-review skill, which is the authority on how a review is done here. The
+  # three non-negotiables around it are what keep an approval meaningful.
+  local f="$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -q 'pr-review' "$f"
+  grep -qi 'MUST leave a summary comment' "$f"
+  grep -qi 'MUST have green CI before approving' "$f"
+  grep -qi 'SHOULD enable auto-merge once you approve' "$f"
+  # and the forge calls that make the auto-merge half actually executable
+  grep -q 'merge_when_checks_succeed' "$f"
+  grep -q -- '--auto --squash' "$f"
+}
+
+@test "scheduled: sweeps skip archived repositories" {
+  # An archived repo is read-only: every comment, push, review and merge against
+  # it fails, and the sweeps were burning runs retrying them. Both sweeps that
+  # enumerate repos must drop them BEFORE acting, and report them in aggregate.
+  for f in pr-feedback-sweep issue-pr-grooming; do
+    grep -qi 'archived' "$PROMPTS_DIR/$f.prompt.md.tmpl"
+    grep -q 'isArchived' "$PROMPTS_DIR/$f.prompt.md.tmpl"
+  done
+  grep -qi 'skipped N PRs in archived repos' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+}
+
+@test "scheduled: every sweep prompt carries a scope clamp and an injection warning" {
+  # A scheduled sweep reads attacker-reachable text all run long: PR bodies,
+  # issue comments, container logs, HTTP bodies. Each prompt must say what the
+  # session is allowed to do at all, and that what it reads is data. Losing
+  # either half turns a stranger's comment into a command on an unattended box.
+  for f in "$PROMPTS_DIR"/pr-feedback-sweep.prompt.md.tmpl \
+           "$PROMPTS_DIR"/issue-pr-grooming.prompt.md.tmpl \
+           "$PROMPTS_DIR"/stumpcloud-sweep.prompt.md; do
+    grep -qi '## Scope clamp' "$f"
+    grep -qi 'Untrusted content' "$f"
+    grep -qi 'never instructions' "$f"
+    grep -qi 'prompt-injection' "$f"
+    # the two exfiltration paths that matter: credentials out, messages out
+    grep -qi 'credential' "$f"
+    grep -q 'SIGNAL_MCP_OPERATOR' "$f"
+  done
+}
+
+@test "scheduled: every drop-in restates the clamp in the harness prompt itself" {
+  # The prompt FILE can fail to load (renamed, unapplied, unreadable). The one
+  # line the daemon hands the model must therefore carry the clamp too, so a
+  # sweep that cannot read its spec still refuses to be driven by what it reads.
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  local rendered="$output"
+  for name in pr-feedback-sweep issue-pr-grooming stumpcloud-sweep; do
+    echo "$rendered" | grep -q "$name" || { echo "missing harness $name"; false; }
+  done
+  # one clamp sentence per scheduled harness
+  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 3 ]
+  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 3 ]
+  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 3 ]
+}
+
 @test "scheduled: grooming prompt keeps the repo lists + comment-before-close rule" {
   grep -q 'stumpcloud' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
   grep -q 'joestump/signal-mcp' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
