@@ -219,8 +219,7 @@ setup() {
 @test "git workflow covers every failure mode from msgbrowse#245" {
   local rule
   for rule in \
-    "Rebase. Never merge" \
-    "force-with-lease" \
+    "Rebase before you push. Never merge" \
     "One PR = one concern" \
     "Semantic prefix, always" \
     "must belong to the repo you are committing into" \
@@ -230,6 +229,29 @@ setup() {
   do
     echo "$CLAUDE_OUT" | grep -qF "$rule" || { echo "missing git rule: $rule"; return 1; }
   done
+}
+
+# A force-push is the one git operation with no undo on the far side of the
+# wire, so the ban has to be absolute — an agent that finds ANY hedge in here
+# will argue itself into "this case is different". These assertions exist to
+# keep the loopholes closed, --force-with-lease included.
+@test "force-pushing is banned outright, with no escape hatch" {
+  local rule
+  for rule in \
+    "NEVER force-push" \
+    "Never force-push. Not \`--force\`, not \`--force-with-lease\`" \
+    "There is no exception to reach for" \
+    "stop and ask Joe first" \
+    "Once a branch is pushed, its history is frozen"
+  do
+    echo "$CLAUDE_OUT" | grep -qF "$rule" || { echo "missing force-push rule: $rule"; return 1; }
+  done
+
+  # The old policy blessed --force-with-lease after a rebase. If that sentence
+  # ever comes back, the ban above is contradicted a few lines earlier.
+  echo "$CLAUDE_OUT" | grep -qF "Force-pushing after a rebase is expected" \
+    && { echo "the retired 'force-push after rebase is fine' rule is back"; return 1; }
+  return 0
 }
 
 # Host-agnostic by design: the rules must not assume gh/GitHub, since half of

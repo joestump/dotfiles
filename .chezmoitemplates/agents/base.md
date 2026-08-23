@@ -198,15 +198,33 @@ The only exception: a read-only task that will not produce a commit — answerin
 
 ### Keeping a branch current
 
-**Rebase. Never merge `main` into your branch.**
+**Rebase before you push. Never merge `main` into your branch.**
 
 ```
-git fetch origin && git rebase origin/main
+git fetch origin && git rebase origin/main   # while the branch is still local
 ```
 
-A `Merge branch 'main' into <feature>` commit in a PR is a defect: it makes the diff unreviewable, buries which changes are actually yours, and turns a later bisect into guesswork. If a branch already has merge commits, rebase them out before asking for review.
+A `Merge branch 'main' into <feature>` commit in a PR is a defect: it makes the diff unreviewable, buries which changes are actually yours, and turns a later bisect into guesswork. So rebase — but rebase *before the branch is published*, while its history is still yours alone.
 
-Force-pushing after a rebase is expected and fine — `--force-with-lease`, never bare `--force`. That is the *only* reason to force-push a branch with an open PR.
+**Once a branch is pushed, its history is frozen.** Keep it current by adding commits on top, never by rewriting what is already published. Amending, squashing, or rebasing a pushed branch produces a rewritten ref, and a rewritten ref can only be published with a force-push — which you must never do.
+
+If a pushed branch is hopelessly behind, or already carries merge commits you cannot rebase out: cut a fresh branch from `origin/main`, replay the payload onto it, open a new PR, and close the old one with a link to its replacement. That costs one PR. A force-push costs somebody their work.
+
+### NEVER force-push
+
+**Never force-push. Not `--force`, not `--force-with-lease`, not `-f`, not `--force-if-includes`, not the forge's "force push" API. Never, to any branch, on any host, in any repo — including branches you created yourself and PRs nobody else has touched.**
+
+There is no exception to reach for, so do not go hunting for one:
+
+- **Not "it is my own branch."** Another identity, a reviewer, or CI may already have fetched it. Several of these repos are worked by `{{ .githubUser }}` and `{{ $agent }}` at the same time.
+- **Not "`--force-with-lease` is the safe one."** The lease only compares the remote ref against the one you last fetched. It happily destroys a commit you fetched but never looked at, and it protects nothing at all in somebody else's checkout.
+- **Not "the rules say rebase, and rebase needs it."** They say rebase *before you push*. After that, add commits.
+- **Not "CI is wedged" / "the history is ugly" / "I need to drop a bad commit."** `git revert` fixes all three — visibly, reversibly, and without touching anyone else's clone.
+- **Not "I only need to fix a commit message."** A wrong commit message is not worth a rewritten ref; correct it in the PR body.
+
+**If you are convinced a force-push is the only way forward, stop and ask Joe first.** Describe what you want to overwrite and why, and wait. Do not do it and report it afterwards — this is the one git operation with no undo on the far side of the wire: the commits it drops vanish from every clone that has not already fetched them, and the person who loses them usually finds out days later.
+
+The one thing that genuinely requires rewritten history is **a committed secret** — and that is still not yours to force-push. Rotate the credential immediately (it is burned the moment it lands — see Secrets below), then hand the history cleanup to Joe.
 
 ### Pull requests
 
