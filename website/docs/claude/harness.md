@@ -5,7 +5,7 @@ title: Harness
 
 # Harness — supervised agents
 
-[`harness`](https://gitea.stump.rocks/stump.wtf/harness) is *systemctl for your
+[`harness`](https://github.com/stump-wtf/harness) is *systemctl for your
 agents*: a Go daemon that supervises long-running agent sessions (Crush, Claude
 Code), keeps them alive across crashes, lets you attach to their terminals, and
 fires one-shot scheduled runs from its own cron.

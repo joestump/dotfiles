@@ -32,7 +32,6 @@ const config = {
         docs: {
           routeBasePath: 'docs',
           sidebarPath: './sidebars.js',
-          editUrl: 'https://gitea.stump.rocks/joestump/dotfiles/_edit/main/website/',
         },
         blog: false,
         theme: {customCss: './src/css/custom.css'},
@@ -52,7 +51,7 @@ const config = {
           {to: '/docs/install/mothership', label: 'Install', position: 'left'},
           {to: '/docs/commands', label: 'Commands', position: 'left'},
           {to: '/docs/claude/harness', label: 'Agents', position: 'left'},
-          {href: 'https://gitea.stump.rocks/joestump/dotfiles', label: 'Gitea', position: 'right'},
+          {href: 'https://github.com/joestump/dotfiles', label: 'GitHub', position: 'right'},
         ],
       },
       footer: {
@@ -89,7 +88,6 @@ const config = {
           {
             title: 'Source',
             items: [
-              {label: 'Gitea repo', href: 'https://gitea.stump.rocks/joestump/dotfiles'},
               {label: 'GitHub mirror', href: 'https://github.com/joestump/dotfiles'},
               {label: 'OpenBao', href: 'https://vault.stump.rocks'},
             ],

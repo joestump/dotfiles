@@ -6,7 +6,7 @@ title: Architecture
 # Architecture & decisions
 
 The design rationale, distilled. The repo's own
-[`Architecture.md`](https://gitea.stump.rocks/joestump/dotfiles/src/branch/main/Architecture.md)
+[`Architecture.md`](https://github.com/joestump/dotfiles/blob/main/Architecture.md)
 goes deeper and is the living document; this page is the reader-facing summary.
 
 ## Separation of concerns (the core constraint)
@@ -87,5 +87,6 @@ something needs to differ on one box, the mechanism is a per-machine override in
 that box's `~/.config/chezmoi/chezmoi.toml` under `[data]` — where maps
 deep-merge and lists replace — not an edit to the target.
 
-The [Gitea repo](https://gitea.stump.rocks/joestump/dotfiles) is the source of
-truth; GitHub is a read-only downstream mirror.
+The canonical repo lives on a private Gitea instance and is the source of
+truth; [`joestump/dotfiles`](https://github.com/joestump/dotfiles) on GitHub is
+its public read-only mirror.
