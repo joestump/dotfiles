@@ -380,8 +380,10 @@
        are listed for the same reason view/grep are — so an interactive Crush
        doesn't prompt for the two tools an agent should reach for FIRST when it
        lands in an unfamiliar repo. Absent from the palette entirely when the
-       embeddings block above is missing, so this is inert on a box that can't
-       reach the gateway. */}}
+       embeddings block above is missing, or when the local vec0 store fails to
+       open — reachability of the gateway is never consulted at registration, so
+       a box that can't reach it still gets both tools and fails at call time
+       instead. */}}
       "semantic_search",
       "semantic_index",
       "todos",
