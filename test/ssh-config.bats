@@ -66,6 +66,47 @@ _render() {
   grep -Eq 'ControlPersist\s+10m' "$cfg"
 }
 
+@test "ssh-config: a Host * fallback block is emitted, and emitted LAST" {
+  local cfg; cfg="$(_render)" || return $?
+  grep -Eq '^Host \*$' "$cfg"
+  # ssh_config is first-match-wins per keyword, so the catch-all is only a
+  # fallback if nothing follows it. Anything after would shadow a specific block.
+  local last_host
+  last_host=$(grep -E '^Host ' "$cfg" | tail -1)
+  [ "$last_host" = "Host *" ]
+}
+
+@test "ssh-config: keepalives live ONLY in the Host * block" {
+  local cfg; cfg="$(_render)" || return $?
+  # A ServerAliveInterval on a specific host wins by first-match and silently
+  # opts that host out of the global value — which is exactly the bug this
+  # block was added to fix (github.com carried its own 600 while every
+  # stump.rocks host resolved to 0, i.e. keepalives disabled entirely).
+  run grep -c 'ServerAliveInterval' "$cfg"
+  [ "$output" -eq 1 ]
+  grep -Eq '^\s*ServerAliveInterval\s+60$' "$cfg"
+  grep -Eq '^\s*ServerAliveCountMax\s+3$' "$cfg"
+}
+
+@test "ssh-config: ssh -G gives every host a non-zero ServerAliveInterval" {
+  local cfg; cfg="$(_render)" || return $?
+  command -v ssh >/dev/null 2>&1 || skip "ssh not installed"
+  # 0 means "send nothing on an idle connection", which is the OpenSSH default
+  # and the reason long-running sessions died to NAT timeouts without either
+  # end noticing. Cover an infra host, a jump host, the special-cased github
+  # block, and a host matching no block at all.
+  local host
+  for host in tars.stump.rocks lir github.com 192.168.100.213 unlisted.example.com; do
+    run ssh -F "$cfg" -G "$host"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"serveraliveinterval 60"* ]] || {
+      echo "no keepalive for $host" >&2
+      return 1
+    }
+    [[ "$output" == *"serveralivecountmax 3"* ]]
+  done
+}
+
 @test "ssh-config: ControlMaster rule excludes github.com" {
   local cfg; cfg="$(_render)" || return $?
   local host_block

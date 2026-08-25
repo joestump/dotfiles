@@ -150,7 +150,8 @@ vaultSshKeys: true
 #
 #   1. ssh.hosts          specific blocks, in list order
 #   2. ssh.jump.hosts     bastion'd hosts, expanded from one shared option set
-#   3. ssh.multiplex      the catch-all ControlMaster rule, last
+#   3. ssh.multiplex      the catch-all ControlMaster rule
+#   4. ssh.defaults       the `Host *` fallbacks (keepalives), last
 #
 # Because of first-match-wins, an entry added to ssh.hosts always beats the jump and
 # multiplex rules below it — that is the supported way to special-case one node
@@ -177,8 +178,6 @@ ssh:
         Hostname: "ssh.github.com"
         Port: "443"
         User: "git"
-        ServerAliveInterval: "600"
-        TCPKeepAlive: "yes"
         IPQoS: "throughput"
         # github.com routes to ssh.github.com:443, whose host key lives under the
         # [ssh.github.com]:443 identity. On a fresh box with an empty known_hosts,
@@ -226,6 +225,25 @@ ssh:
       ControlMaster: "auto"
       ControlPath: "~/.ssh/cm-%C"
       ControlPersist: "10m"
+
+  # Global fallbacks, emitted LAST as `Host *`. Because ssh_config is
+  # first-match-wins PER KEYWORD, anything a block above already set still wins;
+  # this only fills in keywords nobody claimed.
+  #
+  # Keepalives belong here and nowhere else. Without ServerAliveInterval ssh
+  # sends nothing on an idle connection, so a NAT table or a Wi-Fi power-save
+  # blip drops the flow and NEITHER end notices — the session looks alive until
+  # the next keystroke, then dies as "Shared connection to <host> closed",
+  # taking any long-running remote session with it. 60s/3 gives up after ~3
+  # minutes of genuine silence, well inside the 5-15 minute idle timeout most
+  # consumer NAT tables use.
+  defaults:
+    patterns:
+      - "*"
+    options:
+      ServerAliveInterval: "60"
+      ServerAliveCountMax: "3"
+      TCPKeepAlive: "yes"
 
 # Family / personal contacts, including the operator himself. Non-secret phone
 # numbers for people the agent needs to reach (Signal, iMessage, etc.).

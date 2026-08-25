@@ -7,7 +7,8 @@
 
   Emission order is load-bearing: ssh_config is first-match-wins per keyword, so
   specific blocks render before general ones — ssh.hosts, then the expanded
-  ssh.jump.hosts, then the ssh.multiplex catch-all last.
+  ssh.jump.hosts, then the ssh.multiplex catch-all, then the ssh.defaults
+  `Host *` fallbacks last of all.
 
   Every lookup goes through `dig` with a default. chezmoi renders templates with
   missingkey=error, so a bare .ssh.jump on a machine whose [data.ssh] override
@@ -36,6 +37,7 @@ Host {{ dig "patterns" (list) . | join " " }}
 {{- $hosts := dig "hosts" (list) .ssh -}}
 {{- $jump := dig "jump" (dict) .ssh -}}
 {{- $multiplex := dig "multiplex" (dict) .ssh -}}
+{{- $defaults := dig "defaults" (dict) .ssh -}}
 
 # Managed by chezmoi: private_dot_ssh/private_config.tmpl
 # Generated from the `ssh:` block in .chezmoidata.yaml — edit there, not here.
@@ -50,5 +52,9 @@ Host {{ dig "patterns" (list) . | join " " }}
 {{ end -}}
 
 {{- with $multiplex }}
+{{- template "_block" . }}
+{{ end -}}
+
+{{- with $defaults }}
 {{- template "_block" . }}
 {{- end }}
