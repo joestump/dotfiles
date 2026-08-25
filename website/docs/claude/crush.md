@@ -72,7 +72,6 @@ Crush gets its own MCP block — it does **not** read `mcp-servers.json`:
 | --- | --- | --- |
 | `filesystem` | stdio | `@modelcontextprotocol/server-filesystem`, scoped to `~/src` |
 | `gitea` | stdio | Remaps `GITEA_ACCESS_TOKEN` ← `$GITEA_TOKEN` |
-| `github` | http | `api.githubcopilot.com` |
 | `outline` | http | The wiki |
 | `signal` | stdio | `uv run … --channel` — the channels feature the fork adds |
 | `chrome-devtools` | stdio | Drives a local Chrome |
@@ -86,6 +85,12 @@ Crush gets its own MCP block — it does **not** read `mcp-servers.json`:
 `aws-knowledge` and `aws` are **different servers**: the first is public
 documentation and needs no credential; the second reaches the real account and
 can change resources.
+
+**There is no `github` MCP server.** The hosted one at `api.githubcopilot.com` was
+retired; GitHub work goes through the [`gh` CLI](https://cli.github.com/), which is
+authenticated from the environment (`GH_TOKEN`/`GITHUB_TOKEN`) and so works in
+headless and daemon-launched sessions too. `gitea` above is a real MCP server and
+is unaffected.
 
 A long `allowed_tools` list in the same file pre-approves the read-only tools
 across these servers, so routine work doesn't stop on a permission prompt.
