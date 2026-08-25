@@ -84,6 +84,40 @@
       "discover_models": true
     }
   },
+{{- /* Semantic search — an on-demand vector index over the working repo, backing
+       the fork's `semantic_index` / `semantic_search` tools (crush#278). Both
+       tools are registered ONLY when this block is present and the sqlite-vec
+       store initialises; without it Crush has grep and nothing else for
+       "where is retry decided?"-shaped questions.
+
+       Points at the StumpCloud LiteLLM gateway rather than the embedding
+       service directly. bge-m3 is served by text-embeddings-inference on the
+       ie01 RTX A2000 Ada and IS reachable at https://bge-m3.stump.wtf — but
+       that vhost sits behind oauth2-proxy, which answers a Bearer token with a
+       login redirect, and Crush speaks plain OpenAI auth. LiteLLM already
+       fronts the same container over its own API key (model `bge-m3` →
+       hosted_vllm/bge-m3 at http://bge-m3:8000/v1, in-cluster, no proxy), so
+       the gateway is the only path that authenticates. Same $LITELLM_API_KEY
+       as the litellm provider above, and the same unconditional-render rule:
+       a "$VAR" reference, never a literal, never an `if env` gate.
+
+       dimension 1024 is NOT a preference — it is what BAAI/bge-m3 emits, and
+       TEI ignores OpenAI's `dimensions` truncation parameter, so the vector
+       length is fixed by the model. Crush's default of 768 would mismatch every
+       insert. The value is baked into the vec0 table at creation: changing it
+       later fails loudly and needs a reindex (drop `chunks` + `chunk_vectors`,
+       re-run semantic_index), so treat it as tied to the model choice.
+
+       Cost note: embeddings run on Joe's own GPU, so indexing a large repo is
+       free apart from wall time. Indexing stays on demand (there is no apply-
+       time or session-start trigger here) — the agent runs semantic_index when
+       it wants the index, and re-runs are incremental. */}}
+  "embeddings": {
+    "base_url": "{{ .litellmUrl }}",
+    "api_key": "$LITELLM_API_KEY",
+    "model": "bge-m3",
+    "dimension": 1024
+  },
   "lsp": {
     "go": {
       "command": "gopls",
@@ -118,17 +152,6 @@
       "args": ["--stdio"],
       "enabled": true
     }
-  },
-{{- /* Embeddings back the semantic_search/semantic_index tools (crush PR #278).
-         bge-m3 is TEI on ie01's RTX 2000 Ada, routed through the LiteLLM
-         gateway (1024-dim vectors). api_key uses the same $VAR shell-expansion
-         as the provider blocks; dimension is baked into the vector table on
-         first index — changing it means reindexing. */ -}}
-  "embeddings": {
-    "base_url": "{{ .litellmUrl }}",
-    "api_key": "$LITELLM_API_KEY",
-    "model": "bge-m3",
-    "dimension": 1024
   },
   "mcp": {
     "filesystem": {
@@ -351,6 +374,16 @@
       "bash",
       "lsp_diagnostics",
       "lsp_references",
+{{- /* Both semantic tools are read-only-ish and cheap to allow: semantic_search
+       only queries the local sqlite index, and semantic_index writes nothing but
+       that index (it embeds through the gateway above, on Joe's own GPU). They
+       are listed for the same reason view/grep are — so an interactive Crush
+       doesn't prompt for the two tools an agent should reach for FIRST when it
+       lands in an unfamiliar repo. Absent from the palette entirely when the
+       embeddings block above is missing, so this is inert on a box that can't
+       reach the gateway. */}}
+      "semantic_search",
+      "semantic_index",
       "todos",
       "list_mcp_resources",
       "read_mcp_resource",

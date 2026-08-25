@@ -122,6 +122,52 @@ rather than unset. A thin-env launch is fixed at the source (the harness
 - **LSP** — Go, Python, Ansible, YAML, Markdown, Terraform and JSON servers are
   wired up in `crush.json`.
 
+## Semantic search
+
+The fork ships `semantic_index` and `semantic_search` — a vector index over the
+working repo, stored in the project's own SQLite database. They answer the
+questions `grep` is bad at (*where is auth handled*, *what decides whether to
+retry*); for an exact symbol or string literal `grep` is still the right tool.
+This is the same idea as [qmd](../services#qmd-re-indexing), scoped to one repo and built on
+demand rather than on a timer.
+
+Both tools are **opt-in and register only when an `embeddings` block is
+present** in `crush.json`, so the wiring is the whole feature:
+
+```json
+"embeddings": {
+  "base_url": "https://litellm.stump.rocks/v1",
+  "api_key": "$LITELLM_API_KEY",
+  "model": "bge-m3",
+  "dimension": 1024
+}
+```
+
+Embeddings come from **`bge-m3` on the ie01 RTX A2000 Ada**, served by
+Hugging Face text-embeddings-inference. Indexing therefore costs wall time and
+nothing else — no per-token bill.
+
+:::note[Why the gateway and not `bge-m3.stump.wtf` directly]
+The TEI container has its own vhost, but it sits behind oauth2-proxy, which
+answers a Bearer token with an SSO redirect. Crush speaks plain OpenAI auth, so
+that path can't authenticate. LiteLLM already fronts the same container
+in-cluster (`hosted_vllm/bge-m3` → `http://bge-m3:8000/v1`) behind its own API
+key, and that key is already in the environment for the `litellm` provider.
+:::
+
+:::warning[`dimension` is dictated by the model, not chosen]
+`BAAI/bge-m3` emits 1024 floats and TEI ignores OpenAI's `dimensions`
+truncation parameter, so 1024 is the only value that works — Crush's default of
+768 would mismatch every insert. The number is baked into the `vec0` table when
+it's created; changing it later fails with an actionable error and needs a
+reindex (drop `chunks` and `chunk_vectors`, re-run `semantic_index`).
+:::
+
+Indexing is **on demand**: nothing triggers it at apply time or session start.
+Run `semantic_index` when you want the index; files whose contents and embedding
+model haven't changed are skipped, so re-runs are cheap. `crush_info` reports
+the model, dimension and chunk count under `[semantic_index]`.
+
 ## Config gets rewritten under you
 
 Crush rewrites `~/.config/crush/crush.json` in place during config migrations and
