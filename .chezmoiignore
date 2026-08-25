@@ -40,13 +40,18 @@ Library/
 # The scheduled harness sweeps are AGENT jobs: only a login carrying the
 # `-agent` suffix (the bot half of the $USER / $USER-agent convention — see
 # the Identity section of .chezmoidata.yaml, overridable via agentIdentity)
-# gets the sweep prompts. Human logins ignore them — the harness.d drop-ins
-# that declare the sweeps carry the same gate, so they render with no
+# gets the AGENT-ONLY sweep prompts. Human logins ignore those — the harness.d
+# drop-ins that declare them carry the same gate, so they render with no
 # [harness.*] table at all (comments only, which keeps the file — and so the
 # harness.d directory — on disk for [server] harness_d).
+#
+# pr-sweep is deliberately NOT in this list: it is the one sweep that runs
+# under BOTH identities, so its prompt must render on human logins too. Adding
+# it back here would silently re-break Joe's half of the cross-identity review
+# loop — the drop-in would declare a harness pointing at a prompt file that
+# does not exist on that box.
 {{ $sweepUser := .agentIdentity | default .chezmoi.username -}}
 {{ if not (hasSuffix "-agent" $sweepUser) -}}
 .config/dotfiles/stumpcloud-sweep.prompt.md
-.config/dotfiles/pr-feedback-sweep.prompt.md
-.config/dotfiles/issue-pr-grooming.prompt.md
+.config/dotfiles/issue-sweep.prompt.md
 {{ end -}}

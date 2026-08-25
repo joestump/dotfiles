@@ -57,3 +57,15 @@ Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
 .config/systemd/user/stumpcloud-sweep.service
 .config/systemd/user/stumpcloud-sweep.timer
 Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist
+
+# Retired sweep drop-ins + prompts — issue-pr-grooming and pr-feedback-sweep
+# were renamed to issue-sweep and pr-sweep and split so that one owns issues and
+# the other owns PRs (they both used to close PRs). The daemon loads every
+# *.toml in harness.d/, and the new names do not collide with the old ones — so
+# without these entries a machine that already applied would keep BOTH the old
+# and new drop-ins and run four sweeps, two of them fighting over the same PRs.
+# The reload script re-fires on the drop-in hashes and restarts the daemon.
+.config/harness/harness.d/issue-pr-grooming.toml
+.config/harness/harness.d/pr-feedback-sweep.toml
+.config/dotfiles/issue-pr-grooming.prompt.md
+.config/dotfiles/pr-feedback-sweep.prompt.md

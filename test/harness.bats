@@ -105,7 +105,7 @@ for fname, dd in docs.items():
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
 assert names == {'crush-signal', 'claude-code', 'claude-headless',
-                 'stumpcloud-sweep', 'pr-feedback-sweep', 'issue-pr-grooming'}, sorted(names)
+                 'stumpcloud-sweep', 'pr-sweep', 'issue-sweep'}, sorted(names)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
@@ -123,11 +123,13 @@ PY"
   rm -rf "$_cfgdir" "$_cfgdir2"; [ "$status" -eq 0 ]
 }
 
-@test "harness: drop-ins declare no harness on human logins (sweeps are agent-only)" {
+@test "harness: on a human login only pr-sweep declares a harness" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  # Same gate the old inline scheduled block carried: on a human login every
-  # drop-in must render with NO [harness.*] table, or the human box would run
-  # the sweeps too and Signal would double-report.
+  # The agent-only sweeps must render with NO [harness.*] table on a human
+  # login, or Joe's box would run them too and Signal would double-report.
+  # pr-sweep is the deliberate exception: it is the one sweep both identities
+  # run, because the cross-identity review loop needs Joe approving the agent's
+  # PRs on a schedule rather than by hand.
   #
   # The identity has to be PINNED, exactly like the agent cases pin ci-agent.
   # Without --config this renders as whoever runs the suite, so it asserted the
@@ -139,7 +141,10 @@ PY"
 ' >"$_cfg"
   for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
     run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$_f' | grep -c '^\[harness\.' || true"
-    [ "$output" -eq 0 ]
+    case "$(basename "$_f")" in
+      pr-sweep.toml.tmpl) [ "$output" -eq 1 ] ;;
+      *)                  [ "$output" -eq 0 ] ;;
+    esac
   done
   rm -rf "$_cfgdir"
 }

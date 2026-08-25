@@ -90,8 +90,8 @@ never renders them.
 | Harness | Schedule | What it does |
 | --- | --- | --- |
 | `stumpcloud-sweep` | every 6 h | Root-causes anything degraded in StumpCloud; files OMGs at MEDIUM+ |
-| `pr-feedback-sweep` | daily 09:30 | Works own open PRs on both forges — address feedback, push fixes, merge what's green |
-| `issue-pr-grooming` | Mondays 07:00 | Conservative tidy-up of stale and duplicate issues/PRs |
+| `pr-sweep` | daily 09:30 (agent) · 15:30 (human) | PRs only — own PRs (feedback, fixes, merge) plus review/approval of the sibling identity’s. Runs under BOTH identities |
+| `issue-sweep` | Mondays 07:00 | Issues only — evidence-based triage (close only what is provably done) plus `size/*` labelling |
 
 Their instructions live in chezmoi-managed prompt files
 (`~/.config/dotfiles/*.prompt.md`), so a prompt edit propagates on a normal `czu`

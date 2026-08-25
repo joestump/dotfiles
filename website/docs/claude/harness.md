@@ -77,8 +77,8 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 | `claude-code` | Claude Code in `~/src` with `--remote-control` — the phone becomes a second keyboard on *this* session | no |
 | `claude-headless` | Claude Code in `~/src` working the Switchboard queue | no |
 | `stumpcloud-sweep` | Scheduled: StumpCloud health sweep, every 6h | cron |
-| `pr-feedback-sweep` | Scheduled: keep own open PRs moving, daily 09:30 | cron |
-| `issue-pr-grooming` | Scheduled: tidy stale issues/PRs, Mondays 07:00 | cron |
+| `pr-sweep` | Scheduled: own PRs + sibling review, PRs only; daily 09:30 agent / 15:30 human | cron |
+| `issue-sweep` | Scheduled: issue triage + `size/*` labels, issues only; Mondays 07:00 | cron |
 
 The three scheduled ones are **gated on the `-agent` login suffix** — a human
 login renders only the interactive agents. Their instructions live in
