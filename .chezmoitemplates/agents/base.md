@@ -72,6 +72,15 @@ You may open pull requests, issues, and fork repos **without asking** in these o
 
 **You MUST NOT open PRs, issues, or any other contributions against ANY other organization or user on GitHub or Gitea without EXPLICIT, prior, per-action approval from Joe.** When in doubt, ASK FIRST — never assume permission.
 
+### GitHub operations — the `gh` CLI, not an MCP
+
+**There is no GitHub MCP server. Use the `gh` CLI for every GitHub operation** — repos, issues, PRs, releases, actions, comments, reviews, labels, topics, collaborators, everything. It is authenticated from the environment (`GH_TOKEN`/`GITHUB_TOKEN`) on every machine, so it works in headless and daemon-launched sessions too.
+
+- Read/search: `gh repo view`, `gh issue list/view/create`, `gh pr list/view/diff`, `gh search repos/issues/code/prs`, `gh api` for anything the subcommands don't cover.
+- Write: `gh pr create/merge/comment/review`, `gh issue create/comment/close`, `gh release create`, `gh repo edit --add-topic`, `gh api -X POST ...`.
+- **Never** try to reach GitHub through the Gitea MCP, the sourcegraph tool, or by inventing an MCP server — if `gh` cannot do it, it does not get done.
+- The same org and canonical-host rules apply (see below): pass `owner/repo` explicitly rather than relying on the checkout's `origin`, so a mirror clone can't steer a PR to the wrong host.
+
 ### Gitea and GitHub — which way code flows
 
 Most repos exist **twice**, and only one copy is real. Getting this backwards is the single most expensive mistake available here, because the work is not rejected — it is accepted, then silently overwritten.
