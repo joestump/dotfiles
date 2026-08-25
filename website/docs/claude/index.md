@@ -60,7 +60,7 @@ present:
 | Server | Connects where |
 | --- | --- |
 | `chrome-devtools`, `karakeep` | everywhere (Node) |
-| `github`, `outline`, `cairn`, `switchboard` | everywhere (remote HTTP — just the token) |
+| `outline`, `cairn`, `switchboard` | everywhere (remote HTTP — just the token) |
 | `gitea` | everywhere (the Go build cache is warmed by chezmoi) |
 | `aws` | everywhere — including GUI and supervised contexts, since the credential file landed |
 | `signal` | everywhere, once the node is device-linked → [Signal](./signal) |

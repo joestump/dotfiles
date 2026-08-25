@@ -12,7 +12,7 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
   key (OAuth tokens, session state) and any hand-added servers. Only `.mcpServers`
   is rewritten, and the merge **aborts** if any top-level key would drop.
 - **Per-app shape:** Code tags each server with `type` and reaches the remote
-  servers (`github`, `outline`, `cairn`, `switchboard`) over native `http`; Desktop
+  servers (`outline`, `cairn`, `switchboard`) over native `http`; Desktop
   omits `type` and reaches them through the `npx mcp-remote` stdio bridge.
 - **No Docker.** Every server is a plain stdio launcher (`npx`/`go`) or a remote
   HTTP endpoint — nothing here needs a container runtime.
@@ -34,15 +34,25 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 | `cairn` | Cairn artifacts/trajectories (`$CAIRN_BASE_URL`) | `http` (Code) · `mcp-remote` (Desktop) | native / `npx mcp-remote` | both |
 | `chrome-devtools` | Drive a local Chrome for DevTools/automation | stdio | `npx chrome-devtools-mcp` | both |
 | `gitea` | Self-hosted Gitea API (`gitea.stump.rocks`) | stdio | `go run …/gitea-mcp` | both |
-| `github` | GitHub API (**remote hosted** MCP) | `http` (Code) · `mcp-remote` (Desktop) | `api.githubcopilot.com` | both |
 | `karakeep` | Karakeep bookmarks (`karakeep.stump.rocks`) | stdio | `npx @karakeep/mcp` | both |
 | `outline` | Outline wiki (`outline.stump.rocks`) | `http` (Code) · `mcp-remote` (Desktop) | native / `npx mcp-remote` | both |
 | `signal` | Signal send/receive/react | stdio | `uv run` → signal-cli daemon | both · [setup →](./signal) |
 | `switchboard` | Durable webhook→todo queue (`$SWITCHBOARD_CLAUDE_CODE_URL`) | `http` | native | **Code only** |
 
+:::note[No `github` server — use the `gh` CLI]
+The hosted GitHub MCP (`api.githubcopilot.com`) was retired. Every GitHub
+operation — repos, issues, PRs, releases, Actions, reviews — goes through
+[`gh`](https://cli.github.com/) instead, which authenticates from the environment
+(`GH_TOKEN`/`GITHUB_TOKEN`) and therefore works in headless and daemon-launched
+sessions where an MCP OAuth flow can't run. `gh api` covers anything the
+subcommands don't. The merge scripts actively **drop** a stale `github` entry from
+`~/.claude.json`, so an old config self-heals on the next apply. `gitea` is a
+separate, still-live MCP server for the self-hosted forge.
+:::
+
 ### Where each token comes from
 
-Six servers need a credential; each is sourced differently so **nothing secret is
+Five servers need a credential; each is sourced differently so **nothing secret is
 ever written to the chezmoi repo**. `aws` is the exception that proves the rule —
 it needs credentials but stores none, because it signs with SigV4 from the
 standard boto chain (see below).
@@ -53,7 +63,6 @@ the KV path, then `:`, then the field (env-var) name. e.g.
 
 | Server | Credential | Source |
 | --- | --- | --- |
-| `github` | `Authorization: Bearer …` | `secret/users/<you>/github:GITHUB_PERSONAL_ACCESS_TOKEN`, baked as a Bearer header — like outline |
 | `karakeep` | `KARAKEEP_API_KEY` | `secret/users/<you>/karakeep:KARAKEEP_API_KEY`, baked into `env` |
 | `gitea` | `GITEA_TOKEN` | **Not in the config** — gitea-mcp inherits it from the login shell (`env.zsh`, from `secret/users/<you>/gitea:GITEA_TOKEN`) |
 | `outline` | `Authorization: Bearer …` | `secret/users/<you>/outline:OUTLINE_API_TOKEN`, via the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
@@ -123,7 +132,6 @@ A server only connects if its launcher is present on the box:
 | --- | --- | --- |
 | `chrome-devtools` | Node (`npx`) + Chrome | — |
 | `gitea` | Go toolchain | `go run …@latest` recompiles (~12 s) on a cold cache and overruns Claude's startup window, so `go-tools.txt` warms the build cache (`go install gitea-mcp`) |
-| `github` | nothing local | Remote hosted at `api.githubcopilot.com` — just the PAT Bearer (Desktop adds the `npx mcp-remote` bridge) |
 | `karakeep` | Node (`npx`) | `@karakeep/mcp` from npm — no container, no registry login |
 | `outline` | Node (`npx`) | Desktop only (the bridge); Code is native HTTP |
 | `cairn` | Node (`npx`) | Desktop only (the bridge); Code is native HTTP |
@@ -148,8 +156,8 @@ Then **restart Claude Code / Desktop** to reload. Check what's live with
 Crush does **not** read this file — it has its own MCP block in `crush.json`.
 See [Crush](./crush).
 
-> **Five servers aren't in `mcp-servers.json`** — the merge scripts inject them
-> because their shape varies per app or per OS: `github`, `outline`, `cairn` and
+> **Four servers aren't in `mcp-servers.json`** — the merge scripts inject them
+> because their shape varies per app or per OS: `outline`, `cairn` and
 > `switchboard` are remote HTTP with a baked Bearer (native `http` for Code, `npx
 > mcp-remote` for Desktop — except `switchboard`, which is Code-only), and
 > `signal`'s `uv` path + `PATH` differ macOS vs Linux. To change those, edit the
