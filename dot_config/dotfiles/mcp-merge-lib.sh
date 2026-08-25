@@ -48,6 +48,24 @@ mcp_base() {
     "$HOME/.config/dotfiles/mcp-servers.json"
 }
 
+# mcp_drop <target-file> <server-name>...
+#   Retire a server: mcp_merge only unions desired over live, so a server removed
+#   from the repo's definitions would otherwise live on forever in the target.
+#   Deletes the named keys from .mcpServers. Idempotent, no-op when absent.
+mcp_drop() {
+  local cj="$1"; shift
+  [ -f "$cj" ] || return 0
+  command -v jq >/dev/null 2>&1 || { warn "jq required"; return 1; }
+  local tmp
+  tmp="$(mktemp)"
+  if jq '.mcpServers = (reduce ($ARGS.positional[]) as $n (.mcpServers; del(.[$n])))' \
+       "$cj" --args "$@" > "$tmp" && chmod 600 "$tmp" && mv "$tmp" "$cj"; then
+    item ok "dropped mcpServers: $*"
+  else
+    rm -f "$tmp"; warn "failed to drop mcpServers: $*"
+  fi
+}
+
 # mcp_merge <target-file> <desired-mcpServers-json>
 #   Repo-authoritative: managed servers replace live ones; other servers + every
 #   non-mcpServers key are preserved. Only .mcpServers is rewritten. Idempotent.
