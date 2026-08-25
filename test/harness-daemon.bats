@@ -70,3 +70,46 @@ assert d['RunAtLoad'] is True and d['KeepAlive'] is True
   ! grep -q 'start claude-remote-control' "$SCRIPT"
   ! grep -q 'start crush-signal-channel' "$SCRIPT"
 }
+
+# --- Daemon restart lifecycle -------------------------------------------------
+#
+# czu runs `vault-agent restart` every 6h to force a secrets re-render. While
+# harness.service declared Requires=vault-agent.service, systemd could not honor
+# that without tearing this daemon down first — so every live agent session took
+# a SIGTERM four times a day and every scheduled harness re-fired on the way
+# back up (harness#266). The unit must want the agent, not require it, and the
+# build script must own the restart that a binary upgrade actually needs.
+
+@test "harness-daemon: unit WANTS vault-agent, never REQUIRES it" {
+  # Requires= propagates lifecycle. It also never bought what it looked like it
+  # bought: it guarantees vault-agent is started, not that it has rendered.
+  ! grep -Eq '^Requires=' "$UNIT"
+  grep -Eq '^Wants=.*vault-agent\.service' "$UNIT"
+  # Ordering is still asserted — After= is what keeps us behind the agent on boot.
+  grep -Eq '^After=.*vault-agent\.service' "$UNIT"
+}
+
+@test "harness-daemon: build script restarts the daemon only after a successful build" {
+  local script="$REPO_ROOT/.chezmoiscripts/run_after_32-install-harness.sh.tmpl"
+  # Both success paths (first attempt and the cold-boot retry) restart.
+  [ "$(grep -c '^\s*restart_daemon "\$ver"' "$script")" -eq 2 ]
+  # It is a no-op when the daemon is not up: run_onchange_after_51 owns starting it.
+  grep -q 'systemctl --user is-active --quiet harness.service' "$script"
+  grep -q 'launchctl print "gui/\$(id -u)/rocks.stump.harness"' "$script"
+  # The up-to-date early exit must come BEFORE any restart, so an apply that
+  # rebuilt nothing never bounces a running daemon.
+  local uptodate restart
+  uptodate="$(grep -n '(up to date)' "$script" | head -1 | cut -d: -f1)"
+  restart="$(grep -n 'restart_daemon "\$ver"' "$script" | head -1 | cut -d: -f1)"
+  [ "$uptodate" -lt "$restart" ]
+}
+
+@test "harness-daemon: czu still RESTARTS the vault agent (reload does not re-render)" {
+  # Vault Agent accepts SIGHUP and logs "config reload triggered", but it does
+  # not reconcile the rendered secrets file — probed on tars 2026-08-25: a
+  # perturbed secrets-static.env was still perturbed 10s after a HUP. Swapping
+  # czu to reload would silently stop refreshing secrets, which is the same
+  # disease as the `{{ if env ... }}` gating trap this repo already banned.
+  # Safe to keep restarting now that harness.service only Wants= the agent.
+  grep -q 'vault-agent restart' "$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh"
+}

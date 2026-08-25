@@ -2,8 +2,18 @@
 Description=Harness agent supervisor (Go)
 Documentation=https://gitea.stump.rocks/stump.wtf/harness
 After=network-online.target vault-agent.service signal-daemon.service
-Wants=network-online.target signal-daemon.service
-Requires=vault-agent.service
+# Wants=, deliberately NOT Requires=, for vault-agent. Requires= propagates
+# lifecycle: systemd cannot restart a required unit without first tearing down
+# everything that requires it, so `vault-agent restart` — which czu runs every
+# 6h to force a secrets re-render — was stopping and restarting this daemon
+# too. Every live agent session took a SIGTERM four times a day, and every
+# scheduled harness fired on the way back up (harness#266).
+#
+# Requires= was never buying what it looked like it bought: it guarantees
+# vault-agent is *started*, not that it has *rendered*. The secrets file is
+# consumed via `EnvironmentFile=-` below, which tolerates its absence anyway,
+# and After= still orders us behind the agent on boot.
+Wants=network-online.target signal-daemon.service vault-agent.service
 
 [Service]
 Type=simple

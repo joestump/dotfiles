@@ -80,6 +80,59 @@ export GONOSUMDB="$GOPRIVATE"
 export GONOSUMCHECK=1
 
 
+# Restart The Daemon When — And Only When — Its Binary Changed
+#
+# Writing a new binary to ~/.local/bin/harness does nothing to the daemon
+# already running the old one: it keeps serving from the executable it started
+# with until something restarts it. That used to happen by accident, because
+# harness.service declared Requires=vault-agent.service and czu restarts the
+# Vault Agent on every run — so the daemon was dragged down and back up four
+# times a day. Accidental, and expensive: every restart SIGTERMs every live
+# agent session, and every scheduled harness fires again on the way back up
+# (harness#266).
+#
+# That coupling is gone (Wants= now — see harness.service.tmpl), so the restart
+# has to be deliberate, and this script is the only place that knows a new
+# binary actually landed. Called ONLY from the two build-success paths: an
+# apply that finds the fingerprint unchanged has already exited above, and a
+# failed build must never bounce a working daemon onto a binary it did not
+# produce.
+#
+# In-flight sessions still die on an upgrade. That is unavoidable when the
+# supervisor itself is what is being replaced, and it is strictly rarer than
+# the every-6h bounce it replaces. A machine where the daemon is not up yet is
+# left alone: run_onchange_after_51 owns enabling and starting it.
+#
+# @joestump-agent 08/25/2026 - Added alongside the Requires= → Wants= change,
+#   so a harness upgrade still lands promptly once czu stopped restarting the
+#   daemon as a side effect.
+restart_daemon() {
+  _ver="$1"
+  if [ "$(uname)" = "Darwin" ]; then
+    if ! launchctl print "gui/$(id -u)/rocks.stump.harness" >/dev/null 2>&1; then
+      item dim "harness daemon not loaded — skipping restart"
+      return 0
+    fi
+    if launchctl kickstart -k "gui/$(id -u)/rocks.stump.harness" >/dev/null 2>&1; then
+      item ok "harness daemon restarted onto ${_ver}"
+    else
+      warn "could not restart the harness daemon — launchctl kickstart -k gui/$(id -u)/rocks.stump.harness"
+    fi
+    return 0
+  fi
+
+  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  if ! systemctl --user is-active --quiet harness.service 2>/dev/null; then
+    item dim "harness daemon not running — skipping restart"
+    return 0
+  fi
+  if systemctl --user restart harness.service 2>/dev/null; then
+    item ok "harness daemon restarted onto ${_ver}"
+  else
+    warn "could not restart the harness daemon — systemctl --user restart harness.service"
+  fi
+}
+
 heading "🛠  harness"
 
 head="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
@@ -104,6 +157,7 @@ if ( cd "$SRC" && GOTOOLCHAIN=auto \
          -o "$BIN" ./cmd/harness ); then
   printf '%s' "$head" >"$STATE"
   item ok "harness ${ver} → $BIN"
+  restart_daemon "$ver"
 else
   # Exit non-zero so the failure actually surfaces. This used to only warn, so
   # czu completed "ok", the scheduled-state file stayed ok, no Signal alert
@@ -131,6 +185,7 @@ else
          -o "$BIN" ./cmd/harness ); then
     printf '%s' "$head" >"$STATE"
     item ok "harness ${ver} → $BIN (succeeded on retry)"
+    restart_daemon "$ver"
   else
     warn "harness build failed twice — 'cd $SRC && go build ./cmd/harness' by hand to see why"
     exit 1
