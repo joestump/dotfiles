@@ -33,10 +33,6 @@ heading "🔗 Claude Code MCP"
 # Bake it like the others — a subprocess that gets its token from the config works
 # no matter who launched it.
 #
-# github MCP is RETIRED — every GitHub operation goes through the `gh` CLI.
-# The server is dropped from the live config below so a previously-merged entry
-# does not linger (mcp_merge only unions; it never deletes).
-#
 # Fallbacks read the prior value from its current home (ltrimstr is a no-op on a
 # bare token, so a pre-migration env value also passes).
 KK="$(mcp_secret karakeep KARAKEEP_API_KEY             "$(jq -r '.mcpServers.karakeep.env.KARAKEEP_API_KEY // ""'      "$CJ")")"
@@ -94,13 +90,12 @@ desired="$(mcp_base | jq \
   # `vault-oidc-login` must not get an empty token baked in.
   | (if $gt != "" then .gitea.env.GITEA_ACCESS_TOKEN = $gt else . end)
   | map_values(. + {type:"stdio"})                              # Claude Code uses an explicit type
-  # github: RETIRED — dropped from the live config by mcp_drop before the merge.
   # outline: native http + a STATIC Bearer token (no OAuth/refresh tokens), baked.
   | (if $ot != "" then .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
                 headers:{"Authorization": ("Bearer " + $ot)}} else . end)
   # switchboard: native http + static Bearer (baked). Claude Code ONLY. Both halves
   # resolved above; only set when BOTH are non-empty so a fresh machine never bakes a
-  # broken "Bearer " or a url-less entry (cf. github, dotfiles#15).
+  # broken "Bearer " or a url-less entry (cf. dotfiles#15).
   | (if $sb != "" and $sburl != "" then .switchboard = {type:"http", url:$sburl,
                 headers:{"Authorization": ("Bearer " + $sb)}} else . end)
   # cairn: native http + static Bearer (baked). Same both-halves rule as switchboard.
