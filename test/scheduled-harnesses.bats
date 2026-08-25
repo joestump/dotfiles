@@ -79,6 +79,30 @@ _agent_render_all() {
   ! grep -q '^model = "zai/' <<<"$output"
 }
 
+# The other half of that outage. `restart = "on-failure"` is what turned each
+# quota-exhausted stream-open into another relaunch, thousands of times over.
+# harness has since made the policy unreachable for a scheduled harness --
+# onProcessGone returns on `Schedule != ""` before consulting it (harness
+# 1a3f286) -- so this assertion is belt-and-braces, not load-bearing. It is
+# still worth pinning: the config must not go on declaring the policy that
+# caused the outage, and if that early return is ever refactored away, `no` is
+# what keeps a failing sweep from relaunching itself. A cron one-shot's
+# schedule IS its retry.
+@test "scheduled: no scheduled harness relaunches itself on failure" {
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  ! grep -q '^restart = "on-failure"' <<<"$output"
+  # Every scheduled harness states the policy explicitly rather than relying on
+  # a default. Note the default would NOT catch a dropped line: `restart` is
+  # only "always" when unset for an ordinary harness, and a scheduled one is
+  # always a prompt harness (`schedule` requires `prompt`), which defaults to
+  # "no" instead -- the same value, arrived at silently. So the explicit line
+  # is the only thing that states the intent, and the only thing that still
+  # holds if the prompt-harness default ever changes. Assert all three are
+  # present and are "no".
+  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 3 ]
+}
+
 @test "scheduled: cadences — sweep 6h, pr-sweep daily, issue-sweep weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'

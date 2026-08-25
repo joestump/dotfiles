@@ -40,6 +40,15 @@
 #   section to the prompt: container logs, HTTP bodies and web pages are
 #   attacker-reachable text, so they are data to diagnose from, never
 #   instructions to follow.
+#
+# @joestump-agent 08/25/2026 - restart "on-failure" -> "no". This is the exact
+#   policy that produced the 4417/1795 relaunch storm above. harness has since
+#   made it unreachable for a scheduled harness — onProcessGone returns on
+#   `Schedule != ""` before it consults the restart policy at all (harness
+#   1a3f286) — so this is inert today and purely belt-and-braces. But the
+#   config should not keep declaring the policy that caused the outage, and
+#   `no` is what this harness actually wants either way: a cron one-shot's
+#   schedule IS its retry, and the next firing is the retry.
 {{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
 {{ if hasSuffix "-agent" $dropinUser -}}
 [harness.stumpcloud-sweep]
@@ -51,5 +60,5 @@ auto_accept = true
 quiet = true
 workdir = "{{ .chezmoi.homeDir }}"
 description = "StumpCloud health sweep · every 6h · glm-5.2 (Hyper)"
-restart = "on-failure"
+restart = "no"
 {{ end -}}

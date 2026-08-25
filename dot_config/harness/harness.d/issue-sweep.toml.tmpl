@@ -48,6 +48,15 @@
 #   issues only. It also closed PRs, overlapping pr-feedback-sweep; that half
 #   moved to pr-sweep. Prompt rewritten from age-based rules to evidence-based
 #   triage plus size/* labelling.
+#
+# @joestump-agent 08/25/2026 - restart "on-failure" -> "no". This is the exact
+#   policy that produced the 4417/1795 relaunch storm above. harness has since
+#   made it unreachable for a scheduled harness — onProcessGone returns on
+#   `Schedule != ""` before it consults the restart policy at all (harness
+#   1a3f286) — so this is inert today and purely belt-and-braces. But the
+#   config should not keep declaring the policy that caused the outage, and
+#   `no` is what this harness actually wants either way: a cron one-shot's
+#   schedule IS its retry, and the next firing is the retry.
 
 {{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
 {{ if hasSuffix "-agent" $dropinUser -}}
@@ -60,5 +69,5 @@ auto_accept = true
 quiet = true
 workdir = "{{ .chezmoi.homeDir }}"
 description = "Issue sweep — triage + size/* labels, issues only · Mondays 07:00 · glm-5.2 (Hyper)"
-restart = "on-failure"
+restart = "no"
 {{ end -}}
