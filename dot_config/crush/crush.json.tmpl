@@ -119,6 +119,17 @@
       "enabled": true
     }
   },
+{{- /* Embeddings back the semantic_search/semantic_index tools (crush PR #278).
+         bge-m3 is TEI on ie01's RTX 2000 Ada, routed through the LiteLLM
+         gateway (1024-dim vectors). api_key uses the same $VAR shell-expansion
+         as the provider blocks; dimension is baked into the vector table on
+         first index — changing it means reindexing. */ -}}
+  "embeddings": {
+    "base_url": "{{ .litellmUrl }}",
+    "api_key": "$LITELLM_API_KEY",
+    "model": "bge-m3",
+    "dimension": 1024
+  },
   "mcp": {
     "filesystem": {
       "type": "stdio",
