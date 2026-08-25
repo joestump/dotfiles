@@ -6,14 +6,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats + zsh + jq + chezmoi
+      - name: Install bats + zsh + jq + chezmoi + shellcheck
         # chezmoi lets the render-based suites (chezmoiexternal.bats,
         # vault-agent-stale.bats) actually run here instead of skipping; jq backs
         # the approle-setup identity-merge path exercised by
         # vault-approle-blast-radius.bats; python3 backs the crush-providers
-        # JSON validation in the bats job.
+        # JSON validation in the bats job; shellcheck lets lint-shell.bats
+        # exercise the real gate rather than skipping past it.
         run: |
-          sudo apt-get update && sudo apt-get install -y bats zsh jq python3 make
+          sudo apt-get update && sudo apt-get install -y bats zsh jq python3 make shellcheck
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: BATS suite

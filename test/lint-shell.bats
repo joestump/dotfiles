@@ -26,6 +26,14 @@ _fixture() {
 
 _commit() { git -C "$1" add -A && git -C "$1" -c commit.gpgsign=false commit -qm fixture; }
 
+# NB: `command -v a b` returns success if ANY name resolves, so the two-name
+# form silently fails to skip on a host that has chezmoi but not shellcheck.
+# Check them one at a time.
+_need_tools() {
+  command -v chezmoi    >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v shellcheck >/dev/null 2>&1 || skip "shellcheck not installed"
+}
+
 @test "lint-shell: make exposes lint-shell and it runs the script" {
   run grep -qE '^lint-shell:' "$REPO_ROOT/Makefile"
   [ "$status" -eq 0 ]
@@ -62,7 +70,7 @@ _commit() { git -C "$1" add -A && git -C "$1" -c commit.gpgsign=false commit -qm
 }
 
 @test "lint-shell: a clean source tree passes" {
-  command -v chezmoi shellcheck >/dev/null 2>&1 || skip "chezmoi/shellcheck not installed"
+  _need_tools
   local dir; dir=$(_fixture)
   cat > "$dir/.chezmoiscripts/run_after_10-ok.sh.tmpl" <<'EOF'
 #!/usr/bin/env bash
@@ -75,7 +83,7 @@ EOF
 }
 
 @test "lint-shell: a bug in an OS-gated branch this host is NOT is still caught" {
-  command -v chezmoi shellcheck >/dev/null 2>&1 || skip "chezmoi/shellcheck not installed"
+  _need_tools
   local dir; dir=$(_fixture)
   # The faulty line renders only when .chezmoi.os is the OS we are not running
   # on, so a single-render lint would miss it on every machine.
@@ -96,7 +104,7 @@ EOF
 }
 
 @test "lint-shell: a template that FAILS to render is an error, not a silent pass" {
-  command -v chezmoi shellcheck >/dev/null 2>&1 || skip "chezmoi/shellcheck not installed"
+  _need_tools
   local dir; dir=$(_fixture)
   cat > "$dir/.chezmoiscripts/run_after_10-broken.sh.tmpl" <<'EOF'
 #!/usr/bin/env bash
@@ -109,7 +117,7 @@ EOF
 }
 
 @test "lint-shell: a template that renders EMPTY is an error, not a silent pass" {
-  command -v chezmoi shellcheck >/dev/null 2>&1 || skip "chezmoi/shellcheck not installed"
+  _need_tools
   local dir; dir=$(_fixture)
   # Everything behind a gate that is false on every variant: no shell at all.
   cat > "$dir/.chezmoiscripts/run_after_10-empty.sh.tmpl" <<'EOF'
@@ -125,7 +133,7 @@ EOF
 }
 
 @test "lint-shell: identical renders across variants are reported once" {
-  command -v chezmoi shellcheck >/dev/null 2>&1 || skip "chezmoi/shellcheck not installed"
+  _need_tools
   local dir; dir=$(_fixture)
   # No gates, so all four variants render byte-identically and the finding
   # must not be repeated once per variant.
