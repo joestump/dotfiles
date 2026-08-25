@@ -194,19 +194,43 @@ Three **Gitea Actions** workflows gate `main`:
 
 | Workflow | Jobs |
 | --- | --- |
-| `ci.yml` | **bats** — the full BATS suite. **lint** — ShellCheck on plain scripts *and* on rendered `*.sh.tmpl`, `zsh -n` on the shell config, plus JSON, TOML and yamllint validation |
+| `ci.yml` | **bats** — the full BATS suite. **lint** — `make lint-shell` (ShellCheck on plain scripts *and* on every rendered `*.sh.tmpl`, across its gate variants), `zsh -n` on the shell config, plus JSON, TOML and yamllint validation |
 | `gitleaks.yaml` | A verbose git-history secret scan via the shared `stumpcloud/gitleaks-action`, using this repo's `.gitleaks.toml` |
 | `aibot.yml` | The AI review bot on pull requests |
 
-Run the same suite locally:
+Run the same gate locally — CI's lint job calls `make lint-shell`, so these are
+the same checks and not a local approximation:
 
 ```bash
-bats test/
+make check
 ```
 
-Shellcheck is worth calling out: CI's apt build is older than a Homebrew one and
-disagrees on some info/style checks, so a clean local run isn't proof. If CI
-flags something you can't reproduce, run `shellcheck --enable=all` locally.
+`make test` is the BATS suite; `make lint` is `make lint-shell` plus a gitleaks
+scan; `make lint-shell` on its own is the ShellCheck half, and needs no gitleaks
+binary.
+
+### What the shell lint actually covers
+
+`scripts/lint-shell.sh` shellchecks two sets, and the second one is easy to get
+wrong. Every apply-time script in `.chezmoiscripts/` is a `*.sh.tmpl`, so it has
+to be rendered through `chezmoi execute-template` before ShellCheck can parse
+it — a glob over `*.sh` matches none of them.
+
+Rendering once isn't enough either. Templates gate on `.chezmoi.os` and on the
+`-agent` login suffix, so a single render only ever covers one branch of each:
+on a Mac the Linux-only branches are invisible, and on CI's ubuntu runner the
+darwin-only ones are. The script renders the full matrix — `{darwin, linux}` x
+`{human, agent}`, via `--override-data` — and deduplicates identical renders by
+content hash so an un-gated finding is reported once rather than four times.
+
+A template that fails to render, or renders to nothing, is a hard error. It has
+to be: piping `chezmoi execute-template` into `shellcheck` hands ShellCheck an
+empty document when the render fails, and an empty document lints clean.
+
+Shellcheck version drift is worth calling out: CI's apt build is older than a
+Homebrew one and disagrees on some info/style checks, so a clean local run isn't
+proof. If CI flags something you can't reproduce, run `shellcheck --enable=all`
+locally.
 
 This docs site ships from a separate `pages` workflow. It builds once and
 deploys twice — to [Garage Pages](https://joestump.pages.stump.rocks/dotfiles/)
