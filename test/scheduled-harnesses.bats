@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # The scheduled harnesses: three one-shot prompt harnesses, one drop-in file
 # each in dot_config/harness/harness.d/*.toml (stumpcloud-sweep every 6h,
-# pr-feedback-sweep daily, issue-pr-grooming weekly), agent logins only,
+# pr-sweep daily, issue-sweep weekly), agent logins only,
 # replacing the retired standalone stumpcloud-sweep systemd timer / launchd
 # agent. These tests pin the couplings: every scheduled entry points at a
 # prompt file that actually ships, the old units are gone from source AND
@@ -54,7 +54,7 @@ _agent_render_all() {
 @test "scheduled: three scheduled harnesses declared with prompt + cron" {
   run _agent_render_all
   [ "$status" -eq 0 ]
-  for name in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
+  for name in stumpcloud-sweep pr-sweep issue-sweep; do
     grep -qE "^\[harness\.$name\]" <<<"$output" || return 1
     # every scheduled entry needs `prompt` and a 5-field cron `schedule`
     grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -q '^prompt = ' || return 1
@@ -79,16 +79,16 @@ _agent_render_all() {
   ! grep -q '^model = "zai/' <<<"$output"
 }
 
-@test "scheduled: cadences — sweep 6h, pr-feedback daily, grooming weekly" {
+@test "scheduled: cadences — sweep 6h, pr-sweep daily, issue-sweep weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
-  grep -A8 '^\[harness\.pr-feedback-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
-  grep -A8 '^\[harness\.issue-pr-grooming\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
+  grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
 }
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
   run _agent_render_all
-  for f in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
+  for f in stumpcloud-sweep pr-sweep issue-sweep; do
     grep -q "$f.prompt.md" <<<"$output" || return 1
     # pr-feedback/grooming are templates (identity vars); the sweep prompt is
     # identity-free markdown. Either way the template must render cleanly.
@@ -101,28 +101,28 @@ _agent_render_all() {
   done
 }
 
-@test "scheduled: pr-feedback prompt keeps the two-tier merge policy + Signal rule" {
-  grep -qi 'SQUASH' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
-  grep -q 'APPROVED' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
-  grep -q 'chezmoi.username' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
-  grep -q 'SIGNAL_MCP_OPERATOR' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+@test "scheduled: pr-sweep prompt keeps the two-tier merge policy + Signal rule" {
+  grep -qi 'SQUASH' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  grep -q 'APPROVED' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  grep -q 'chezmoi.username' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  grep -q 'SIGNAL_MCP_OPERATOR' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
 }
 
-@test "scheduled: pr-feedback prompt pins the cross-identity approval rule" {
+@test "scheduled: pr-sweep prompt pins the cross-identity approval rule" {
   # Neither identity may merge its own PR; the two identities unblock each
   # other - the sweep must APPROVE the opposite identity's eligible PRs and
   # never its own.
-  grep -q 'reviews and approves PRs authored by' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
-  grep -qi 'Never approve a PR authored by your OWN identity' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
-  grep -qi 'auto-merge' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -q 'reviews and approves PRs authored by' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  grep -qi 'Never approve a PR authored by your OWN identity' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  grep -qi 'auto-merge' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
 }
 
-@test "scheduled: pr-feedback prompt splits author mode from reviewer mode" {
+@test "scheduled: pr-sweep prompt splits author mode from reviewer mode" {
   # The sweep wears exactly two hats, chosen by PR author: it responds to and
   # merges its OWN PRs, and it REVIEWS the sibling identity's. A PR authored by
   # anyone else is out of scope entirely - dropping that third row is how the
   # sweep starts reviewing the outside world's work.
-  local f="$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  local f="$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
   grep -qi 'Author mode' "$f"
   grep -qi 'Reviewer mode' "$f"
   grep -qi 'Leave it completely alone' "$f"
@@ -138,7 +138,7 @@ _agent_render_all() {
   # Reviewer mode is not a second inline review checklist - it loads the
   # pr-review skill, which is the authority on how a review is done here. The
   # three non-negotiables around it are what keep an approval meaningful.
-  local f="$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  local f="$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
   grep -q 'pr-review' "$f"
   grep -qi 'MUST leave a summary comment' "$f"
   grep -qi 'MUST have green CI before approving' "$f"
@@ -152,11 +152,11 @@ _agent_render_all() {
   # An archived repo is read-only: every comment, push, review and merge against
   # it fails, and the sweeps were burning runs retrying them. Both sweeps that
   # enumerate repos must drop them BEFORE acting, and report them in aggregate.
-  for f in pr-feedback-sweep issue-pr-grooming; do
+  for f in pr-sweep issue-sweep; do
     grep -qi 'archived' "$PROMPTS_DIR/$f.prompt.md.tmpl"
     grep -q 'isArchived' "$PROMPTS_DIR/$f.prompt.md.tmpl"
   done
-  grep -qi 'skipped N PRs in archived repos' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -qi 'skipped N PRs in archived repos' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
 }
 
 @test "scheduled: every sweep prompt carries a scope clamp and an injection warning" {
@@ -164,8 +164,8 @@ _agent_render_all() {
   # issue comments, container logs, HTTP bodies. Each prompt must say what the
   # session is allowed to do at all, and that what it reads is data. Losing
   # either half turns a stranger's comment into a command on an unattended box.
-  for f in "$PROMPTS_DIR"/pr-feedback-sweep.prompt.md.tmpl \
-           "$PROMPTS_DIR"/issue-pr-grooming.prompt.md.tmpl \
+  for f in "$PROMPTS_DIR"/pr-sweep.prompt.md.tmpl \
+           "$PROMPTS_DIR"/issue-sweep.prompt.md.tmpl \
            "$PROMPTS_DIR"/stumpcloud-sweep.prompt.md; do
     grep -qi '## Scope clamp' "$f"
     grep -qi 'Untrusted content' "$f"
@@ -184,7 +184,7 @@ _agent_render_all() {
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output"
-  for name in pr-feedback-sweep issue-pr-grooming stumpcloud-sweep; do
+  for name in pr-sweep issue-sweep stumpcloud-sweep; do
     echo "$rendered" | grep -q "$name" || { echo "missing harness $name"; false; }
   done
   # one clamp sentence per scheduled harness
@@ -207,16 +207,16 @@ _agent_render_all() {
       || { echo "$f still carves out a force-push exception"; return 1; }
   done
   # ...and the replacement route is spelled out where the conflict case lives.
-  grep -q 'replay this PR' "$PROMPTS_DIR/pr-feedback-sweep.prompt.md.tmpl"
+  grep -q 'replay this PR' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
   return 0
 }
 
-@test "scheduled: grooming prompt keeps the repo lists + comment-before-close rule" {
-  grep -q 'stumpcloud' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
-  grep -q 'joestump/signal-mcp' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
-  grep -qi 'Always leave a comment before closing' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
-  # grooming must never close the pr-feedback-sweep's own PRs
-  grep -qi 'never close PRs authored by' "$PROMPTS_DIR/issue-pr-grooming.prompt.md.tmpl"
+@test "scheduled: issue-sweep prompt keeps the repo lists + comment-before-close rule" {
+  grep -q 'stumpcloud' "$PROMPTS_DIR/issue-sweep.prompt.md.tmpl"
+  grep -q 'joestump/signal-mcp' "$PROMPTS_DIR/issue-sweep.prompt.md.tmpl"
+  grep -qi 'Always leave a comment before closing' "$PROMPTS_DIR/issue-sweep.prompt.md.tmpl"
+  # grooming must never close the pr-sweep's own PRs
+  grep -qi 'Any pull request, for any reason' "$PROMPTS_DIR/issue-sweep.prompt.md.tmpl"
 }
 
 @test "scheduled: old standalone sweep units retired everywhere" {
@@ -238,25 +238,77 @@ _agent_render_all() {
   # everything the schedule depends on must be embedded in it.
   for f in dot_config/harness/harness.toml.tmpl \
            dot_config/harness/harness.d/stumpcloud-sweep.toml.tmpl \
-           dot_config/harness/harness.d/pr-feedback-sweep.toml.tmpl \
-           dot_config/harness/harness.d/issue-pr-grooming.toml.tmpl \
+           dot_config/harness/harness.d/pr-sweep.toml.tmpl \
+           dot_config/harness/harness.d/issue-sweep.toml.tmpl \
            dot_config/dotfiles/stumpcloud-sweep.prompt.md \
-           dot_config/dotfiles/pr-feedback-sweep.prompt.md.tmpl \
-           dot_config/dotfiles/issue-pr-grooming.prompt.md.tmpl; do
+           dot_config/dotfiles/pr-sweep.prompt.md.tmpl \
+           dot_config/dotfiles/issue-sweep.prompt.md.tmpl; do
     grep -q "$f" "$RELOAD_SCRIPT" || return 1
   done
   grep -q 'harness reload\|HARNESS_BIN" reload' "$RELOAD_SCRIPT" || return 1
 }
 
-@test "scheduled: human logins get none of it" {
-  # .chezmoiignore keeps the prompts off human logins; each harness.d drop-in
-  # gates its table on the -agent suffix (the main config no longer carries
-  # the scheduled block at all).
-  grep -q 'pr-feedback-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
-  grep -q 'issue-pr-grooming.prompt.md' "$REPO_ROOT/.chezmoiignore"
+@test "scheduled: human logins get pr-sweep and nothing else" {
+  # pr-sweep is the ONE sweep that runs under both identities - that is what
+  # keeps Joe reviewing the agent's PRs on a schedule instead of by hand. The
+  # other two stay agent-only. Both gates have to agree: .chezmoiignore must
+  # ship the prompt, and the drop-in must declare the table.
+  grep -q 'issue-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
+  grep -q 'stumpcloud-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
+  ! grep -q 'pr-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
+
+  # agent-only drop-ins keep the suffix gate; pr-sweep must NOT have one
+  grep -q 'hasSuffix "-agent"' "$HARNESS_D/issue-sweep.toml.tmpl"
+  grep -q 'hasSuffix "-agent"' "$HARNESS_D/stumpcloud-sweep.toml.tmpl"
+  ! grep -q '{{ if hasSuffix "-agent"' "$HARNESS_D/pr-sweep.toml.tmpl"
+}
+
+@test "scheduled: a human login renders pr-sweep only, on its own cadence" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local cfgdir out
+  cfgdir="$(mktemp -d)"
+  printf '[data]\n    agentIdentity = "ci-human"\n' >"$cfgdir/chezmoi.toml"
+  out=""
   for f in "$HARNESS_D"/*.toml.tmpl; do
-    grep -q 'hasSuffix "-agent"' "$f" || return 1
+    out+="$(chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f")"
   done
+  rm -rf "$cfgdir"
+  # the one sweep a human runs, staggered off the agent's 09:30
+  grep -q '^\[harness\.pr-sweep\]' <<<"$out"
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* \*"'
+  # and none of the agent-only ones
+  ! grep -q '^\[harness\.issue-sweep\]' <<<"$out"
+  ! grep -q '^\[harness\.stumpcloud-sweep\]' <<<"$out"
+}
+
+@test "scheduled: the two sweeps are disjoint — issues here, PRs there" {
+  # They used to overlap: issue-pr-grooming closed PRs as well as issues, kept
+  # off pr-feedback-sweep's toes only by a "not the acting identity's own PRs"
+  # carve-out. Now each owns one object type outright.
+  local iss="$PROMPTS_DIR/issue-sweep.prompt.md.tmpl"
+  local prs="$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  grep -qi 'You own issues. You do not touch pull requests' "$iss"
+  grep -qi 'You own pull requests. You do not touch issues' "$prs"
+  # the issue sweep must no longer carry PR-closing rules
+  ! grep -qi '^### PRs — close if ANY apply' "$iss"
+  # and the PR sweep owns closing them instead
+  grep -qi 'close stale and superseded PRs' "$prs"
+}
+
+@test "scheduled: issue sweep triages on evidence and sizes, not on age" {
+  # The old rules closed anything untouched for 90 days. Age is now explicitly
+  # not a closing reason, a merged PR's closing keyword is not evidence, and
+  # every surviving issue gets exactly one size/* label.
+  local f="$PROMPTS_DIR/issue-sweep.prompt.md.tmpl"
+  grep -qi 'Age is not evidence' "$f"
+  grep -qi 'is \*\*not\*\* evidence' "$f"
+  ! grep -qi 'Stale with no activity for 90+ days' "$f"
+  for l in 'size/S' 'size/M' 'size/L' 'size/XL'; do
+    grep -q "$l" "$f" || return 1
+  done
+  grep -qi 'exactly one' "$f"
+  # and the retired competing scale must not come back
+  grep -qi 'sonnet-ready' "$f"
 }
 
 @test "scheduled: every sweep is pinned to glm-5.2 on Hyper" {
@@ -264,13 +316,13 @@ _agent_render_all() {
   # appends --model), so a config-wide model change can never silently retarget
   # them.
   run _agent_render_all
-  for name in stumpcloud-sweep pr-feedback-sweep issue-pr-grooming; do
+  for name in stumpcloud-sweep pr-sweep issue-sweep; do
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "hyper/glm-5.2"' || return 1
   done
 }
 
 @test "scheduled: prompts carry the Harness attribution footer, no PII" {
-  for f in pr-feedback-sweep issue-pr-grooming; do
+  for f in pr-sweep issue-sweep; do
     grep -qF 'Executed via scheduled [Harness]' "$PROMPTS_DIR/$f.prompt.md.tmpl"
     grep -q 'openrouter.ai' "$PROMPTS_DIR/$f.prompt.md.tmpl"
     # No phone numbers in the repo (identity values resolve from env at runtime)
@@ -283,7 +335,7 @@ _agent_render_all() {
 # link is unopenable. Assert on the RENDERED prompt so a stale .chezmoidata
 # value or a hardcoded Gitea URL both fail here.
 @test "scheduled: the Harness attribution link is the public GitHub mirror, never Gitea" {
-  for f in pr-feedback-sweep issue-pr-grooming; do
+  for f in pr-sweep issue-sweep; do
     local out
     out="$(chezmoi execute-template --source "$REPO_ROOT" < "$PROMPTS_DIR/$f.prompt.md.tmpl")"
     grep -qF '[Harness](https://github.com/stump-wtf/harness)' <<< "$out"
@@ -294,7 +346,7 @@ _agent_render_all() {
 # The drop-ins are where a future editor adds the next scheduled sweep, so the
 # rule has to be visible there too, not only in the prompt files.
 @test "scheduled: drop-ins record the public-link rule for the attribution footer" {
-  for f in pr-feedback-sweep issue-pr-grooming stumpcloud-sweep; do
+  for f in pr-sweep issue-sweep stumpcloud-sweep; do
     grep -q 'ATTRIBUTION LINKS ARE PUBLIC' "$REPO_ROOT/dot_config/harness/harness.d/$f.toml.tmpl"
   done
 }

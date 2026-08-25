@@ -52,6 +52,80 @@ Two different rules, and picking the wrong one files the issue where nobody will
 
 **Links stay honest either way:** a story/PR/source-file link always points at the repo the *code* lives in (e.g. `stumpcloud/ansible/...`); only the **issue** moves when the rule above says it does.
 
+## Sizing an issue — the `size/*` ladder
+
+Every open issue in a repo we own carries **exactly one** `size/*` label. It answers one
+question: *what is the weakest model that can take this issue and carry it end to end* —
+read it, find the code, make the change, write the tests, and not get lost.
+
+| Label | Anchor model | What lands here |
+|---|---|---|
+| `size/S` | an older Haiku | Mechanical and localized. Docs, config, a rename, a dependency bump, a one-line fix whose location the issue already names. No design judgment, no cross-file reasoning. |
+| `size/M` | Opus 4.6 Max | One subsystem, a handful of files. The design is already decided in the issue or an existing spec; the work is implementing and testing it. Bug fixes needing real diagnosis but in a bounded area. |
+| `size/L` | Sonnet 5 | Spans subsystems, or introduces a new component inside an established architecture. Design choices within stated constraints, schema/state migrations, concurrency or protocol work, substantial test surface. |
+| `size/XL` | Opus 5 / Fable 5 | Epics. Cross-repo or cross-service work. New architecture, protocol, or security model. Anything that needs an ADR or spec written first. Anything whose problem statement is still ambiguous and needs investigation before implementation. |
+
+Tie-breakers, in order:
+
+- An `epic` label means `size/XL` **unless** it is a thin tracking wrapper over children
+  that are all `S` — then size it like its children.
+- A long "Requirements" checklist pushes an issue up a bucket.
+- Security-critical work, credential handling, and data migrations push up a bucket.
+- A well-written issue that names exact files and line numbers pulls *down* a bucket —
+  the work is smaller when the search is already done.
+
+**One scale only.** Do not run `size/*` alongside a second capability scale
+(`model/haiku`, `sonnet-ready`, and friends are retired). Two scales that disagree are
+worse than no scale, because nobody knows which one is current.
+
+## Triaging an issue — is it still real?
+
+Sizing is worthless on an issue that should be closed. Give every issue a verdict before
+you give it a size:
+
+| Verdict | Meaning | Action |
+|---|---|---|
+| `OK` | Valid and actionable as written | Size it, leave it open |
+| `STALE` | The work is already done | Close, with the evidence |
+| `SUPERSEDED` | A design change made this issue describe something we deliberately did *not* build | Close or rewrite against the current design |
+| `DUP` | Another issue covers it | Close, naming the survivor |
+| `BLOCKED` | Real, but hard-gated on another issue | Leave open, name the blocker |
+| `HUMAN` | No model can do it — physical access, a browser-only vendor signup, a personal decision, contacting someone | Leave open, flag it for Joe |
+| `BOT` | Renovate Dependency Dashboards and similar | **Never size, never close.** They are bot-managed and re-open themselves. |
+
+### Verify before you close — the rule that matters
+
+**A merged PR saying `Closes #N` is not evidence that #N is fixed.** Neither is an issue's
+age, and neither is a PR title that sounds right. The only evidence that work is done is
+**the current state of the code on `main`**. Go read it.
+
+This is not hypothetical. In the 2026-08-25 backlog triage, of the issues a merged PR
+claimed to close, two were untouched: `stump.wtf/reduit#180`'s exact wrong comment was
+still in both files it named, and `stump.wtf/msgbrowse#244`'s "tagging produces no release
+assets" still reproduced on the newest release. Both would have been wrongly closed on the
+PR reference alone.
+
+Conversely, issues go stale **silently**: a PR that fixes the thing without a closing
+keyword leaves the issue open forever. Eight of `stump.wtf/mixtape`'s issues were fixed
+that way. So the check runs in both directions — never trust the tracker's own bookkeeping
+in either.
+
+**Age is a prompt to look, never a reason to close.** A backlog filed in one planning
+session is uniformly old and uniformly valid; a two-week-old issue in a fast-moving repo
+can already be obsolete. Close on evidence, not on a date. If you cannot get evidence,
+leave it open and say why.
+
+### Closing well
+
+Leave a comment before every close, and make the comment carry the evidence — the file and
+line, the PR number, the spec section — not just a verdict. The next person reading the
+closed issue should be able to check your work without redoing it. Where a repo's issues
+have dependencies recorded, a stale blocking link can refuse the close (Gitea returns
+`412`); fix the wrong link rather than forcing past it.
+
+When an issue is only *partly* done, do not close it — narrow it. Say what shipped, say
+what remains, and leave it open scoped to the remainder.
+
 ## Git workflow
 
 These rules are host-, OS- and harness-agnostic. Everything below works identically on macOS and Linux, on Gitea and GitHub, from any agent. Where a host differs, only the *command* differs — the rule does not.
