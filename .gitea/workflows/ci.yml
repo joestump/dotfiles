@@ -6,14 +6,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats + zsh + jq + chezmoi
+      - name: Install bats + zsh + jq + chezmoi + shellcheck
         # chezmoi lets the render-based suites (chezmoiexternal.bats,
         # vault-agent-stale.bats) actually run here instead of skipping; jq backs
         # the approle-setup identity-merge path exercised by
         # vault-approle-blast-radius.bats; python3 backs the crush-providers
-        # JSON validation in the bats job.
+        # JSON validation in the bats job; shellcheck lets lint-shell.bats
+        # exercise the real gate rather than skipping past it.
         run: |
-          sudo apt-get update && sudo apt-get install -y bats zsh jq python3 make
+          sudo apt-get update && sudo apt-get install -y bats zsh jq python3 make shellcheck
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: BATS suite
@@ -27,24 +28,25 @@ jobs:
       - name: Install lint tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck zsh jq yamllint python3
+          sudo apt-get install -y shellcheck zsh jq yamllint python3 make
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: ShellCheck — plain scripts
-        run: |
-          git ls-files 'scripts/*.sh' 'run_*.sh' 'dot_config/dotfiles/*.sh' '.githooks/pre-commit' '.chezmoiscripts/*.sh' \
-            | xargs -r shellcheck -x -e SC1091
-
-      - name: ShellCheck — rendered chezmoi *.sh.tmpl
-        run: |
-          rc=0
-          for f in $(git ls-files '*.sh.tmpl'); do
-            echo "::group::$f"
-            chezmoi execute-template --source "$PWD" < "$f" | shellcheck -x -e SC1091 - || rc=1
-            echo "::endgroup::"
-          done
-          exit $rc
+      - name: ShellCheck — plain scripts + rendered chezmoi templates
+        # Deliberately a `make` target, not an inline copy of the globs. The old
+        # inline version drifted from the Makefile — the Makefile's glob missed
+        # every `.chezmoiscripts/*.sh.tmpl`, so a contributor's green `make
+        # lint` said nothing about the scripts that run on every apply, while
+        # only CI knew. scripts/lint-shell.sh is now the single definition of
+        # what "shell lint" means, and both callers run it. It also renders
+        # each template across its `.chezmoi.os` and `-agent` gate variants,
+        # which this ubuntu runner could not otherwise reach: before, the
+        # darwin-only branches were never linted anywhere in CI.
+        #
+        # `lint-shell` rather than `lint` because secret scanning has its own
+        # workflow (gitleaks.yaml) with the shared action; this runner has no
+        # gitleaks binary and does not need one.
+        run: make lint-shell
 
       - name: zsh -n — shell config
         run: |

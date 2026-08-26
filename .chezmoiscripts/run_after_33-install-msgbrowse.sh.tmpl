@@ -52,15 +52,15 @@ brew update --quiet >/dev/null 2>&1 || warn "brew update failed; installing from
 # install-or-upgrade, per package, each independently soft-failing.
 brew_sync() {
   local kind="$1" pkg="$2" label="$3"
-  if brew list $kind "$pkg" >/dev/null 2>&1; then
-    if brew outdated $kind "$pkg" >/dev/null 2>&1 && [ -n "$(brew outdated $kind "$pkg" 2>/dev/null)" ]; then
-      if brew upgrade $kind "$pkg" >/dev/null 2>&1; then item ok "$label upgraded"
+  if brew list ${kind:+"$kind"} "$pkg" >/dev/null 2>&1; then
+    if brew outdated ${kind:+"$kind"} "$pkg" >/dev/null 2>&1 && [ -n "$(brew outdated ${kind:+"$kind"} "$pkg" 2>/dev/null)" ]; then
+      if brew upgrade ${kind:+"$kind"} "$pkg" >/dev/null 2>&1; then item ok "$label upgraded"
       else warn "$label upgrade failed (app running?); retrying next apply"; fi
     else
       item ok "$label up to date"
     fi
   else
-    if brew install $kind "$pkg" >/dev/null 2>&1; then item ok "$label installed"
+    if brew install ${kind:+"$kind"} "$pkg" >/dev/null 2>&1; then item ok "$label installed"
     else warn "$label install failed; retrying next apply"; fi
   fi
 }
