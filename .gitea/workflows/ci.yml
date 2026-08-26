@@ -33,7 +33,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: ShellCheck — plain scripts + rendered chezmoi templates
-        # Deliberately `make lint`, not an inline copy of the globs. The old
+        # Deliberately a `make` target, not an inline copy of the globs. The old
         # inline version drifted from the Makefile — the Makefile's glob missed
         # every `.chezmoiscripts/*.sh.tmpl`, so a contributor's green `make
         # lint` said nothing about the scripts that run on every apply, while
