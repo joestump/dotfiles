@@ -335,13 +335,32 @@ _agent_render_all() {
   grep -qi 'sonnet-ready' "$f"
 }
 
-@test "scheduled: every sweep is pinned to glm-5.2 on Hyper" {
+@test "scheduled: every sweep is pinned per entry, to its own cheap model" {
   # Unattended permission-free runs — the model is pinned per entry (harness
   # appends --model), so a config-wide model change can never silently retarget
   # them.
+  #
+  # All three moved off hyper/glm-5.2 on 2026-08-28 in the Hyper cost review:
+  # prism is the router (it picks per prompt, so an idle health check and a real
+  # PR review do not pay the same rate), and qwen3.8-flash is the cheap fixed
+  # pin for the bounded weekly issue pass.
   run _agent_render_all
-  for name in stumpcloud-sweep pr-sweep issue-sweep; do
-    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "hyper/glm-5.2"' || return 1
+  for pin in stumpcloud-sweep:prism pr-sweep:prism issue-sweep:qwen3.8-flash; do
+    name=${pin%%:*}
+    model=${pin##*:}
+    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
+  done
+}
+
+@test "scheduled: no sweep runs on a premium-tier model" {
+  # The sweeps are unattended and metered per token, so an expensive pin is a
+  # bill nobody is watching accrue. kimi-k3 in particular is what the crush-signal
+  # pin silently drifted to ($3.27/M in, $16.33/M out); it must never reach a
+  # cron one-shot. glm-5.2 is listed because these three were on it until the
+  # cost review, and a careless revert is the likely way it comes back.
+  run _agent_render_all
+  for model in kimi-k3 kimi-k2.7-code glm-5.2 glm-5.1 deepseek-v4-pro qwen3.7-max qwen3.6-max qwen3.8-max; do
+    ! grep -q "model = \"hyper/$model\"" <<<"$output" || return 1
   done
 }
 

@@ -1,0 +1,39 @@
+{{/*
+Model pin for the crush-signal harness — MANAGED, not create_.
+
+This file used to be create_private_crush.json.tmpl, seed-once-then-never-touch,
+and that is exactly how it broke. Crush's TUI model picker rewrites its config
+in place, so a model switched during a live Signal session is written to the
+TARGET — and because create_ means "write only if absent", chezmoi had no
+opinion about it ever again. The pin below said zai/glm-5.2 while the running
+agent had drifted to hyper/kimi-k3: $3.27/M in and $16.33/M out, the priciest
+model in Hyper's catalog, at max reasoning effort, on an always-on agent
+against a metered account with auto-top-up behind it. `harness list` still
+described it as "GLM-5.2 (Z.ai)" the whole time.
+
+Managed means the drift cannot recur: an apply now reverts the target. The
+trade is deliberate and it is the entire point — a model chosen in the TUI
+lasts until the next czu, and a permanent change is an edit HERE.
+
+Same trap harness.toml was pulled out of; see its header for the other half.
+
+PROVIDER CHOICE. Z.ai is quota-metered (hourly/weekly/monthly), not
+pay-per-token, so a busy week degrades to a hard stop rather than to a bill.
+That is the property this always-on agent wants. Hyper stays the metered
+overflow and nothing here should point at it.
+
+  large  glm-5.2        plenty for Signal work; the 5.3 tier buys nothing here
+  small  glm-5.3-flash  titles and summaries, which fire on every exchange —
+                        the cheapest way to keep those off the large quota.
+                        Replaces glm-4.7-flashx, two generations stale.
+
+@joestump-agent 08/28/2026 - Converted from create_ to managed after the pin
+  drifted to hyper/kimi-k3 undetected, and repointed small at glm-5.3-flash.
+*/ -}}
+{
+  "$schema": "https://charm.land/crush.json",
+  "models": {
+    "large": { "model": "glm-5.2", "provider": "zai" },
+    "small": { "model": "glm-5.3-flash", "provider": "zai" }
+  }
+}

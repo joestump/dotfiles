@@ -141,9 +141,19 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # trade-off is deliberate and worth knowing: a harness created through the TUI
 # does NOT survive a czu. Declare harnesses in
 # dot_config/harness/harness.toml.tmpl instead.
+#
+# ~/.local/share/crush-signal/crush.json joined this list on 2026-08-28. It was
+# create_ — seed-once — on the reasoning that it is per-machine runtime state
+# that Crush owns outright. That reasoning failed expensively: Crush's TUI model
+# picker rewrote the target during a live Signal session, and because create_
+# means "write only if absent", the drift was permanent and invisible. The pin
+# read zai/glm-5.2 while the always-on agent ran hyper/kimi-k3 — the priciest
+# model on Hyper, metered, for six days. The model an unattended agent runs is
+# declared config, not runtime state.
 czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" \
   "$HOME/.config/crush/crush.json" \
   "$HOME/.config/harness/harness.toml" \
+  "$HOME/.local/share/crush-signal/crush.json" \
   "$HOME/.gitconfig")"
 for czu_reassert_line in ${(f)czu_reassert_out}; do
   case "$czu_reassert_line" in
