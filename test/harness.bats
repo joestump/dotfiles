@@ -128,7 +128,7 @@ for fname, dd in docs.items():
     names |= set(dd['harness'])
 assert names == {'crush-signal', 'claude-code', 'claude-headless',
                  'stumpcloud-sweep', 'pr-sweep', 'issue-sweep',
-                 'blog-sweep'}, sorted(names)
+                 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never

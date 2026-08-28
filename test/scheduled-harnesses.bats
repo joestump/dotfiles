@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# The scheduled harnesses: three one-shot prompt harnesses, one drop-in file
+# The scheduled harnesses: five one-shot prompt harnesses, one drop-in file
 # each in dot_config/harness/harness.d/*.toml (stumpcloud-sweep every 6h,
-# pr-sweep daily, issue-sweep weekly), agent logins only,
+# pr-sweep daily, issue-sweep + blog-sweep + navidrome-ldap-sync weekly), agent logins only,
 # replacing the retired standalone stumpcloud-sweep systemd timer / launchd
 # agent. These tests pin the couplings: every scheduled entry points at a
 # prompt file that actually ships, the old units are gone from source AND
@@ -51,10 +51,10 @@ _agent_render_all() {
   done
 }
 
-@test "scheduled: three scheduled harnesses declared with prompt + cron" {
+@test "scheduled: five scheduled harnesses declared with prompt + cron" {
   run _agent_render_all
   [ "$status" -eq 0 ]
-  for name in stumpcloud-sweep pr-sweep issue-sweep; do
+  for name in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync; do
     grep -qE "^\[harness\.$name\]" <<<"$output" || return 1
     # every scheduled entry needs `prompt` and a 5-field cron `schedule`
     grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -q '^prompt = ' || return 1
@@ -98,22 +98,23 @@ _agent_render_all() {
   # always a prompt harness (`schedule` requires `prompt`), which defaults to
   # "no" instead -- the same value, arrived at silently. So the explicit line
   # is the only thing that states the intent, and the only thing that still
-  # holds if the prompt-harness default ever changes. Assert all four are
+  # holds if the prompt-harness default ever changes. Assert all five are
   # present and are "no".
-  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 4 ]
+  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 5 ]
 }
 
-@test "scheduled: cadences — sweep 6h, pr daily, issue + blog weekly" {
+@test "scheduled: cadences — sweep 6h, pr daily, issue + blog + navidrome weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
   grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
   grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
+  grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 0"'
 }
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
   run _agent_render_all
-  for f in stumpcloud-sweep pr-sweep issue-sweep; do
+  for f in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync; do
     grep -q "$f.prompt.md" <<<"$output" || return 1
     # pr-feedback/grooming are templates (identity vars); the sweep prompt is
     # identity-free markdown. Either way the template must render cleanly.
@@ -191,6 +192,7 @@ _agent_render_all() {
   # either half turns a stranger's comment into a command on an unattended box.
   for f in "$PROMPTS_DIR"/pr-sweep.prompt.md.tmpl \
            "$PROMPTS_DIR"/issue-sweep.prompt.md.tmpl \
+           "$PROMPTS_DIR"/navidrome-ldap-sync.prompt.md.tmpl \
            "$PROMPTS_DIR"/stumpcloud-sweep.prompt.md; do
     grep -qi '## Scope clamp' "$f"
     grep -qi 'Untrusted content' "$f"
@@ -209,13 +211,13 @@ _agent_render_all() {
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output"
-  for name in pr-sweep issue-sweep stumpcloud-sweep blog-sweep; do
+  for name in pr-sweep issue-sweep stumpcloud-sweep blog-sweep navidrome-ldap-sync; do
     echo "$rendered" | grep -q "$name" || { echo "missing harness $name"; false; }
   done
   # one clamp sentence per scheduled harness
-  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 4 ]
-  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 4 ]
-  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 4 ]
+  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 5 ]
+  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 5 ]
+  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 5 ]
 }
 
 # The base agent rules ban force-pushing outright, but the sweep prompts are a
