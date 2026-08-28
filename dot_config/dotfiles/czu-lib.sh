@@ -102,11 +102,10 @@ czu_sync_prod() {
 # instead — either way the render stops landing, forever, because answering
 # the prompt once doesn't stop the app writing again.
 #
-# For a target listed here the RENDER is the whole truth (runtime state
-# belongs in the app's own data config, e.g. ~/.local/share/crush-signal/
-# crush.json), so the resolution is always "overwrite": verify the target
-# first, and only when it differs force-apply just that target, before the
-# main apply runs. The main apply then finds it clean and never needs to ask.
+# For a target listed here the RENDER is the whole truth, so the resolution is
+# always "overwrite": verify the target first, and only when it differs
+# force-apply just that target, before the main apply runs. The main apply
+# then finds it clean and never needs to ask.
 #
 # SRCDIR is the production clone; it is passed explicitly (--source) so the
 # reassert renders the same tree the main apply will, even mid-migration when

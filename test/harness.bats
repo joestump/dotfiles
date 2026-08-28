@@ -14,7 +14,7 @@ HARNESS_ENV="$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
 # chezmoi wants to chmod 644 on every apply, and because crush has also rewritten
 # the contents it stops to ask "…has changed since chezmoi last wrote it?" —
 # which wedges any non-interactive apply. Attribute order is create_ then private_.
-MODEL_PIN="$REPO_ROOT/dot_local/share/crush-signal/create_private_crush.json.tmpl"
+MODEL_PIN="$REPO_ROOT/dot_local/share/crush-signal/private_crush.json.tmpl"
 CRUSH_JSON="$REPO_ROOT/dot_config/crush/crush.json.tmpl"
 
 _render() {
@@ -46,14 +46,36 @@ _render() {
     "$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh"
 }
 
-@test "harness: the crush model pin STAYS create_ (crush owns it outright)" {
-  # Unchanged by the harness.toml switch. crush rewrites this on every model
-  # change and nothing in it needs to propagate — it is per-machine state, not
-  # declared config.
+@test "harness: the crush model pin is NOT create_ (the drift guard)" {
+  # This was create_ until 2026-08-28, on the reasoning that crush rewrites it
+  # on every model change so it is per-machine state rather than declared
+  # config. That reasoning cost real money. Crush's TUI model picker rewrote
+  # the TARGET mid-session, and create_ means "write only if absent" — so
+  # chezmoi never had an opinion about it again. The pin said zai/glm-5.2 while
+  # the always-on Signal agent actually ran hyper/kimi-k3 ($3.27/M in,
+  # $16.33/M out, max reasoning effort) against a metered account, for six days,
+  # while `harness list` still displayed "GLM-5.2 (Z.ai)".
+  #
+  # The model an unattended agent runs is declared config. Same conclusion
+  # harness.toml reached above, for the same reason, and handled the same way:
+  # czu_reassert_targets absorbs the TUI rewrite (see the test below).
+  #
+  # Deliberate consequence: a model picked in the Crush TUI lasts until the
+  # next czu. A permanent change is an edit to the template.
+  [ -f "$MODEL_PIN" ]
   case "$MODEL_PIN" in
-    */create_private_crush.json.tmpl) ;;
-    *) fail "crush model pin must stay create_private_, got: $MODEL_PIN" ;;
+    */create_*) fail "crush model pin must NOT be create_ — that is how it drifted to kimi-k3" ;;
   esac
+  [ ! -f "$REPO_ROOT/dot_local/share/crush-signal/create_private_crush.json.tmpl" ]
+}
+
+@test "harness: czu reasserts the crush model pin, since the TUI rewrites it" {
+  # Managed-but-app-rewritten trips chezmoi's changed-since-last-write guard:
+  # interactive apply prompts, scheduled apply silently skips. Without this the
+  # switch away from create_ would trade one silent no-op for another — and on
+  # the agent box, which runs unattended, it would be the silent one.
+  grep -q '"\$HOME/.local/share/crush-signal/crush.json"' \
+    "$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh"
 }
 
 @test "harness: the crush model pin is private_ (0600) so apply never prompts" {
@@ -63,8 +85,8 @@ _render() {
   # The mode comes from the filename attribute, not the file's own bits — git
   # only records the exec bit, so 0600 can never be carried by the blob.
   case "$MODEL_PIN" in
-    */create_private_crush.json.tmpl) ;;
-    *) fail "model pin must be create_private_ (0600), got: $MODEL_PIN" ;;
+    */private_crush.json.tmpl) ;;
+    *) fail "model pin must be private_ (0600), got: $MODEL_PIN" ;;
   esac
 }
 
@@ -293,15 +315,21 @@ assert \"env_file\" not in h, h
   [ "$status" -ne 0 ]
 }
 
-@test "harness: the model pin is glm-5.2 on the zai provider specifically" {
+@test "harness: the model pin is glm-5.2 on the zai provider, and never hyper" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   # glm-5.2 is served by BOTH zai and hyper, so the provider must be pinned too.
+  #
+  # The always-on agent belongs on Z.ai specifically: Z.ai is quota-metered, so
+  # a busy week degrades to a hard stop, while Hyper is pay-per-token and
+  # degrades to a bill. Assert NEITHER slot points at hyper — the drift that
+  # motivated this test moved both of them there at once.
   run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$MODEL_PIN' | python3 -c '
 import json,sys
 m = json.load(sys.stdin)[\"models\"]
 assert m[\"large\"] == {\"model\": \"glm-5.2\", \"provider\": \"zai\"}, m[\"large\"]
 assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
+assert all(v[\"provider\"] != \"hyper\" for v in m.values()), m
 '"
   [ "$status" -eq 0 ]
 }
