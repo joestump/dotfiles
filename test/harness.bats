@@ -127,7 +127,8 @@ for fname, dd in docs.items():
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
 assert names == {'crush-signal', 'claude-code', 'claude-headless',
-                 'stumpcloud-sweep', 'pr-sweep', 'issue-sweep'}, sorted(names)
+                 'stumpcloud-sweep', 'pr-sweep', 'issue-sweep',
+                 'blog-sweep'}, sorted(names)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
