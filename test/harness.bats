@@ -200,11 +200,17 @@ PY"
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   # Both keys used to be omitted, and the default restart_delay is 0 - an
-  # instant respawn. The daemon gives up after 3 exits in a 10s window plus 5
-  # backoff attempts and latches FAILED, which is terminal, so a fast-failing
-  # agent was permanently gone in ~30s with nobody at a desk to notice. The
-  # delay must stay wider than that 10s crash window's per-retry spacing, so a
-  # transient upstream failure is retried instead of latching.
+  # instant respawn. The daemon gives up after 5 consecutive failed runs and
+  # latches FAILED, which is terminal, so a fast-failing agent was permanently
+  # gone in ~30s with nobody at a desk to notice. A non-zero delay spreads the
+  # attempt budget over minutes, giving a transient upstream failure room to
+  # clear inside it.
+  #
+  # restart itself is "always" OR "on-failure" for a long-running harness.
+  # "always" respawns on a CLEAN exit too, and a clean exit clears the
+  # consecutive-failure counter — so exit-0 looping is the one loop give-up
+  # cannot break. That is survivable for the Claude harnesses (flat-rate) and
+  # not for a metered one; see the crush-signal check below.
   # EXCEPTION - scheduled one-shots: config validation rejects restart=always
   # (respawning a one-shot after its clean exit makes the schedule meaningless);
   # they pin on-failure so a crashed run retries, and need no delay. They live
@@ -234,10 +240,31 @@ for name, h in harnesses.items():
     if 'schedule' in h:
         assert h.get('restart') in ('no', 'on-failure'), (name, h.get('restart'))
     else:
-        assert h.get('restart') == 'always', (name, h.get('restart'))
+        assert h.get('restart') in ('always', 'on-failure'), (name, h.get('restart'))
         assert h.get('restart_delay', 0) >= 5, (name, h.get('restart_delay'))
 PY"
   rm -rf "$_cfgdir" "$_cfgdir2"; [ "$status" -eq 0 ]
+}
+
+@test "harness: crush-signal is on-failure, because it is the metered one" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # crush-signal is the only always-on harness that costs money per launch, so
+  # it is the only one that must not respawn into a wall. "always" respawns on
+  # a clean exit, and a clean exit CLEARS the daemon's consecutive-failure
+  # counter — the one loop give-up can never break, and the one that bills for
+  # every lap. "on-failure" walks the 6-attempt budget and parks in `failed`.
+  #
+  # The delay is deliberately larger than its siblings': the budget is 6
+  # attempts either way, so spreading them over minutes instead of seconds
+  # costs no extra launches and lets a provider blip clear inside the budget.
+  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
+import sys, tomllib
+h = tomllib.loads(sys.stdin.read())[\"harness\"][\"crush-signal\"]
+assert h[\"restart\"] == \"on-failure\", h[\"restart\"]
+assert h[\"restart_delay\"] >= 30, h[\"restart_delay\"]
+'"
+  [ "$status" -eq 0 ]
 }
 
 @test "harness: claude-code is Remote Control + skip-permissions, no Signal wiring" {
