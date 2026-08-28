@@ -43,12 +43,36 @@
 # fast-failing crush burns all five attempts in about half a minute and is gone
 # until someone runs `harness start`, from a phone, having had no notification.
 #
-# restart_delay = 5 spaces retries wider than the 10s crash window, so a
-# transient failure (Z.ai 5xx, a Signal reconnect, an OOM) is retried
-# indefinitely instead of latching. The deliberate trade: a genuinely broken
-# harness now retries forever rather than surfacing as `failed` in
-# `harness doctor` — for a phone-driven agent, self-healing beats a tidy error
-# state nobody is at a desk to read.
+# That paragraph describes the give-up rule as it WAS, and the rule has since
+# changed. Read this half.
+#
+# Give-up used to be gated on `flapping`, which only trips on 3 exits inside
+# the 10s crash window. Spacing retries wider than that window (delay = 5)
+# therefore made give-up UNREACHABLE, and this note used to record that as a
+# deliberate trade: retry forever, because for a phone-driven agent
+# self-healing beats an error state nobody is at a desk to read.
+#
+# It was not a trade, it was the outage. A harness failing reliably but slowly
+# outlived the crash window on every run, reset the counter every time, and
+# reported `flapping no` throughout — while restarting 6,212 times and
+# exhausting the provider's weekly quota. harness fixed it upstream by giving
+# consecutive-failure accounting its own clock: a run clears the counter only
+# by exiting cleanly or by lasting HealthyRun (5 min), and MaxRestarts (5) is
+# checked against THAT (supervisor.go, "Consecutive-failure accounting").
+#
+# So a broken harness now parks in `failed` after ~6 attempts whatever
+# restart_delay says, which is what we wanted all along. Two holes remain, and
+# only the first is fixable from this file:
+#
+#   1. `restart = "always"` respawns on a CLEAN exit too, and a clean exit
+#      CLEARS the failure counter — so an exit-0 loop is the one loop give-up
+#      can never break. Use "on-failure" for anything that costs money per
+#      launch; see crush-signal below.
+#   2. A harness that runs LONGER than HealthyRun before dying resets the
+#      counter every cycle and loops indefinitely. Nothing here can change
+#      that — it is daemon policy — and for a metered agent each cycle is a
+#      full session's tokens. Watch the provider's dashboard, not
+#      `harness list`.
 #
 # Every agent below runs with permission prompts off, so all are
 # `enabled = false`: the daemon will NOT autostart them on boot. Start one
@@ -91,14 +115,33 @@
 # Changing this is an env_file change, NOT an OpenBao one: harness appends
 # env_file last (spawn.go buildEnv) and later duplicates shadow earlier ones, so
 # an env_file line beats anything Vault Agent renders.
+#
+# RESTART = ON-FAILURE, NOT ALWAYS. This is the only harness here that costs
+# money per launch, so it is the one that must not respawn into a wall. Two
+# ways it differs from its Claude siblings:
+#
+#   * A clean exit means the agent was told to quit, and respawning it fights
+#     whoever did that. Worse, per the note above, a clean exit clears the
+#     consecutive-failure counter — so "always" turns an exit-0 loop into the
+#     one loop the daemon's give-up rule can never break.
+#   * Z.ai is quota-metered. When the quota goes, every launch fails at
+#     stream-open; "on-failure" then walks the 6-attempt budget and parks in
+#     `failed`, visible in `harness doctor` and spending nothing further.
+#
+# restart_delay = 30, up from 5. The budget is 6 attempts either way, so a
+# longer delay buys no extra launches — it spreads them over minutes instead
+# of seconds, which gives a transient blip (a Z.ai 5xx, a Signal reconnect)
+# room to clear INSIDE the budget rather than burning it in half a minute. A
+# failed launch is not free: it starts crush, loads every MCP server, and
+# makes a provider request before it finds out.
 [harness.crush-signal]
 harness = "crush"
 args = ["--yolo", "--channels", "signal", "--channels", "switchboard"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
 description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
-restart = "always"
-restart_delay = 5
+restart = "on-failure"
+restart_delay = 30
 enabled = false
 
 # Claude Code in ~/src, driven from the Claude app / claude.ai via Remote Control.
