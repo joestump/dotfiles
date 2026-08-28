@@ -98,16 +98,17 @@ _agent_render_all() {
   # always a prompt harness (`schedule` requires `prompt`), which defaults to
   # "no" instead -- the same value, arrived at silently. So the explicit line
   # is the only thing that states the intent, and the only thing that still
-  # holds if the prompt-harness default ever changes. Assert all three are
+  # holds if the prompt-harness default ever changes. Assert all four are
   # present and are "no".
-  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 3 ]
+  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 4 ]
 }
 
-@test "scheduled: cadences — sweep 6h, pr-sweep daily, issue-sweep weekly" {
+@test "scheduled: cadences — sweep 6h, pr daily, issue + blog weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
   grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
+  grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
 }
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
@@ -208,13 +209,13 @@ _agent_render_all() {
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output"
-  for name in pr-sweep issue-sweep stumpcloud-sweep; do
+  for name in pr-sweep issue-sweep stumpcloud-sweep blog-sweep; do
     echo "$rendered" | grep -q "$name" || { echo "missing harness $name"; false; }
   done
   # one clamp sentence per scheduled harness
-  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 3 ]
-  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 3 ]
-  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 3 ]
+  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 4 ]
+  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 4 ]
+  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 4 ]
 }
 
 # The base agent rules ban force-pushing outright, but the sweep prompts are a
@@ -345,7 +346,7 @@ _agent_render_all() {
   # PR review do not pay the same rate), and qwen3.8-flash is the cheap fixed
   # pin for the bounded weekly issue pass.
   run _agent_render_all
-  for pin in stumpcloud-sweep:prism pr-sweep:prism issue-sweep:qwen3.8-flash; do
+  for pin in stumpcloud-sweep:prism pr-sweep:prism issue-sweep:qwen3.8-flash blog-sweep:qwen3.8-flash; do
     name=${pin%%:*}
     model=${pin##*:}
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
@@ -362,6 +363,46 @@ _agent_render_all() {
   for model in kimi-k3 kimi-k2.7-code glm-5.2 glm-5.1 deepseek-v4-pro qwen3.7-max qwen3.6-max qwen3.8-max; do
     ! grep -q "model = \"hyper/$model\"" <<<"$output" || return 1
   done
+}
+
+@test "scheduled: blog-sweep opens a PR and never merges" {
+  # blog-sweep is the only sweep whose output is PUBLIC and irreversible —
+  # apps.stump.wtf has no draft mode, so merged is live and CloudFront-cached.
+  # The blog-post skill's own workflow ends in merge-and-verify; the scheduled
+  # run deliberately stops at the PR so a human approves public writing. That
+  # override lives in two places and both must hold: the prompt FILE, and the
+  # one-line clamp the daemon hands the model in case the file cannot be read.
+  local f="$PROMPTS_DIR/blog-sweep.prompt.md.tmpl"
+  grep -qi 'You open a PR. You never merge' "$f"
+  grep -qi 'do not merge' "$f"
+  grep -qi 'auto-merge' "$f"
+
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  local clamp
+  clamp=$(grep -A3 '^\[harness\.blog-sweep\]' <<<"$output" | grep '^prompt =')
+  grep -q 'NEVER merges' <<<"$clamp"
+  grep -q 'never pushes to main' <<<"$clamp"
+  grep -q 'never enables auto-merge' <<<"$clamp"
+}
+
+@test "scheduled: blog-sweep may produce nothing, and says so" {
+  # A weekly cron that MUST emit a post emits filler, and filler is permanently
+  # public. The prompt has to authorize the empty run explicitly, or a model
+  # trying to be useful will invent a story out of dependency bumps.
+  local f="$PROMPTS_DIR/blog-sweep.prompt.md.tmpl"
+  grep -qi 'no post' "$f"
+  grep -qi 'successful run' "$f"
+  grep -qi 'filler' "$f"
+}
+
+@test "scheduled: blog-sweep never writes about StumpCloud" {
+  # Infra is not studio content; a public post about it is a disclosure. The
+  # skill says so, but nobody is watching this run, so the clamp is restated in
+  # both the prompt file and the daemon's one-liner.
+  grep -qi 'never stumpcloud' "$PROMPTS_DIR/blog-sweep.prompt.md.tmpl"
+  run _agent_render_all
+  grep -A3 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'never writes about the stumpcloud org'
 }
 
 @test "scheduled: prompts carry the Harness attribution footer, no PII" {
