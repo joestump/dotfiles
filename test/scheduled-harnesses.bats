@@ -147,12 +147,11 @@ if bad:
   [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 5 ]
 }
 
-@test "scheduled: cadences — sweep 6h, pr 3x/wk staggered, issue + blog + navidrome weekly" {
+@test "scheduled: cadences — sweep + pr daily, issue + blog + navidrome weekly" {
   run _agent_render_all
-  grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
-  # 3x/week, and staggered against the human side's Tue/Thu/Sat so the two
-  # identities alternate days instead of both firing daily.
-  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* 1,3,5"'
+  grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* \*"'
+  # daily, staggered 09:30 (agent) against the human side's 15:30
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
   grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
   grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 0"'
@@ -351,7 +350,7 @@ if bad:
   rm -rf "$cfgdir"
   # the one sweep a human runs, staggered off the agent's 09:30
   grep -q '^\[harness\.pr-sweep\]' <<<"$out"
-  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* 2,4,6"'
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* \*"'
   # and none of the agent-only ones
   ! grep -q '^\[harness\.issue-sweep\]' <<<"$out"
   ! grep -q '^\[harness\.stumpcloud-sweep\]' <<<"$out"
@@ -553,7 +552,7 @@ if bad:
     < "$HARNESS_D/pr-sweep.toml.tmpl"
   [ "$status" -eq 0 ]
   grep -q '^\[harness\.pr-sweep\]' <<<"$output"
-  grep -q 'schedule = "30 15 \* \* 2,4,6"' <<<"$output"
+  grep -q 'schedule = "30 15 \* \* \*"' <<<"$output"
 
   # the agent identity on the HUMAN's host -> nothing: the gate is per identity
   printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n    prSweepAgentHost = "some-other-box"\n' \
@@ -571,7 +570,7 @@ if bad:
   # An unbudgeted run chose, on its own, to do full diff reviews plus local
   # test verification on 13 third-party PRs. Every ceiling below is load-bearing.
   grep -q '## Run budget' "$p"
-  grep -q 'At most 6 PRs total' "$p"
+  grep -q 'At most 15 PRs total' "$p"
   grep -q 'Repos we own, and nothing else' "$p"
   grep -q '30 minutes' "$p"
   # Z.ai is subscription-metered, so any per-token figure is not a charge --
