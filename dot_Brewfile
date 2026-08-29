@@ -38,6 +38,18 @@ brew "tmux"                    # optional backend= for harness-supervised agents
 brew "uv"                      # Python runner — launches the Signal MCP (uv run --directory ~/src/signal-mcp)
 brew "gum"                     # charm TUI toolkit — powers the `dot`/`theme`/`status` helpers
 brew "eza"                     # modern ls — backend for the eza OMZ plugin (ls/ll/la aliases)
+brew "yt-dlp"                  # YouTube downloader — ALSO the cookie extractor behind `cookie-vault`
+                               # (--cookies-from-browser writes a Netscape jar and handles
+                               # Chrome's macOS Keychain decryption). Consumers on the fleet
+                               # (Pinchflat, Jellyfin's YoutubeMetadata) read the jar we store.
+
+# barnardb/cookies emits cookies in HTTP `Cookie:` HEADER form — handy for a
+# curl one-liner against a site you are already logged in to. It is NOT the
+# extractor for cookie-vault: header form drops domain/path/expiry/secure, so a
+# Netscape jar cannot be rebuilt from it. yt-dlp above does that job.
+tap "barnardb/cookies"
+brew "barnardb/cookies/cookies"
+
 brew "go"                      # Go toolchain — builds the crush fork (run_after_30-install-crush) and enables go-tools.txt (GOTOOLCHAIN=auto fetches newer toolchains as go.mod demands)
 # (vault — the OpenBao client — is installed OS-aware; see the note above.)
 
