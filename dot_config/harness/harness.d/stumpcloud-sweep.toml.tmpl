@@ -93,6 +93,34 @@
 #   else), so between 07:00 runs the only cover is deterministic monitoring.
 #   If that is not actually watching what this sweep watches, 12h ("0 7,19 * *
 #   *") is the safer cut.
+#
+# @joestump-agent 08/29/2026 - TRIED litellm/Qwen3.8-27B (the local dense 27B
+#   on ai01) and reverted to this pin. Recorded so nobody spends another
+#   afternoon on it.
+#
+#   The model is real, local, free, and answers plain completions in ~4.5s
+#   through the LiteLLM gateway. It CANNOT run a sweep: ai01's vLLM engine is
+#   started without `--enable-auto-tool-choice` and `--tool-call-parser`, so
+#   Crush dies at stream-open with
+#
+#     "auto" tool choice requires --enable-auto-tool-choice and
+#     --tool-call-parser to be set. Received Model Group=Qwen3.8-27B
+#
+#   A sweep is nothing but tool calls, so that is fatal, not degraded. Neither
+#   local engine has the flags — ie01's Qwen3-VL-8B is the same.
+#
+#   TO MAKE LOCAL WORK, and it is an ANSIBLE change, not a dotfiles one: add
+#   `--enable-auto-tool-choice` and `--tool-call-parser hermes` to the
+#   vllm_qwen38 engine args in stumpcloud-ansible dub.yaml, redeploy ai01, and
+#   re-test with `crush --yolo run --model litellm/Qwen3.8-27B "..."` BEFORE
+#   flipping the model line here. `crush models | grep litellm` only lists the
+#   gateway's models when the vault secrets are loaded in the shell.
+#
+#   Also correcting the record: an earlier pass concluded the fleet had no GPU
+#   able to hold a 27B. That was wrong, and for a dull reason — it read a stale
+#   ansible branch predating ai01 (created 2026-08-23). ai01 is a guest on hal
+#   with an RTX 3090 Ti + RTX 3090 passed through, 48 GB, running Qwen3.8-27B
+#   INT8 tensor-parallel at its full native 262144 context.
 {{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
 {{ if hasSuffix "-agent" $dropinUser -}}
 [harness.stumpcloud-sweep]
