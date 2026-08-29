@@ -154,6 +154,15 @@
 #   ansible branch predating ai01 (created 2026-08-23). ai01 is a guest on hal
 #   with an RTX 3090 Ti + RTX 3090 passed through, 48 GB, running Qwen3.8-27B
 #   INT8 tensor-parallel at its full native 262144 context.
+#
+# @joestump-agent 08/29/2026 - UPDATE, the blocker above is FIXED. ansible#558
+#   added `--enable-auto-tool-choice --tool-call-parser qwen3_xml` to the
+#   vllm_qwen38 engine args on ai01 and is merged and deploying. Note the
+#   parser is `qwen3_xml`, NOT `hermes` as guessed above — the checkpoint's
+#   chat template uses the XML tool-call form (read off tokenizer_config.json,
+#   not guessed). Before flipping the model line here, verify with a
+#   TOOL-USING run, not a completion — a completion passes either way:
+#   `crush --yolo run --model litellm/Qwen3.8-27B "list open PRs in stump.wtf"`.
 {{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
 {{ $isAgent := hasSuffix "-agent" $dropinUser -}}
 {{ $wantHost := "" -}}
