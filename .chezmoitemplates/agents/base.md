@@ -176,6 +176,57 @@ MIRROR ─────▶ github.com/stump-wtf/foo
 
 The direction is not always Gitea → GitHub. A few repos are GitHub-native (public-facing ones that were born there), and for those GitHub is canonical and there may be no Gitea copy at all. **Do not guess from the hostname**, and do not rely on a list of repo names — lists rot.
 
+#### reverse-gitea — GitHub canonical, synced back to Gitea
+
+A third topology, and the one most likely to catch you out, because it looks
+like the mirror case with the arrows swapped:
+
+```
+CANONICAL ──▶ github.com/{{ .githubUser }}/foo
+                · git history is authoritative — branch and push here
+                · issues + PRs live here
+                · GitHub Actions is the CI that gates merge
+                · releases and ghcr.io images are cut here
+                      │
+                      │  pull mirror: Gitea fetches from GitHub, one-way
+                      ▼
+COPY ───────▶ {{ .giteaUrl }}/stump.wtf/foo
+                · git history is a COPY, replaced on every sync
+                · issues + PRs opened here are unread
+```
+
+Fewer than five repos use this, so there is no list to memorise — read the
+topics. A reverse-gitea repo is tagged `canonical-github` on **both** copies,
+and the Gitea copy additionally carries `downstream-mirror`.
+
+**Why it exists:** the repo was born on GitHub and its release machinery lives
+there — GitHub Releases, `ghcr.io` images, an Actions pipeline other things
+consume. Moving that to Gitea would break every consumer. The Gitea copy is
+kept for internal discoverability and for the same reason the ordinary mirrors
+exist, not because anything reads it.
+
+**The sync runs the other way, and that is deliberate.** Gitea *pulls* from
+GitHub rather than GitHub pushing to Gitea, because a push mirror would mean
+storing Gitea credentials in GitHub Actions secrets — credentials to a private
+internal host, held on a public forge. A Gitea-side pull mirror needs no
+outbound trust at all.
+
+**The trap.** A reverse-gitea repo's Gitea copy is a perfectly ordinary-looking
+clone with a plausible `origin`, and `git ls-remote` against it works fine. Two
+signals give it away, and both are worth checking before you branch:
+
+- Its release/tag list is **behind** the GitHub copy's, because releases are cut
+  on GitHub. If the version actually deployed does not exist as a Gitea tag,
+  you are on the copy.
+- Deployed images come from `ghcr.io`, which only GitHub builds.
+
+Seen in the wild on `spotter`: the Gitea copy carried a stale `canonical-gitea`
+topic — alongside `wifi-scanner` and `network-scanner` topics belonging to an
+entirely different project — while GitHub held the deployed `v0.3.9`, the
+`ghcr.io` images and two weeks of newer commits. **A `canonical-*` topic that
+contradicts where the releases and images actually are is stale metadata, not
+an instruction.** Trust the artifacts, fix the topic, and say so.
+
 #### Ask the repo which host is canonical
 
 Every repo we own declares it in its own **topics**, so one API call answers the question on either host:
@@ -188,7 +239,12 @@ Every repo we own declares it in its own **topics**, so one API call answers the
 
 Both copies carry the same `canonical-*` topic, so you get the same answer wherever you land; the mirror additionally carries `downstream-mirror`. Topics are **not** replicated by the push mirror — they are per-host metadata and must be set on each side.
 
-**You are required to maintain these topics.** Set them when you create a repo (see "Creating and configuring repositories" below), and **when you touch a repo that is missing them, add them in that same session** rather than leaving the next agent to re-derive it:
+**You are required to maintain these topics** — but only where they are *missing*, and only as a one-off. Set them when you create a repo (see "Creating and configuring repositories" below), and **when you touch a repo whose topics are absent, add them in that same session** rather than leaving the next agent to re-derive it. Do not restate topics that are already correct, and do not churn a repo's topic list run after run.
+
+Two limits on doing it directly:
+
+- **If a control plane owns the field, go through it.** Gitea repositories vended by `repo-factory` have their configuration declared in `<owner>/<owner>-repositories`; setting anything by API there is drift the floor exists to prevent. Agents deliberately hold read-only Gitea repo tokens, so a `401` on a write is the system working, not a problem to route around — open a pull request, or hand it to Joe.
+- **A wrong topic is not the same as a missing one.** Correcting a topic that contradicts reality (see reverse-gitea above) is a deliberate change worth naming in your summary, not a silent fix.
 
 - **Gitea:** `PUT /repos/<owner>/<repo>/topics/<topic>` adds one without disturbing the others.
 - **GitHub:** `gh repo edit <owner>/<repo> --add-topic <topic>` — it reads and merges, where the raw `PUT /topics` API replaces the whole list.
