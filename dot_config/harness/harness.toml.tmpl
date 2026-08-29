@@ -103,6 +103,12 @@
 # when a tool is polled. Opt-in is per-server and CLI-only (there is no config
 # key for it — hence args), and both "signal" and "server:signal" are accepted.
 #
+# SIGNAL ONLY. This harness used to also carry `--channels switchboard`, which
+# split webhook duty with the phone: doorbells landed in whatever session won
+# the race, and the Switchboard queue looked dead because the events were being
+# consumed by a Signal-driven agent nobody was watching. crush-switchboard below
+# now owns the switchboard channel exclusively — do not re-add it here.
+#
 # PREFIX IS IDENTITY-CONDITIONAL — see crush-signal.env.tmpl, which renders it.
 # On a human login (joestump, e.g. kitt) the Signal account is Joe's own and its
 # Note to Self carries other automations' items, so the agent keeps the `cc`
@@ -136,10 +142,41 @@
 # makes a provider request before it finds out.
 [harness.crush-signal]
 harness = "crush"
-args = ["--yolo", "--channels", "signal", "--channels", "switchboard"]
+args = ["--yolo", "--channels", "signal"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
 description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
+restart = "on-failure"
+restart_delay = 30
+enabled = false
+
+# The Switchboard worker: Crush sitting in ~/src, woken by webhook doorbells.
+#
+# --channels switchboard opts the `switchboard` MCP server into the fork's
+# channel feature, so inbound todos (Gitea/GitHub webhook events, and anything
+# else routed into a granted queue) arrive as live events mid-session instead
+# of sitting unclaimed until something polls list_todos. Same opt-in mechanics
+# as crush-signal's signal channel: per-server, CLI-only, no config key.
+#
+# NO SIGNAL CHANNEL here, by design. One channel consumer per server: the
+# signal channel belongs to crush-signal, this one answers doorbells only.
+# Alerts that need a human go out via the signal MCP's send tools, which work
+# fine from a non-channel session.
+#
+# Same model-pinning and restart economics as crush-signal — see that block's
+# comments. CRUSH_GLOBAL_DATA in the env file repoints this harness at its own
+# ~/.local/share/crush-switchboard/crush.json (glm-5.2 / glm-5.3-flash on zai),
+# seeded once per box and NOT chezmoi-managed (it is app-owned runtime state,
+# like crush's history dir).
+#
+# @joestump-agent 08/26/2026 - Added, taking over the switchboard channel from
+#   crush-signal so webhook events have exactly one always-on consumer.
+[harness.crush-switchboard]
+harness = "crush"
+args = ["--yolo", "--channels", "switchboard"]
+workdir = "{{ .chezmoi.homeDir }}/src"
+env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-switchboard.env"
+description = "Crush · GLM-5.2 (Z.ai) · YOLO · Switchboard channel (webhook todos)"
 restart = "on-failure"
 restart_delay = 30
 enabled = false
@@ -240,13 +277,13 @@ enabled = false
 # should carry it — see stump.wtf/harness#99 for what happens when the daemon's
 # persisted active profile does not resolve (it silently starts nothing).
 [profile.default]
-description = "Everyday set — Crush Signal channel + headless Claude worker"
-harnesses = ["crush-signal", "claude-headless"]
+description = "Everyday set — Crush Signal channel + Crush Switchboard worker + headless Claude worker"
+harnesses = ["crush-signal", "crush-switchboard", "claude-headless"]
 autostart = true
 
 [profile.full]
 description = "All harnesses running"
-harnesses = ["crush-signal", "claude-code", "claude-headless"]
+harnesses = ["crush-signal", "crush-switchboard", "claude-code", "claude-headless"]
 autostart = false
 
 # Remote access — the SSH cockpit
