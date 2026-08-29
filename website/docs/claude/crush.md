@@ -60,9 +60,12 @@ unusable Crush. A test (`test/czu-run-env.bats`) greps for this.
 
 **No default model is pinned.** Crush persists your pick in its own data config
 (`~/.local/share/crush/crush.json`), which chezmoi doesn't manage. The
-`crush-signal` harness is the exception — it points `CRUSH_GLOBAL_DATA` at
-`~/.local/share/crush-signal/crush.json` to pin `glm-5.2` for that session only,
-leaving your interactive `crush` alone.
+supervised harnesses are the exception — `crush-signal` and `crush-switchboard`
+each point `CRUSH_GLOBAL_DATA` at their own `~/.local/share/<harness>/crush.json`
+to pin `glm-5.2` (zai) for that session only, leaving your interactive `crush`
+alone. Those pins **are** chezmoi-managed and czu-reasserted: the model an
+unattended agent runs is declared config, and an unpinned harness silently takes
+crush's first-enabled-provider fallback rather than failing loudly.
 
 ## MCP servers
 

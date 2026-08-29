@@ -23,6 +23,7 @@ flowchart TD
     toml --> d
     env --> unit --> d
     d --> a1["crush-signal<br/>Crush · Signal channel"]
+    d --> a1b["crush-switchboard<br/>Crush · Switchboard doorbells"]
     d --> a2["claude-code<br/>Remote Control"]
     d --> a3["claude-headless<br/>Switchboard queue worker"]
     d --> a4["scheduled sweeps<br/>cron, one-shot"]
@@ -73,12 +74,21 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 
 | Harness | What it is | Autostart |
 | --- | --- | :---: |
-| `crush-signal` | Crush on GLM-5.2 (Z.ai), `--yolo`, driven from the **Signal** and **Switchboard** channels | no |
+| `crush-signal` | Crush on GLM-5.2 (Z.ai), `--yolo`, driven from the **Signal** channel | no |
+| `crush-switchboard` | Crush on GLM-5.2 (Z.ai), `--yolo`, woken by **Switchboard** webhook doorbells | no |
 | `claude-code` | Claude Code in `~/src` with `--remote-control` — the phone becomes a second keyboard on *this* session | no |
 | `claude-headless` | Claude Code in `~/src` working the Switchboard queue | no |
 | `stumpcloud-sweep` | Scheduled: StumpCloud health sweep, every 6h | cron |
 | `pr-sweep` | Scheduled: own PRs + sibling review, PRs only; daily 09:30 agent / 15:30 human | cron |
 | `issue-sweep` | Scheduled: issue triage + `size/*` labels, issues only; Mondays 07:00 | cron |
+
+**One channel consumer per server.** `crush-signal` carried `--channels
+switchboard` alongside `signal` until 2026-08-29, and the two sessions raced for
+every doorbell: webhook events landed in whichever won, usually the phone-driven
+agent nobody was watching, so the queue looked dead while it was being drained.
+The channels are split one-per-harness now, and each crush harness points
+`CRUSH_GLOBAL_DATA` at its own data dir — so each also carries its own
+chezmoi-managed model pin under `~/.local/share/<harness>/crush.json`.
 
 The three scheduled ones are **gated on the `-agent` login suffix** — a human
 login renders only the interactive agents. Their instructions live in
@@ -111,8 +121,8 @@ Named sets that `harness use-profile` switches between. Exactly one carries
 
 | Profile | Harnesses |
 | --- | --- |
-| `default` | `crush-signal`, `claude-headless` |
-| `full` | `crush-signal`, `claude-code`, `claude-headless` |
+| `default` | `crush-signal`, `crush-switchboard`, `claude-headless` |
+| `full` | `crush-signal`, `crush-switchboard`, `claude-code`, `claude-headless` |
 
 ## Driving it
 
