@@ -166,11 +166,19 @@ enabled = false
 # Same model-pinning and restart economics as crush-signal — see that block's
 # comments. CRUSH_GLOBAL_DATA in the env file repoints this harness at its own
 # ~/.local/share/crush-switchboard/crush.json (glm-5.2 / glm-5.3-flash on zai),
-# seeded once per box and NOT chezmoi-managed (it is app-owned runtime state,
-# like crush's history dir).
+# which is chezmoi-managed and czu-reasserted exactly like crush-signal's — the
+# model an unattended agent runs is declared config, and an unpinned harness
+# silently takes crush's first-enabled-provider fallback while `harness list`
+# still shows the model this description claims.
 #
 # @joestump-agent 08/26/2026 - Added, taking over the switchboard channel from
 #   crush-signal so webhook events have exactly one always-on consumer.
+#
+# @joestump 08/29/2026 - Corrected the model-pin note during review of #197: the
+#   pin is chezmoi-managed and czu-reasserted like crush-signal's, not seeded
+#   per box. It shipped unpinned, which meant every machine but the one it was
+#   hand-seeded on would have run crush's fallback model under this GLM-5.2
+#   description.
 [harness.crush-switchboard]
 harness = "crush"
 args = ["--yolo", "--channels", "switchboard"]
