@@ -396,17 +396,21 @@ if bad:
   # prompt, so an idle health check and a real PR review do not pay the same
   # rate), and qwen3.8-flash is the cheap fixed pin for a bounded weekly pass.
   #
-  # pr-sweep moved AGAIN on 2026-08-29, to zai/glm-5.3-flash: after it burned
-  # ~$80 in an hour, a subscription plan whose session limit refuses at
-  # stream-open beats a metered one that auto-tops-up. Different provider, so
-  # it is asserted separately rather than folded into the hyper/ loop.
+  # pr-sweep AND stumpcloud-sweep moved again on 2026-08-29, to
+  # zai/glm-5.3-flash: after pr-sweep burned ~$80 in an hour, a subscription
+  # plan whose session limit refuses at stream-open beats a metered one that
+  # auto-tops-up, and flash is the cheapest option on either. The two weekly
+  # passes stay on Hyper. Different provider, so they are asserted separately
+  # rather than folded into the hyper/ loop.
   run _agent_render_all
-  for pin in stumpcloud-sweep:prism issue-sweep:qwen3.8-flash blog-sweep:qwen3.8-flash; do
+  for pin in issue-sweep:qwen3.8-flash blog-sweep:qwen3.8-flash; do
     name=${pin%%:*}
     model=${pin##*:}
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
   done
-  grep -A12 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'model = "zai/glm-5.3-flash"' || return 1
+  for name in pr-sweep stumpcloud-sweep; do
+    grep -A12 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "zai/glm-5.3-flash"' || return 1
+  done
 }
 
 @test "scheduled: no sweep runs on a premium-tier model" {
