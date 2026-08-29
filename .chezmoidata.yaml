@@ -334,3 +334,27 @@ ghostty:
     - "#1c1e2d"   # custom dark navy
     - "#1f2028"   # custom charcoal-blue
     - "#21222e"   # custom slate
+
+# Scheduled Sweep Ownership
+#
+# Which single machine arms each metered sweep, per identity. A sweep's drop-in
+# renders its `[harness.*]` table ONLY on the host named for the identity that
+# machine runs as, so the schedule fires once per identity across the fleet
+# instead of once per machine. An empty string disarms that side entirely.
+#
+# This exists because a cron in a drop-in is evaluated in each host's LOCAL
+# time. `30 15 * * *` on three machines in two timezones is three independent
+# full runs a day at three different absolute times, not one.
+#
+# @joestump-agent 08/29/2026 - Added after pr-sweep billed ~$80 of Hyper in
+# under an hour. It lost its `-agent` identity gate on 08/25 (deliberately, so
+# the human identity would sweep too) and nothing replaced it, so every
+# human-identity machine ran its own full pass. Per Joe: tars owns the
+# joestump-agent sweeps, kitt owns the joestump ones, and the MacBook runs no
+# scheduled sweeps at all — it is an interactive machine, and a sweep that
+# fires there competes with the person using it.
+sweeps:
+  # Hostnames as `.chezmoi.hostname` sees them (short name, e.g. "kitt").
+  # Empty disarms that identity's sweep fleet-wide.
+  prSweepAgentHost: "tars"
+  prSweepHumanHost: "kitt"

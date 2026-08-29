@@ -27,13 +27,22 @@ _render() {
 # root, and the scheduled block in harness.toml is gated on the `-agent`
 # suffix. Without this the scheduled-harness tests silently test nothing on a
 # human login and fail on CI's root.
+# The host this suite is running on, as the template sees it. Needed because
+# pr-sweep is host-gated (.sweeps.prSweepHost) and renders nothing unless the
+# gate matches — see "pr-sweep is disarmed fleet-wide by default" below.
+_this_host() {
+  chezmoi execute-template --source "$REPO_ROOT" <<<'{{ .chezmoi.hostname }}'
+}
+
 _agent_render() {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
   # the config format from the extension, so mint the .toml inside a temp dir.
+  # prSweepHost is armed to THIS host so the declaration-shape tests below
+  # still see pr-sweep; the gate itself is tested separately.
   local cfgdir rc
   cfgdir="$(mktemp -d)"
-  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = "%s"\n' "$(_this_host)" >"$cfgdir/chezmoi.toml"
   chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$1"
   rc=$?
   rm -rf "$cfgdir"
@@ -103,10 +112,12 @@ _agent_render_all() {
   [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 5 ]
 }
 
-@test "scheduled: cadences — sweep 6h, pr daily, issue + blog + navidrome weekly" {
+@test "scheduled: cadences — sweep 6h, pr 3x/wk staggered, issue + blog + navidrome weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 \*/6 \* \* \*"'
-  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
+  # 3x/week, and staggered against the human side's Tue/Thu/Sat so the two
+  # identities alternate days instead of both firing daily.
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* 1,3,5"'
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
   grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
   grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 0"'
@@ -284,17 +295,20 @@ _agent_render_all() {
   grep -q 'stumpcloud-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
   ! grep -q 'pr-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
 
-  # agent-only drop-ins keep the suffix gate; pr-sweep must NOT have one
+  # agent-only drop-ins keep the suffix gate; pr-sweep must NOT have one --
+  # it runs under both identities. What it has instead is a HOST gate, so it
+  # runs on one machine rather than on every machine that renders it.
   grep -q 'hasSuffix "-agent"' "$HARNESS_D/issue-sweep.toml.tmpl"
   grep -q 'hasSuffix "-agent"' "$HARNESS_D/stumpcloud-sweep.toml.tmpl"
   ! grep -q '{{ if hasSuffix "-agent"' "$HARNESS_D/pr-sweep.toml.tmpl"
+  grep -q 'sweeps.prSweepAgentHost' "$HARNESS_D/pr-sweep.toml.tmpl"
 }
 
 @test "scheduled: a human login renders pr-sweep only, on its own cadence" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   local cfgdir out
   cfgdir="$(mktemp -d)"
-  printf '[data]\n    agentIdentity = "ci-human"\n' >"$cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-human"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n' "$(_this_host)" >"$cfgdir/chezmoi.toml"
   out=""
   for f in "$HARNESS_D"/*.toml.tmpl; do
     out+="$(chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f")"
@@ -302,7 +316,7 @@ _agent_render_all() {
   rm -rf "$cfgdir"
   # the one sweep a human runs, staggered off the agent's 09:30
   grep -q '^\[harness\.pr-sweep\]' <<<"$out"
-  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* \*"'
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* 2,4,6"'
   # and none of the agent-only ones
   ! grep -q '^\[harness\.issue-sweep\]' <<<"$out"
   ! grep -q '^\[harness\.stumpcloud-sweep\]' <<<"$out"
@@ -446,4 +460,82 @@ _agent_render_all() {
 @test "harness-config skill: loads in Claude Code (plugins tsv)" {
   grep -q 'claude-plugin-harness.git' "$PLUGINS_TSV"
   grep -q 'harness@claude-plugin-harness' "$PLUGINS_TSV"
+}
+
+# A drop-in cron is evaluated in each host's LOCAL time, so an ungated
+# `30 15 * * *` on three machines in two timezones is three independent full
+# runs a day, not one. pr-sweep lost its `-agent` gate on 2026-08-25 (so the
+# human identity would sweep too) and nothing replaced it, so every
+# human-identity machine armed its own. On 2026-08-29 that billed ~$80 of
+# Hyper in under an hour, invisibly. These three tests pin the gate.
+@test "scheduled: pr-sweep never arms on a machine that owns neither identity" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local cfgdir
+  cfgdir="$(mktemp -d)"
+  # The MacBook case: a real host that is neither the agent host nor the human
+  # host. It must render NO harness table, under EITHER identity — an
+  # interactive machine runs no scheduled sweep.
+  for ident in ci-agent ci-human; do
+    printf '[data]\n    agentIdentity = "%s"\n[data.sweeps]\n    prSweepAgentHost = "some-agent-box"\n    prSweepHumanHost = "some-human-box"\n' \
+      "$ident" >"$cfgdir/chezmoi.toml"
+    run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
+      < "$HARNESS_D/pr-sweep.toml.tmpl"
+    [ "$status" -eq 0 ]
+    ! grep -q '^\[harness\.pr-sweep\]' <<<"$output"
+    ! grep -q '^schedule = ' <<<"$output"
+  done
+  # An empty host disarms that identity entirely.
+  printf '[data]\n    agentIdentity = "ci-human"\n[data.sweeps]\n    prSweepHumanHost = ""\n' >"$cfgdir/chezmoi.toml"
+  run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
+    < "$HARNESS_D/pr-sweep.toml.tmpl"
+  [ "$status" -eq 0 ]
+  ! grep -q '^\[harness\.pr-sweep\]' <<<"$output"
+  rm -rf "$cfgdir"
+}
+
+@test "scheduled: the shipped defaults pin agent->tars, human->kitt, Mac->nothing" {
+  grep -qE '^  prSweepAgentHost: "tars"' "$REPO_ROOT/.chezmoidata.yaml"
+  grep -qE '^  prSweepHumanHost: "kitt"' "$REPO_ROOT/.chezmoidata.yaml"
+  # neither key may name a laptop
+  ! grep -qE '^  prSweep(Agent|Human)Host: "macbook' "$REPO_ROOT/.chezmoidata.yaml"
+}
+
+@test "scheduled: pr-sweep arms for each identity on its own designated host" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local cfgdir
+  cfgdir="$(mktemp -d)"
+
+  # matching host -> renders, with the identity-staggered cadence intact
+  printf '[data]\n    agentIdentity = "ci-human"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n' \
+    "$(_this_host)" >"$cfgdir/chezmoi.toml"
+  run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
+    < "$HARNESS_D/pr-sweep.toml.tmpl"
+  [ "$status" -eq 0 ]
+  grep -q '^\[harness\.pr-sweep\]' <<<"$output"
+  grep -q 'schedule = "30 15 \* \* 2,4,6"' <<<"$output"
+
+  # the agent identity on the HUMAN's host -> nothing: the gate is per identity
+  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n    prSweepAgentHost = "some-other-box"\n' \
+    "$(_this_host)" >"$cfgdir/chezmoi.toml"
+  run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
+    < "$HARNESS_D/pr-sweep.toml.tmpl"
+  [ "$status" -eq 0 ]
+  ! grep -q '^\[harness\.pr-sweep\]' <<<"$output"
+
+  rm -rf "$cfgdir"
+}
+
+@test "scheduled: pr-sweep prompt carries a hard run budget and reports its cost" {
+  local p="$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
+  # An unbudgeted run chose, on its own, to do full diff reviews plus local
+  # test verification on 13 third-party PRs. Every ceiling below is load-bearing.
+  grep -q '## Run budget' "$p"
+  grep -q 'At most 6 PRs total' "$p"
+  grep -q 'Repos we own, and nothing else' "$p"
+  grep -q '30 minutes' "$p"
+  # prism reports $0.00 locally, so the summary must say so rather than let a
+  # reader mistake the local figure for the real spend.
+  grep -q 'run cost' "$p"
+  grep -q 'Hyper dashboard' "$p"
+  grep -qi 'never mistake the local figure\|only real number' "$p"
 }

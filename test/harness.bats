@@ -94,6 +94,13 @@ _render() {
   esac
 }
 
+# pr-sweep is host-gated per identity (.sweeps.prSweepAgentHost /
+# .sweeps.prSweepHumanHost), so a render that does not name THIS host sees no
+# pr-sweep table at all. Tests that assert on the seeded set must arm it.
+_hb_this_host() {
+  chezmoi execute-template --source "$REPO_ROOT" <<<'{{ .chezmoi.hostname }}'
+}
+
 @test "harness: rendered harness.toml + drop-ins are valid TOML with all seeded harnesses" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
@@ -107,7 +114,9 @@ _render() {
   _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
   printf '[data]
     agentIdentity = "ci-agent"
-' >"$_cfg"
+[data.sweeps]
+    prSweepAgentHost = "%s"
+' "$(_hb_this_host)" >"$_cfg"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
@@ -165,7 +174,9 @@ PY"
   _cfgdir="$(mktemp -d)"; _cfg="$_cfgdir/chezmoi.toml"
   printf '[data]
     agentIdentity = "ci"
-' >"$_cfg"
+[data.sweeps]
+    prSweepHumanHost = "%s"
+' "$(_hb_this_host)" >"$_cfg"
   for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
     run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$_f' | grep -c '^\[harness\.' || true"
     case "$(basename "$_f")" in
@@ -225,7 +236,9 @@ PY"
   _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
   printf '[data]
     agentIdentity = "ci-agent"
-' >"$_cfg"
+[data.sweeps]
+    prSweepAgentHost = "%s"
+' "$(_hb_this_host)" >"$_cfg"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
