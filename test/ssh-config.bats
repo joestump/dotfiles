@@ -387,3 +387,21 @@ YAML
   [ "$(grep -c '^Host ' <<<"$output")" -eq 1 ]
   [[ "$output" == *"Host *.example.org"* ]]
 }
+
+@test "ssh-config: tars resolves to the joestump-agent account, both aliases" {
+  # tars runs the joestump-agent identity. ssh otherwise defaults to the local
+  # username, and the resulting "Permission denied (publickey,password)" reads
+  # exactly like an unauthorized key rather than a wrong account -- which is how
+  # tars got written off as unreachable on 2026-08-29 while its sweeps were the
+  # thing under investigation.
+  local cfg
+  cfg="$(_render)"
+  command -v ssh >/dev/null 2>&1 || skip "ssh not installed"
+  for host in tars tars.stump.rocks; do
+    run bash -c "ssh -F '$cfg' -G '$host' 2>/dev/null | awk '/^user /{print \$2}'"
+    [ "$output" = "joestump-agent" ] || { echo "$host resolved to user '$output'"; false; }
+  done
+  # and it must not regress into the generic joestump default
+  run bash -c "ssh -F '$cfg' -G tars.stump.rocks 2>/dev/null | awk '/^hostname /{print \$2}'"
+  [ "$output" = "tars.stump.rocks" ]
+}

@@ -185,6 +185,20 @@ ssh:
         # known"); accept-new pins on first contact and rejects later changes.
         StrictHostKeyChecking: "accept-new"
 
+    # tars runs the joestump-agent identity, so its account is `joestump-agent`
+    # rather than the local username ssh defaults to. Without this block,
+    # `ssh tars.stump.rocks` from a joestump machine fails with
+    # "Permission denied (publickey,password)" even though the key IS authorized
+    # for the right account — a failure that reads exactly like a missing key.
+    #
+    # @joestump-agent 08/29/2026 - Added after that misdiagnosis cost a session:
+    # tars was written off as unreachable, so the sweeps running there went
+    # unexamined while their cost was being investigated.
+    - patterns: ["tars", "tars.stump.rocks"]
+      options:
+        HostName: "tars.stump.rocks"
+        User: "joestump-agent"
+
     # cloud01 bootstrap — temporary, remove after WG/internal DNS lands
     # (cloud01.stump.rocks is NXDOMAIN on the LAN, hence the literal IP).
     # The bare `cloud01` alias is listed so `ssh cloud01` keeps working.
