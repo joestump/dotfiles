@@ -92,6 +92,24 @@ else
   systemctl --user reset-failed 2>/dev/null || true
 
   # ---- the one true supervisor ----
+  # `systemctl --user enable` alone does not survive a headless box. Without
+  # linger, systemd stops user@$UID.service the moment the last login session
+  # closes, taking the daemon and every agent it supervises with it. Anything
+  # that polls the host over SSH then restarts harness on every poll: on kitt,
+  # rack-hud's 60s check restarted it 19 times in 20 minutes, and each restart
+  # re-registered Claude Remote Control, firing a push notification each time.
+  #
+  # @joestump-agent 08/29/2026 - Enable linger before enabling the unit.
+  if [ "$(loginctl show-user "$USER" -p Linger --value 2>/dev/null)" = "yes" ]; then
+    item dim "linger already enabled for $USER"
+  elif loginctl enable-linger "$USER" 2>/dev/null \
+    || sudo -n loginctl enable-linger "$USER" 2>/dev/null; then
+    item ok "enabled linger for $USER (harness outlives the login session)"
+  else
+    warn "could not enable linger — harness will die with your login session"
+    warn "run: sudo loginctl enable-linger $USER"
+  fi
+
   systemctl --user enable harness.service 2>/dev/null || true
   step "start harness.service" -- systemctl --user restart harness.service
   item ok "harness daemon $(systemctl --user is-active harness.service 2>/dev/null || echo unknown)"
