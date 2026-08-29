@@ -150,10 +150,17 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # read zai/glm-5.2 while the always-on agent ran hyper/kimi-k3 — the priciest
 # model on Hyper, metered, for six days. The model an unattended agent runs is
 # declared config, not runtime state.
+#
+# ~/.local/share/crush-switchboard/crush.json is the same file for the second
+# always-on crush harness, and joined the list the day it was added (#197).
+# Each harness gets its own CRUSH_GLOBAL_DATA, so each needs its own reassert
+# entry — a pin that is not listed here stops landing the first time the TUI
+# touches it.
 czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" \
   "$HOME/.config/crush/crush.json" \
   "$HOME/.config/harness/harness.toml" \
   "$HOME/.local/share/crush-signal/crush.json" \
+  "$HOME/.local/share/crush-switchboard/crush.json" \
   "$HOME/.gitconfig")"
 for czu_reassert_line in ${(f)czu_reassert_out}; do
   case "$czu_reassert_line" in

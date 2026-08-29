@@ -1,0 +1,42 @@
+{{/*
+Model pin for the crush-switchboard harness — MANAGED, not create_.
+
+Same file, same rules, same reasons as dot_local/share/crush-signal — read that
+header first; this one only records why a SECOND copy exists.
+
+crush-switchboard points CRUSH_GLOBAL_DATA at its own data dir so its model pin
+and session history do not collide with crush-signal's. That split is the whole
+point of the separate harness, but it also means the crush-signal pin does not
+cover it: the large/small selection lives ONLY in $CRUSH_GLOBAL_DATA/crush.json,
+never in ~/.config/crush/crush.json (which carries providers, MCP and options
+and no `models` key at all). Without this file crush does not fail and does not
+prompt — internal/config/load.go defaultModelSelection() silently takes the
+first enabled provider from the catalog order, across the five this box
+configures, hyper included. The harness would report "Crush · GLM-5.2 (Z.ai)"
+in `harness list` while running whatever that fallback resolved to, which is
+the exact shape of the drift the crush-signal pin was converted to fix.
+
+MANAGED, not create_, for that same reason: crush's TUI model picker rewrites
+the target in place, and create_ ("write only if absent") means chezmoi never
+has an opinion about it again. czu_reassert_targets in executable_czu-run.zsh
+absorbs the rewrite so the managed render keeps landing.
+
+Same pin as crush-signal — this agent's work (webhook triage, issue and PR
+reads) is the same weight as its Signal work, and zai is quota-metered rather
+than pay-per-token, so a busy week degrades to a hard stop instead of a bill.
+Nothing here should ever point at hyper.
+
+  large  glm-5.2        plenty for doorbell triage
+  small  glm-5.3-flash  titles and summaries, off the large quota
+
+@joestump 08/29/2026 - Added while reviewing #197. The harness landed with
+  CRUSH_GLOBAL_DATA repointed but no pin at the far end, so every box except
+  the one it was hand-seeded on would have run the fallback model.
+*/ -}}
+{
+  "$schema": "https://charm.land/crush.json",
+  "models": {
+    "large": { "model": "glm-5.2", "provider": "zai" },
+    "small": { "model": "glm-5.3-flash", "provider": "zai" }
+  }
+}

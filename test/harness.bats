@@ -1,8 +1,10 @@
 #!/usr/bin/env bats
 # Tests for the harness seed (dot_config/harness/*, dot_local/share/crush-signal/*).
 #
-# Two harnesses ship in the seed: crush-signal (crush driven from Signal, model-pinned)
-# and claude-code (Claude Code driven from the Claude app via Remote Control). The
+# Two crush harnesses ship in the seed — crush-signal (Signal channel) and
+# crush-switchboard (Switchboard doorbells) — plus claude-code (Claude Code driven
+# from the Claude app via Remote Control). Each crush harness owns exactly one
+# channel and carries its OWN model pin, because each repoints CRUSH_GLOBAL_DATA. The
 # files have to agree with each other and with dot_config/crush/crush.json.tmpl or the
 # harness silently runs the wrong model, or with no Signal channel. These assertions
 # pin the couplings that a careless edit to any one file would break.
@@ -15,6 +17,8 @@ HARNESS_ENV="$REPO_ROOT/dot_config/harness/crush-signal.env.tmpl"
 # the contents it stops to ask "…has changed since chezmoi last wrote it?" —
 # which wedges any non-interactive apply. Attribute order is create_ then private_.
 MODEL_PIN="$REPO_ROOT/dot_local/share/crush-signal/private_crush.json.tmpl"
+SWB_ENV="$REPO_ROOT/dot_config/harness/crush-switchboard.env.tmpl"
+SWB_MODEL_PIN="$REPO_ROOT/dot_local/share/crush-switchboard/private_crush.json.tmpl"
 CRUSH_JSON="$REPO_ROOT/dot_config/crush/crush.json.tmpl"
 
 _render() {
@@ -126,9 +130,9 @@ for fname, dd in docs.items():
     over = set(dd['harness']) & names
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
-assert names == {'crush-signal', 'claude-code', 'claude-headless',
-                 'stumpcloud-sweep', 'pr-sweep', 'issue-sweep',
-                 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names)
+assert names == {'crush-signal', 'crush-switchboard', 'claude-code',
+                 'claude-headless', 'stumpcloud-sweep', 'pr-sweep',
+                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
@@ -138,7 +142,7 @@ assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['serve
 # scheduled entries carry no enabled key at all (mutually exclusive with
 # schedule); the daemon fires them only on their cron. The interactive three
 # live in the main doc; a scheduled name may never appear there.
-interactive = {'crush-signal', 'claude-code', 'claude-headless'}
+interactive = {'crush-signal', 'crush-switchboard', 'claude-code', 'claude-headless'}
 assert set(d['harness']) == interactive, sorted(d['harness'])
 for name in interactive:
     assert d['harness'][name]['enabled'] is False, name
@@ -296,14 +300,33 @@ assert \"env_file\" not in h, h
   [[ "$output" == *'"--channels", "signal"'* ]]
 }
 
-@test "harness: crush-signal opts into the switchboard channel too" {
+@test "harness: the switchboard channel belongs to crush-switchboard, not crush-signal" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  # Without this opt-in the switchboard MCP's tools still work but its doorbell
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # ONE CHANNEL CONSUMER PER SERVER. crush-signal carried both channels until
+  # #197, and the two sessions raced for every doorbell: webhook events landed
+  # in whichever won, which was usually the phone-driven agent nobody was
+  # watching, so the Switchboard queue looked dead while being drained.
+  #
+  # Without the opt-in the switchboard MCP's tools still work but its doorbell
   # notifications never reach the session — the queue fills silently. The
   # opt-in is CLI-only in the fork (no config key), so it must ride args.
+  #
+  # This asserts per-table, not over the whole render: a whole-file grep for
+  # the flag is satisfied by EITHER harness carrying it, which is exactly how
+  # re-adding it to crush-signal would slip through green.
   run _render "$HARNESS_TOML"
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"--channels", "switchboard"'* ]]
+  run bash -c "printf '%s' \"\$(cat)\" | python3 -c '
+import sys, tomllib
+h = tomllib.loads(sys.stdin.read())[\"harness\"]
+sig, swb = h[\"crush-signal\"][\"args\"], h[\"crush-switchboard\"][\"args\"]
+assert \"switchboard\" not in sig, (\"crush-signal must not carry the switchboard channel\", sig)
+assert \"signal\" not in swb, (\"crush-switchboard must not carry the signal channel\", swb)
+assert sig.count(\"--channels\") == 1 and \"signal\" in sig, sig
+assert swb.count(\"--channels\") == 1 and \"switchboard\" in swb, swb
+' " <<<"$output"
+  [ "$status" -eq 0 ]
 }
 
 @test "harness: every harness declares a kind from the enum (no cmd, no default)" {
@@ -341,6 +364,93 @@ assert \"env_file\" not in h, h
 @test "harness: env_file carries no secrets (it is committed)" {
   run grep -nE "API_KEY *=|TOKEN *=|SECRET *=|PASSWORD *=" "$HARNESS_ENV"
   [ "$status" -ne 0 ]
+}
+
+@test "harness: crush-switchboard env_file repoints CRUSH_GLOBAL_DATA at ITS OWN pin dir" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # The two crush harnesses must not share a data dir: it holds session history
+  # as well as the pin, so a shared one interleaves two agents' transcripts.
+  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$SWB_ENV' | grep -c '^CRUSH_GLOBAL_DATA=/.*/\.local/share/crush-switchboard\$'"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+}
+
+@test "harness: crush-switchboard env_file carries no secrets (it is committed)" {
+  run grep -nE "API_KEY *=|TOKEN *=|SECRET *=|PASSWORD *=" "$SWB_ENV"
+  [ "$status" -ne 0 ]
+}
+
+@test "harness: EVERY CRUSH_GLOBAL_DATA dir ships a model pin" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # The large/small selection lives ONLY in $CRUSH_GLOBAL_DATA/crush.json —
+  # ~/.config/crush/crush.json carries providers, MCP and options and has no
+  # `models` key. With the pin absent crush does not error and does not prompt:
+  # defaultModelSelection() takes the first enabled provider in catalog order,
+  # across the five configured here, hyper included. The harness would still be
+  # described as "GLM-5.2 (Z.ai)" in `harness list` the whole time.
+  #
+  # So this is a set check, not a spot check: repointing a new harness at a new
+  # data dir without shipping a pin for it is the failure, and it is invisible
+  # on the box where the file was seeded by hand.
+  local envf dir
+  for envf in "$REPO_ROOT"/dot_config/harness/*.env.tmpl; do
+    dir="$(chezmoi execute-template --source "$REPO_ROOT" < "$envf" \
+      | sed -n 's|^CRUSH_GLOBAL_DATA=.*/\.local/share/||p')"
+    [ -n "$dir" ] || continue
+    [ -f "$REPO_ROOT/dot_local/share/$dir/private_crush.json.tmpl" ] \
+      || fail "$envf points CRUSH_GLOBAL_DATA at $dir with no managed model pin there"
+  done
+}
+
+@test "harness: czu reasserts EVERY model pin, since the TUI rewrites them" {
+  # One reassert entry per pin. A pin that is not listed stops landing the
+  # first time crush's model picker touches the target — silently, on the
+  # unattended box, which is where it matters.
+  local pin name
+  for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
+    name="$(basename "$(dirname "$pin")")"
+    grep -q "\"\$HOME/.local/share/$name/crush.json\"" \
+      "$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh" \
+      || fail "$name has a model pin but no czu_reassert_targets entry"
+  done
+}
+
+@test "harness: every model pin is private_ (0600) and NOT create_" {
+  # Both attributes are load-bearing and both were learned the hard way; see
+  # the crush-signal tests above for the six-day kimi-k3 drift. Applied to the
+  # whole set so a new harness cannot reintroduce either mistake.
+  local pin
+  for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
+    [ -f "$pin" ]
+  done
+  run bash -c "ls '$REPO_ROOT'/dot_local/share/*/*crush.json.tmpl"
+  [ "$status" -eq 0 ]
+  ! grep -q 'create_' <<<"$output"
+  while read -r f; do
+    case "$f" in
+      */private_crush.json.tmpl) ;;
+      *) fail "model pin must be private_ (0600), got: $f" ;;
+    esac
+  done <<<"$output"
+}
+
+@test "harness: every model pin is glm-5.2 on zai, and never hyper" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # glm-5.2 is served by BOTH zai and hyper. Z.ai is quota-metered, so a busy
+  # week degrades to a hard stop; Hyper is pay-per-token and degrades to a
+  # bill. Every always-on crush belongs on zai, not just the first one written.
+  local pin
+  for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
+    run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$pin' | python3 -c '
+import json,sys
+m = json.load(sys.stdin)[\"models\"]
+for slot in (\"large\", \"small\"):
+    assert m[slot][\"provider\"] == \"zai\", (slot, m[slot])
+assert m[\"large\"][\"model\"] == \"glm-5.2\", m[\"large\"]
+'"
+    [ "$status" -eq 0 ] || fail "bad pin: $pin"
+  done
 }
 
 @test "harness: the model pin is glm-5.2 on the zai provider, and never hyper" {
