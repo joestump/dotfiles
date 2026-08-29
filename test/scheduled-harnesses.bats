@@ -584,3 +584,42 @@ if bad:
   grep -q 'subscription-metered' "$p"
   grep -qi 'quota' "$p"
 }
+
+@test "scheduled: stumpcloud-sweep draws an explicit act-vs-escalate line" {
+  local p="$PROMPTS_DIR/stumpcloud-sweep.prompt.md"
+  # The sweep runs on a small model. What it may do alone, and what it must
+  # hand to a stronger one, has to be stated -- not left to its judgement.
+  grep -q 'What you may fix yourself, and what you must hand off' "$p"
+  grep -qi 'restart a container' "$p"
+  grep -qi 'restart docker' "$p"
+  # One VM restart, once. A reboot loop is worse than the outage it clears.
+  grep -qi 'Restart a VM' "$p"
+  grep -q 'ONCE' "$p"
+  # Ansible-repo fixes are escalated, and the sweep opens no PRs itself.
+  grep -qi 'change to the Ansible repo' "$p"
+  grep -q 'You do NOT open PRs yourself' "$p"
+}
+
+@test "scheduled: stumpcloud-sweep escalates on-plan and fire-and-forget" {
+  local p="$PROMPTS_DIR/stumpcloud-sweep.prompt.md"
+  grep -q 'harness run --detach' "$p"
+  # Escalation must stay on the same subscription plan -- escalating to a
+  # metered provider is how a cheap sweep becomes an expensive one.
+  grep -q 'zai/glm-5.3' "$p"
+  grep -qi 'Do not escalate to a metered provider' "$p"
+  # There is no result channel; an escalation that waits for the child is a bug.
+  grep -qi 'fire-and-forget' "$p"
+  grep -qi 'no result channel' "$p"
+  grep -qi 'Never wait for, poll, or depend on' "$p"
+  # and it must be recorded, or nobody knows the work is in flight
+  grep -qi 'Record every escalation' "$p"
+}
+
+@test "scheduled: the escalation target is not the sweep's own model" {
+  # Escalating to the same pin is a no-op that looks like an escalation.
+  local p="$PROMPTS_DIR/stumpcloud-sweep.prompt.md"
+  local pin
+  pin="$(grep -m1 '^model = ' "$HARNESS_D/stumpcloud-sweep.toml.tmpl" | sed -E 's/.*"(.*)"/\1/')"
+  run bash -c "grep -c 'harness run --detach --kind crush --model $pin' '$p' || true"
+  [ "$output" -eq 0 ]
+}
