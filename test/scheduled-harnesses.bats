@@ -525,15 +525,15 @@ if bad:
     run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
       < "$HARNESS_D/pr-sweep.toml.tmpl"
     [ "$status" -eq 0 ]
-    ! grep -q '^\[harness\.pr-sweep\]' <<<"$output"
-    ! grep -q '^schedule = ' <<<"$output"
+    [ "$(grep -c '^\[harness\.pr-sweep\]' <<<"$output")" -eq 0 ]
+    [ "$(grep -c '^schedule = ' <<<"$output")" -eq 0 ]
   done
   # An empty host disarms that identity entirely.
   printf '[data]\n    agentIdentity = "ci-human"\n[data.sweeps]\n    prSweepHumanHost = ""\n' >"$cfgdir/chezmoi.toml"
   run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
     < "$HARNESS_D/pr-sweep.toml.tmpl"
   [ "$status" -eq 0 ]
-  ! grep -q '^\[harness\.pr-sweep\]' <<<"$output"
+  [ "$(grep -c '^\[harness\.pr-sweep\]' <<<"$output")" -eq 0 ]
   rm -rf "$cfgdir"
 }
 
@@ -564,7 +564,7 @@ if bad:
   run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" \
     < "$HARNESS_D/pr-sweep.toml.tmpl"
   [ "$status" -eq 0 ]
-  ! grep -q '^\[harness\.pr-sweep\]' <<<"$output"
+  [ "$(grep -c '^\[harness\.pr-sweep\]' <<<"$output")" -eq 0 ]
 
   rm -rf "$cfgdir"
 }
