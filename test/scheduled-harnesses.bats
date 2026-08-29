@@ -82,10 +82,45 @@ _agent_render_all() {
 # turns that silent stall into a bigger bill. Guard the regression: a scheduled
 # harness must never be pinned back to a hard-capped provider without a
 # deliberate change here.
-@test "scheduled: no scheduled harness is pinned to the hard-capped Z.ai plan" {
+# Z.ai IS allowed again, deliberately, but only for sweeps that can survive a
+# refusal. The August outage was never caused by the cap itself -- it was
+# `restart = "on-failure"` turning each quota-exhausted stream-open into another
+# relaunch (4417 on the StumpCloud sweep, 1795 on this one). With that amplifier
+# gone, a hard cap is a FEATURE: Z.ai refuses and stops, where Hyper auto-tops-up
+# and bills on. So the guard is no longer "never zai" -- it is "a zai pin must be
+# accompanied by the restart policy that makes a refusal harmless".
+@test "scheduled: any Z.ai-pinned sweep cannot relaunch itself into the cap" {
   run _agent_render_all
   [ "$status" -eq 0 ]
-  ! grep -q '^model = "zai/' <<<"$output"
+  local render_file
+  render_file="$(mktemp)"
+  printf '%s\n' "$output" >"$render_file"
+  # NB: assert with a single command whose status stands. Bash's set -e never
+  # fails on a `!`-negated command unless it is the last one in the test, so a
+  # mid-test `! grep -q ...` is a silent no-op -- it passes whatever the render
+  # says. (Several older assertions in this file are vacuous for that reason.)
+  run python3 -c '
+import re, sys
+text = open(sys.argv[1]).read()
+bad = []
+for blk in re.split(r"^\[harness\.", text, flags=re.M)[1:]:
+    name, _, body = blk.partition("]")
+    body = re.split(r"^\[", body, flags=re.M)[0]
+    scheduled = re.search(r"^schedule = ", body, re.M)
+    zai       = re.search(r"^model = \"zai/", body, re.M)
+    onfail    = re.search(r"^restart = \"on-failure\"", body, re.M)
+    norestart = re.search(r"^restart = \"no\"", body, re.M)
+    # An always-on harness may legitimately restart on failure; a SCHEDULED one
+    # may not -- that is what turned quota exhaustion into 4417 relaunches.
+    if scheduled and onfail:
+        bad.append(name + ": scheduled harness declares restart=on-failure")
+    if zai and not norestart:
+        bad.append(name + ": zai-pinned harness lacks restart=\"no\"")
+if bad:
+    sys.exit("; ".join(bad))
+' "$render_file"
+  rm -f "$render_file"
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
 # The other half of that outage. `restart = "on-failure"` is what turned each
@@ -357,16 +392,22 @@ _agent_render_all() {
   # appends --model), so a config-wide model change can never silently retarget
   # them.
   #
-  # All three moved off hyper/glm-5.2 on 2026-08-28 in the Hyper cost review:
-  # prism is the router (it picks per prompt, so an idle health check and a real
-  # PR review do not pay the same rate), and qwen3.8-flash is the cheap fixed
-  # pin for the bounded weekly issue pass.
+  # stumpcloud-sweep and the two weekly passes moved off hyper/glm-5.2 on
+  # 2026-08-28 in the Hyper cost review: prism is the router (it picks per
+  # prompt, so an idle health check and a real PR review do not pay the same
+  # rate), and qwen3.8-flash is the cheap fixed pin for a bounded weekly pass.
+  #
+  # pr-sweep moved AGAIN on 2026-08-29, to zai/glm-5.3-flash: after it burned
+  # ~$80 in an hour, a subscription plan whose session limit refuses at
+  # stream-open beats a metered one that auto-tops-up. Different provider, so
+  # it is asserted separately rather than folded into the hyper/ loop.
   run _agent_render_all
-  for pin in stumpcloud-sweep:prism pr-sweep:prism issue-sweep:qwen3.8-flash blog-sweep:qwen3.8-flash; do
+  for pin in stumpcloud-sweep:prism issue-sweep:qwen3.8-flash blog-sweep:qwen3.8-flash; do
     name=${pin%%:*}
     model=${pin##*:}
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
   done
+  grep -A12 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'model = "zai/glm-5.3-flash"' || return 1
 }
 
 @test "scheduled: no sweep runs on a premium-tier model" {
@@ -533,9 +574,10 @@ _agent_render_all() {
   grep -q 'At most 6 PRs total' "$p"
   grep -q 'Repos we own, and nothing else' "$p"
   grep -q '30 minutes' "$p"
-  # prism reports $0.00 locally, so the summary must say so rather than let a
-  # reader mistake the local figure for the real spend.
+  # Z.ai is subscription-metered, so any per-token figure is not a charge --
+  # the summary must say so, and must surface a quota refusal, which is the
+  # only cost signal that exists on this plan.
   grep -q 'run cost' "$p"
-  grep -q 'Hyper dashboard' "$p"
-  grep -qi 'never mistake the local figure\|only real number' "$p"
+  grep -q 'subscription-metered' "$p"
+  grep -qi 'quota' "$p"
 }
