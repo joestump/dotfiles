@@ -113,3 +113,17 @@ assert d['RunAtLoad'] is True and d['KeepAlive'] is True
   # Safe to keep restarting now that harness.service only Wants= the agent.
   grep -q 'vault-agent restart' "$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh"
 }
+
+@test "harness-daemon: Linux branch enables linger so the daemon outlives logout" {
+  # Without linger, systemd stops user@$UID.service when the last session
+  # closes, so any SSH-polled host restarts harness on every poll. Enabling it
+  # must come before the unit is enabled, and must be idempotent.
+  grep -q 'loginctl enable-linger' "$SCRIPT"
+  grep -q 'loginctl show-user "$USER" -p Linger --value' "$SCRIPT"
+  # Ordering: linger is established before the unit is enabled/started.
+  linger_line=$(grep -n 'loginctl enable-linger' "$SCRIPT" | head -1 | cut -d: -f1)
+  enable_line=$(grep -n 'systemctl --user enable harness.service' "$SCRIPT" | head -1 | cut -d: -f1)
+  [ "$linger_line" -lt "$enable_line" ]
+  # An unprivileged box that cannot set it must say so rather than fail silently.
+  grep -q 'sudo -n loginctl enable-linger' "$SCRIPT"
+}
