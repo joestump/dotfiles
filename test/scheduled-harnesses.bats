@@ -409,7 +409,7 @@ if bad:
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
   done
   for name in pr-sweep stumpcloud-sweep; do
-    grep -A12 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "zai/glm-5.3-flash"' || return 1
+    grep -A12 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "litellm/Qwen3.8-27B"' || return 1
   done
 }
 
@@ -576,12 +576,12 @@ if bad:
   grep -q '## Run budget' "$p"
   grep -q 'At most 15 PRs total' "$p"
   grep -q 'Repos we own, and nothing else' "$p"
-  grep -q '30 minutes' "$p"
+  grep -q '45 minutes' "$p"
   # Z.ai is subscription-metered, so any per-token figure is not a charge --
   # the summary must say so, and must surface a quota refusal, which is the
   # only cost signal that exists on this plan.
   grep -q 'run cost' "$p"
-  grep -q 'subscription-metered' "$p"
+  grep -q 'local and unmetered' "$p"
   grep -qi 'quota' "$p"
 }
 
