@@ -600,26 +600,32 @@ if bad:
   grep -q 'You do NOT open PRs yourself' "$p"
 }
 
-@test "scheduled: stumpcloud-sweep escalates on-plan and fire-and-forget" {
+@test "scheduled: stumpcloud-sweep hands off durably, not via harness run" {
   local p="$PROMPTS_DIR/stumpcloud-sweep.prompt.md"
-  grep -q 'harness run --detach' "$p"
-  # Escalation must stay on the same subscription plan -- escalating to a
-  # metered provider is how a cheap sweep becomes an expensive one.
-  grep -q 'zai/glm-5.3' "$p"
-  grep -qi 'Do not escalate to a metered provider' "$p"
-  # There is no result channel; an escalation that waits for the child is a bug.
-  grep -qi 'fire-and-forget' "$p"
-  grep -qi 'no result channel' "$p"
-  grep -qi 'Never wait for, poll, or depend on' "$p"
-  # and it must be recorded, or nobody knows the work is in flight
-  grep -qi 'Record every escalation' "$p"
+  # `harness run` has NO --model flag (the surface is --workdir/--kind/--name/
+  # --detach), so the spawn-an-agent escalation this prompt used to carry would
+  # have failed with `unknown flag: --model` the first time it was reached.
+  grep -q 'Do not try to spawn another agent' "$p"
+  grep -q 'does not work and never did' "$p"
+  # The handoff is an issue in the single StumpCloud tracker, carrying enough
+  # context that the next reader does not have to redo the run.
+  grep -q 'stumpcloud/stumpcloud' "$p"
+  grep -qi 'One issue per distinct problem' "$p"
+  grep -qi 'entire handoff' "$p"
+  grep -qi 'Signal summary' "$p"
 }
 
-@test "scheduled: the escalation target is not the sweep's own model" {
-  # Escalating to the same pin is a no-op that looks like an escalation.
+@test "scheduled: the broken harness-run command is only ever a counter-example" {
+  # It may appear ONCE, quoted inside the explanation of why it fails. It must
+  # never be reintroduced as an instruction, so the prohibition has to come
+  # first -- a reader (or a model) skimming for a command must hit the "do not"
+  # before the command itself.
   local p="$PROMPTS_DIR/stumpcloud-sweep.prompt.md"
-  local pin
-  pin="$(grep -m1 '^model = ' "$HARNESS_D/stumpcloud-sweep.toml.tmpl" | sed -E 's/.*"(.*)"/\1/')"
-  run bash -c "grep -c 'harness run --detach --kind crush --model $pin' '$p' || true"
-  [ "$output" -eq 0 ]
+  local warn cmd
+  warn=$(grep -n 'Do not try to spawn another agent' "$p" | head -1 | cut -d: -f1)
+  cmd=$(grep -n 'harness run --detach' "$p" | head -1 | cut -d: -f1)
+  [ -n "$warn" ] && [ -n "$cmd" ] && [ "$warn" -lt "$cmd" ]
+  # and it appears exactly once, so nobody re-adds a working-looking copy
+  run bash -c "grep -c 'harness run --detach' '$p' || true"
+  [ "$output" -eq 1 ]
 }
