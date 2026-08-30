@@ -146,6 +146,19 @@ You may open pull requests, issues, and fork repos **without asking** in these o
 
 **You MUST NOT open PRs, issues, or any other contributions against ANY other organization or user on GitHub or Gitea without EXPLICIT, prior, per-action approval from Joe.** When in doubt, ASK FIRST — never assume permission.
 
+### Merging — the hard allowlist
+
+Merging is even more restricted than contributing. **You may ONLY merge pull requests that live in these places — anywhere else, merging is FORBIDDEN, full stop:**
+
+| Host | Where merging is allowed |
+|------|--------------------------|
+| GitHub | `github.com/{{ $agent }}/*` |
+| GitHub | `github.com/{{ .githubUser }}/*` |
+| GitHub | `github.com/tvdinner/*` |
+| Gitea | `{{ .giteaUrl }}/*` (any repo on the internal instance) |
+
+**Never merge a PR in ANY other organization or under ANY other user on GitHub** — no exceptions, no "it looked abandoned", no "CI was green and it was obviously fine", no per-PR judgment calls. Merging a PR lands code in someone else's repository under our credentials; that is not an error an apology fixes. This is not a guideline — an agent that merges outside this allowlist has caused real damage. If a PR somewhere else genuinely needs merging, STOP and ask Joe explicitly.
+
 ### GitHub operations — the `gh` CLI
 
 **Use the `gh` CLI for every GitHub operation** — repos, issues, PRs, releases, actions, comments, reviews, labels, topics, collaborators, everything. It is authenticated from the environment (`GH_TOKEN`/`GITHUB_TOKEN`) on every machine, so it works in headless and daemon-launched sessions too.
