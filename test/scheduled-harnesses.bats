@@ -409,11 +409,7 @@ if bad:
     grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
   done
   for name in pr-sweep stumpcloud-sweep; do
-        case "$name" in
-      pr-sweep|stumpcloud-sweep) want='model = "litellm/Qwen3.8-27B"' ;;
-      *)                          want='model = "zai/glm-5.3-flash"' ;;
-    esac
-    grep -A12 "^\[harness\.$name\]" <<<"$output" | grep -q "$want" || return 1
+    grep -A12 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "litellm/Qwen3.8-27B"' || return 1
   done
 }
 
