@@ -447,12 +447,16 @@ assert swb.count(\"--channels\") == 1 and \"switchboard\" in swb, swb
   done <<<"$output"
 }
 
-@test "harness: every model pin is glm-5.2 on zai, and never hyper" {
+@test "harness: every model pin is glm-5.3-flash on zai, and never hyper" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # glm-5.2 is served by BOTH zai and hyper. Z.ai is quota-metered, so a busy
-  # week degrades to a hard stop; Hyper is pay-per-token and degrades to a
-  # bill. Every always-on crush belongs on zai, not just the first one written.
+  # The GLM models are served by BOTH zai and hyper. Z.ai is quota-metered, so
+  # a busy week degrades to a hard stop; Hyper is pay-per-token and degrades to
+  # a bill. Every always-on crush belongs on zai, not just the first one
+  # written -- the provider assertion is the load-bearing half of this test.
+  #
+  # @joestump-agent 08/30/2026 - large moved glm-5.2 -> glm-5.3-flash, so both
+  # slots are now the same model.
   local pin
   for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
     run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$pin' | python3 -c '
@@ -460,16 +464,17 @@ import json,sys
 m = json.load(sys.stdin)[\"models\"]
 for slot in (\"large\", \"small\"):
     assert m[slot][\"provider\"] == \"zai\", (slot, m[slot])
-assert m[\"large\"][\"model\"] == \"glm-5.2\", m[\"large\"]
+assert m[\"large\"][\"model\"] == \"glm-5.3-flash\", m[\"large\"]
 '"
     [ "$status" -eq 0 ] || fail "bad pin: $pin"
   done
 }
 
-@test "harness: the model pin is glm-5.2 on the zai provider, and never hyper" {
+@test "harness: the model pin is glm-5.3-flash on the zai provider, and never hyper" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # glm-5.2 is served by BOTH zai and hyper, so the provider must be pinned too.
+  # The GLM models are served by BOTH zai and hyper, so the provider must be
+  # pinned too. large moved glm-5.2 -> glm-5.3-flash on 2026-08-30.
   #
   # The always-on agent belongs on Z.ai specifically: Z.ai is quota-metered, so
   # a busy week degrades to a hard stop, while Hyper is pay-per-token and
@@ -478,7 +483,7 @@ assert m[\"large\"][\"model\"] == \"glm-5.2\", m[\"large\"]
   run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$MODEL_PIN' | python3 -c '
 import json,sys
 m = json.load(sys.stdin)[\"models\"]
-assert m[\"large\"] == {\"model\": \"glm-5.2\", \"provider\": \"zai\"}, m[\"large\"]
+assert m[\"large\"] == {\"model\": \"glm-5.3-flash\", \"provider\": \"zai\"}, m[\"large\"]
 assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
 assert all(v[\"provider\"] != \"hyper\" for v in m.values()), m
 '"
