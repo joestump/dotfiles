@@ -386,31 +386,33 @@ if bad:
   grep -qi 'sonnet-ready' "$f"
 }
 
-@test "scheduled: every sweep is pinned per entry, to its own cheap model" {
+@test "scheduled: every sweep is pinned per entry, and none is metered" {
   # Unattended permission-free runs — the model is pinned per entry (harness
-  # appends --model), so a config-wide model change can never silently retarget
-  # them.
+  # appends --model), so a config-wide model change can never silently
+  # retarget them.
   #
-  # stumpcloud-sweep and the two weekly passes moved off hyper/glm-5.2 on
-  # 2026-08-28 in the Hyper cost review: prism is the router (it picks per
-  # prompt, so an idle health check and a real PR review do not pay the same
-  # rate), and qwen3.8-flash is the cheap fixed pin for a bounded weekly pass.
+  # HISTORY, because this pin has moved three times in three days and each
+  # move was a reaction to the previous one:
+  #   08-28  all four onto Hyper (prism / qwen3.8-flash) in a cost review
+  #   08-29  pr-sweep + stumpcloud-sweep off Hyper after pr-sweep burned ~$80
+  #          in an hour on a router whose price reads $0.00 locally
+  #   08-30  all four onto litellm/Qwen3.8-27B, the LOCAL 27B on ai01, once
+  #          vLLM v0.28.0 made prefix caching work for GDN hybrids
   #
-  # pr-sweep AND stumpcloud-sweep moved again on 2026-08-29, to
-  # zai/glm-5.3-flash: after pr-sweep burned ~$80 in an hour, a subscription
-  # plan whose session limit refuses at stream-open beats a metered one that
-  # auto-tops-up, and flash is the cheapest option on either. The two weekly
-  # passes stay on Hyper. Different provider, so they are asserted separately
-  # rather than folded into the hyper/ loop.
+  # THE INVARIANT THAT MATTERS is the last line: no sweep may sit on a
+  # pay-per-token provider. Local costs nothing; if a sweep is ever moved back
+  # to hyper/ it must be a deliberate edit here, not a silent drift.
   run _agent_render_all
-  for pin in issue-sweep:qwen3.8-flash blog-sweep:qwen3.8-flash; do
-    name=${pin%%:*}
-    model=${pin##*:}
-    grep -A10 "^\[harness\.$name\]" <<<"$output" | grep -q "model = \"hyper/$model\"" || return 1
+  [ "$status" -eq 0 ]
+  local rendered="$output" name
+  for name in pr-sweep stumpcloud-sweep issue-sweep blog-sweep; do
+    grep -A12 "^\[harness\.$name\]" <<<"$rendered" | grep -q 'model = "litellm/Qwen3.8-27B"' \
+      || { echo "$name is not pinned to the local model"; return 1; }
   done
-  for name in pr-sweep stumpcloud-sweep; do
-    grep -A12 "^\[harness\.$name\]" <<<"$output" | grep -q 'model = "litellm/Qwen3.8-27B"' || return 1
-  done
+  # No scheduled harness may be pinned to the metered provider. Written as a
+  # counting assertion rather than `! grep`, which set -e ignores mid-test.
+  run bash -c "grep -c '^model = \"hyper/' <<<\"\$(cat)\" || true" <<<"$rendered"
+  [ "$output" -eq 0 ] || { echo "a sweep is still pinned to hyper/"; false; }
 }
 
 @test "scheduled: no sweep runs on a premium-tier model" {
