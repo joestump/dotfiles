@@ -123,8 +123,11 @@
 #   67-87 tok/s; the clock goes on re-reading the same prompt.
 #
 #   Measured on the same read-only sweep rehearsal: 1m49s on
-#   zai/glm-5.3-flash, and still running past 17 minutes on the local 27B,
-#   correct but crawling.
+#   zai/glm-5.3-flash against 24m57s on the local 27B, where the local run was
+#   KILLED rather than finished — it was still working, correctly, and had got
+#   about as far in 25 minutes as flash did in 30 seconds. So >24m57s is a
+#   floor, not the real figure. It was stopped because it holds one of only
+#   two max-num-seqs slots on a single-user box for the whole run.
 #
 #   BEFORE PINNING THIS MODEL HERE, fix the engine, not the prompt. The MTP
 #   benchmark in dub.yaml (+40% decode) was measured on single-shot
