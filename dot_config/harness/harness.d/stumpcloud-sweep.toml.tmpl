@@ -93,6 +93,46 @@
 #   else), so between 07:00 runs the only cover is deterministic monitoring.
 #   If that is not actually watching what this sweep watches, 12h ("0 7,19 * *
 #   *") is the safer cut.
+#
+# @joestump-agent 08/30/2026 - THE LOCAL 27B: what it can do, and why it is not
+#   pinned here yet. Written down because two separate sessions have now gone
+#   looking, and each found a different wrong answer first.
+#
+#   The hardware is real and adequate. ai01 is a guest on hal with an RTX 3090
+#   Ti + RTX 3090 passed through, 48 GB total, serving Qwen3.8-27B INT8
+#   tensor-parallel at its full native 262144 context, reached as
+#   `litellm/Qwen3.8-27B` through the gateway Crush already declares. An
+#   earlier pass concluded the fleet had no GPU able to hold a 27B; that was
+#   read off a stale ansible branch predating ai01 and is simply wrong.
+#
+#   TOOL CALLING WAS THE FIRST BLOCKER, and it is FIXED. ai01 ran without
+#   `--enable-auto-tool-choice` / `--tool-call-parser`, so Crush died at
+#   stream-open on every agent request while plain completions kept working —
+#   invisible to any healthcheck. ansible#558 added both (parser `qwen3_xml`,
+#   NOT hermes: this checkpoint's chat template uses the XML tool-call form)
+#   and ai01 was redeployed 2026-08-29.
+#
+#   THE SECOND BLOCKER IS THROUGHPUT, AND IT IS A CONFIG PROBLEM, NOT THE
+#   MODEL. The engine reports `enable_prefix_caching=False` with a 0.0% hit
+#   rate for the whole of a run. It is not in the non-default args, so vLLM
+#   forced it off — most likely the MTP speculative-decoding config or the fp8
+#   KV cache, though the logs do not say which. Without prefix caching every
+#   turn re-prefills the entire conversation, and an agent loop is dozens of
+#   turns over a context that only grows, so prefill cost climbs roughly with
+#   the square of the turn count. Decode speed is fine and hits the benchmarked
+#   67-87 tok/s; the clock goes on re-reading the same prompt.
+#
+#   Measured on the same read-only sweep rehearsal: 1m49s on
+#   zai/glm-5.3-flash, and still running past 17 minutes on the local 27B,
+#   correct but crawling.
+#
+#   BEFORE PINNING THIS MODEL HERE, fix the engine, not the prompt. The MTP
+#   benchmark in dub.yaml (+40% decode) was measured on single-shot
+#   generation, which is the one workload prefix caching does not help; for a
+#   multi-turn agent the trade almost certainly inverts. Try dropping MTP,
+#   adding `--enable-prefix-caching`, redeploying, and re-running the same
+#   rehearsal for a clean before/after. Verify the hit rate is non-zero in the
+#   engine log rather than trusting the flag.
 {{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
 {{ if hasSuffix "-agent" $dropinUser -}}
 [harness.stumpcloud-sweep]
