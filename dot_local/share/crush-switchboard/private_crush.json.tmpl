@@ -26,17 +26,29 @@ reads) is the same weight as its Signal work, and zai is quota-metered rather
 than pay-per-token, so a busy week degrades to a hard stop instead of a bill.
 Nothing here should ever point at hyper.
 
-  large  glm-5.2        plenty for doorbell triage
+  large  glm-5.3-flash  doorbell triage; same tier as small
   small  glm-5.3-flash  titles and summaries, off the large quota
 
 @joestump 08/29/2026 - Added while reviewing #197. The harness landed with
   CRUSH_GLOBAL_DATA repointed but no pin at the far end, so every box except
   the one it was hand-seeded on would have run the fallback model.
+
+@joestump-agent 08/30/2026 - large glm-5.2 -> glm-5.3-flash, per Joe. Both
+  tiers are now the same model, which is the point: flash is a generation
+  newer than 5.2 and cheaper against the same quota, and the note above
+  claiming "the 5.3 tier buys nothing here" was written before 5.3-flash
+  existed as an option for the large slot.
+
+  `harness list` also described these as "GLM-5.2 (Z.ai)" while the harness
+  itself carried no model pin at all -- the model has always come from THIS
+  file via CRUSH_GLOBAL_DATA. The description strings are corrected in
+  harness.toml.tmpl so the listing stops asserting a pin that does not live
+  there.
 */ -}}
 {
   "$schema": "https://charm.land/crush.json",
   "models": {
-    "large": { "model": "glm-5.2", "provider": "zai" },
+    "large": { "model": "glm-5.3-flash", "provider": "zai" },
     "small": { "model": "glm-5.3-flash", "provider": "zai" }
   }
 }

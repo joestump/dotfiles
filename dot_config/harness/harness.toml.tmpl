@@ -84,12 +84,12 @@
 # token reaches the agents without a login shell in the loop. Running the
 # daemon by hand instead? Source that file first.
 
-# Crush driven from Signal, on Z.ai's GLM-5.2, with permission prompts off.
+# Crush driven from Signal, on Z.ai's GLM-5.3 Flash, with permission prompts off.
 #
 # MODEL PINNING. Crush has no --model flag; the model comes from config, and the
 # last config file wins (GlobalConfig → GlobalConfigData → project configs).
 # CRUSH_GLOBAL_DATA, set in the env_file below, repoints GlobalConfigData at
-# ~/.local/share/crush-signal/crush.json, which pins glm-5.2 on the zai provider
+# ~/.local/share/crush-signal/crush.json, which pins glm-5.3-flash on the zai provider
 # for THIS harness only. The `crush` you run interactively keeps its own model —
 # the shared ~/.config/crush/crush.json still pins nothing, by design.
 #
@@ -145,7 +145,7 @@ harness = "crush"
 args = ["--yolo", "--channels", "signal"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
-description = "Crush · GLM-5.2 (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
+description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
 restart = "on-failure"
 restart_delay = 30
 enabled = false
@@ -184,7 +184,7 @@ harness = "crush"
 args = ["--yolo", "--channels", "switchboard"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-switchboard.env"
-description = "Crush · GLM-5.2 (Z.ai) · YOLO · Switchboard channel (webhook todos)"
+description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Switchboard channel (webhook todos)"
 restart = "on-failure"
 restart_delay = 30
 enabled = false
