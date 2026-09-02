@@ -94,9 +94,11 @@ _render() {
   esac
 }
 
-# pr-sweep is host-gated per identity (.sweeps.prSweepAgentHost /
-# .sweeps.prSweepHumanHost), so a render that does not name THIS host sees no
-# pr-sweep table at all. Tests that assert on the seeded set must arm it.
+# EVERY sweep is host-gated (.sweeps.<name>AgentHost, plus prSweepHumanHost for
+# pr-sweep's human side), so a render that does not name THIS host sees no
+# scheduled table at all. Tests that assert on the seeded set must arm all of
+# them — arming only pr-sweep silently drops the other four and the seeded-set
+# assertions then test a smaller set than they claim to.
 _hb_this_host() {
   chezmoi execute-template --source "$REPO_ROOT" <<<'{{ .chezmoi.hostname }}'
 }
@@ -112,11 +114,16 @@ _hb_this_host() {
   # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
   # the config format from the extension, so mint the .toml inside a temp dir.
   _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
+  _h="$(_hb_this_host)"
   printf '[data]
     agentIdentity = "ci-agent"
 [data.sweeps]
     prSweepAgentHost = "%s"
-' "$(_hb_this_host)" >"$_cfg"
+    stumpcloudSweepAgentHost = "%s"
+    issueSweepAgentHost = "%s"
+    blogSweepAgentHost = "%s"
+    navidromeLdapSyncAgentHost = "%s"
+' "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
@@ -234,11 +241,16 @@ PY"
   # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
   # the config format from the extension, so mint the .toml inside a temp dir.
   _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
+  _h="$(_hb_this_host)"
   printf '[data]
     agentIdentity = "ci-agent"
 [data.sweeps]
     prSweepAgentHost = "%s"
-' "$(_hb_this_host)" >"$_cfg"
+    stumpcloudSweepAgentHost = "%s"
+    issueSweepAgentHost = "%s"
+    blogSweepAgentHost = "%s"
+    navidromeLdapSyncAgentHost = "%s"
+' "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
