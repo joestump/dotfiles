@@ -31,6 +31,8 @@
 #   sweep prompt: {{ include "dot_config/dotfiles/stumpcloud-sweep.prompt.md" | sha256sum }}
 #   pr prompt:    {{ include "dot_config/dotfiles/pr-sweep.prompt.md.tmpl" | sha256sum }}
 #   issue prompt: {{ include "dot_config/dotfiles/issue-sweep.prompt.md.tmpl" | sha256sum }}
+#   drop-in brief: {{ include "dot_config/harness/harness.d/morning-brief.toml.tmpl" | sha256sum }}
+#   brief prompt: {{ include "dot_config/dotfiles/morning-brief.prompt.md.tmpl" | sha256sum }}
 set -euo pipefail
 
 # Both identity branches below reload the daemon, so the ui-lib source and the

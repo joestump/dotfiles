@@ -383,3 +383,4 @@ sweeps:
   issueSweepAgentHost: "tars"
   blogSweepAgentHost: "tars"
   navidromeLdapSyncAgentHost: "tars"
+  morningBriefAgentHost: "tars"

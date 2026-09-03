@@ -54,4 +54,5 @@ Library/
 {{ if not (hasSuffix "-agent" $sweepUser) -}}
 .config/dotfiles/stumpcloud-sweep.prompt.md
 .config/dotfiles/issue-sweep.prompt.md
+.config/dotfiles/morning-brief.prompt.md
 {{ end -}}
