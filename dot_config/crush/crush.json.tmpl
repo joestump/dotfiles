@@ -344,6 +344,7 @@
       "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-skills",
       "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-plugin-sdd/skills",
       "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/claude-plugin-harness/skills",
+      "{{ .chezmoi.homeDir }}/.config/crush/skills-ext/stumpcloud-skills/skills",
       "{{ .chezmoi.homeDir }}/.config/claude-marketplaces/claude-personal/skills"
     ],
     "disabled_skills": [
@@ -355,7 +356,15 @@
       "report-friction",
       "index",
       "search",
-      "work"
+      "work",
+{{- /* Superseded by the canonical skills in stumpcloud/skills
+       (skills-ext/stumpcloud-skills). Each disabled name has a stronger,
+       maintained replacement there — do not re-enable without deleting the
+       replacement. */}}
+      "arr-triage",
+      "stumpcloud-deploy",
+      "proxmox-manage",
+      "stumpcloud-zfs"
     ],
     "disabled_tools": []
   },

@@ -353,8 +353,33 @@ ghostty:
 # joestump-agent sweeps, kitt owns the joestump ones, and the MacBook runs no
 # scheduled sweeps at all — it is an interactive machine, and a sweep that
 # fires there competes with the person using it.
+#
+# @joestump-agent 08/31/2026 - Extended to ALL FIVE sweeps. Only pr-sweep was
+# host-gated; the other four gated on the `-agent` login suffix alone, which
+# names an IDENTITY and not a MACHINE. That is only a single-runner rule while
+# exactly one agent box exists — the second one silently doubles every
+# ungated sweep, with two agents racing on the same repos, opening duplicate
+# PRs and posting duplicate Signal alerts.
+#
+# Found while evaluating a second agent login on ai01. That move was dropped
+# (tars keeps the sweeps — it is a dedicated box with 17 GB free against
+# ai01's 9 GB, and ai01 runs the very vLLM engine four of these sweeps call,
+# so a runaway sweep there would kill its own model server). The gap it
+# exposed is real regardless of whether anything ever moves, and it is the
+# same shape as the 08/29 incident above: a gate that reads as "one machine"
+# but is not.
 sweeps:
   # Hostnames as `.chezmoi.hostname` sees them (short name, e.g. "kitt").
   # Empty disarms that identity's sweep fleet-wide.
+  #
+  # pr-sweep is the only one with a HUMAN side — it renders for both identities
+  # on staggered schedules (09:30 agent / 15:30 human). The other four render
+  # for the agent identity only, so a HumanHost key for them would be a value
+  # no template reads. Add one at the same time you add a human branch, not
+  # before.
   prSweepAgentHost: "tars"
   prSweepHumanHost: "kitt"
+  stumpcloudSweepAgentHost: "tars"
+  issueSweepAgentHost: "tars"
+  blogSweepAgentHost: "tars"
+  navidromeLdapSyncAgentHost: "tars"

@@ -22,18 +22,30 @@ pay-per-token, so a busy week degrades to a hard stop rather than to a bill.
 That is the property this always-on agent wants. Hyper stays the metered
 overflow and nothing here should point at it.
 
-  large  glm-5.2        plenty for Signal work; the 5.3 tier buys nothing here
+  large  glm-5.3-flash  Signal work; same tier as small, one quota to watch
   small  glm-5.3-flash  titles and summaries, which fire on every exchange —
                         the cheapest way to keep those off the large quota.
                         Replaces glm-4.7-flashx, two generations stale.
 
 @joestump-agent 08/28/2026 - Converted from create_ to managed after the pin
   drifted to hyper/kimi-k3 undetected, and repointed small at glm-5.3-flash.
+
+@joestump-agent 08/30/2026 - large glm-5.2 -> glm-5.3-flash, per Joe. Both
+  tiers are now the same model, which is the point: flash is a generation
+  newer than 5.2 and cheaper against the same quota, and the note above
+  claiming "the 5.3 tier buys nothing here" was written before 5.3-flash
+  existed as an option for the large slot.
+
+  `harness list` also described these as "GLM-5.2 (Z.ai)" while the harness
+  itself carried no model pin at all -- the model has always come from THIS
+  file via CRUSH_GLOBAL_DATA. The description strings are corrected in
+  harness.toml.tmpl so the listing stops asserting a pin that does not live
+  there.
 */ -}}
 {
   "$schema": "https://charm.land/crush.json",
   "models": {
-    "large": { "model": "glm-5.2", "provider": "zai" },
+    "large": { "model": "glm-5.3-flash", "provider": "zai" },
     "small": { "model": "glm-5.3-flash", "provider": "zai" }
   }
 }

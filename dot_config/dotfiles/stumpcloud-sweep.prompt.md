@@ -118,36 +118,40 @@ draw it. Stay inside it.
 - Anything destructive or irreversible. When only a risky action would fix it,
   report and stop — that has not changed.
 
-## How to escalate
+## How to hand off
 
-Use `harness run` to spawn a separate, better-equipped agent. The
-`harness-control` skill covers the mechanics; the essentials:
+**Do not try to spawn another agent.** An earlier version of this prompt told
+you to run
 
 ```
-harness run --detach --kind crush --model zai/glm-5.3 \
-  "<one specific task, with everything you already established>"
+harness run --detach --kind crush --model <model> "..."
 ```
 
-`zai/glm-5.3` is the escalation target because it is materially stronger than
-this sweep's pin and sits on the SAME subscription plan — escalating costs no
-new money, only quota. Do not escalate to a metered provider.
+That command does not work and never did. `harness run` has no `--model` flag —
+the whole surface is `--workdir`, `--kind`, `--name`, `--detach` — so it exits
+immediately with `unknown flag: --model`. Scratchpad runs launched without it
+were also observed exiting non-zero with no output. If you find yourself
+reaching for `harness run`, stop: that path is not currently usable from here.
 
-**Escalation is fire-and-forget. There is no result channel.** The spawned run
-cannot answer you; you get a name, not a result. So:
+**Hand off durably instead.** A handoff has to survive this run ending, and an
+issue does that while a spawned process does not:
 
-- **Never wait for, poll, or depend on the escalated run.** Spawn it, note it,
-  carry on with the rest of the sweep.
-- **The prompt IS the entire handoff.** Put everything you learned in it — the
-  host, the service, the symptom, the log line that identified it, the repo and
-  file you believe is wrong, and what you already ruled out. An escalation that
-  says "look into the DNS thing" makes the next agent rediscover your whole
-  run at full price.
-- **One escalation per distinct problem.** Do not batch unrelated findings into
-  one prompt, and do not spawn two runs for the same thing.
+- **File an issue in `stumpcloud/stumpcloud`** (the single tracker for all
+  StumpCloud work, code-level or not) describing the problem and the fix you
+  believe is needed. Label it `OMG` only if it belongs to an incident writeup;
+  otherwise leave it unlabelled for triage.
+- **Put everything you established in the issue body** — the host, the service,
+  the symptom, the log line that identified it, the repo and file you believe
+  is wrong, and what you already ruled out. This is the entire handoff: whoever
+  picks it up should not have to redo your run.
+- **One issue per distinct problem.** Do not batch unrelated findings, and
+  check for an existing open issue before filing a duplicate.
+- **Name it in the Signal summary too**, so it is visible immediately rather
+  than only to whoever next reads the tracker.
 
-Record every escalation in the report: what you handed off, to what, and why it
-was above your line. The escalated run reports through its own channel, later
-and separately — so if you do not name it, nobody knows it is in flight.
+A filed issue is slower than a spawned agent would have been. It is also the
+only handoff that still exists tomorrow, which matters more for a sweep that
+runs unattended.
 
 ## Reporting — non-negotiable
 
