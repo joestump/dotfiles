@@ -173,6 +173,18 @@
     refreshPeriod = "24h"
 [".config/crush/skills-ext/claude-plugin-harness".pull]
     args = ["--ff-only", "--quiet"]
+# StumpCloud's canonical agent-skill marketplace (gitea.stump.rocks/stumpcloud/
+# skills) — fleet, deploy, triage, secrets, CI, storage, media, backups, Proxmox,
+# and skill-authoring skills. PUBLIC repo, no credential guard needed. These are
+# the maintained replacements for the ad-hoc copies that used to live in the
+# claude-personal marketplace (arr-triage, stumpcloud-deploy, proxmox-manage,
+# stumpcloud-zfs) — see disabled_skills in crush.json.
+[".config/crush/skills-ext/stumpcloud-skills"]
+    type = "git-repo"
+    url = "https://gitea.stump.rocks/stumpcloud/skills.git"
+    refreshPeriod = "24h"
+[".config/crush/skills-ext/stumpcloud-skills".pull]
+    args = ["--ff-only", "--quiet"]
 
 # ---------- Signal MCP server (Linux only) ----------
 # The Signal MCP (a JSON-RPC client for the signal-cli daemon) is launched with
