@@ -123,7 +123,8 @@ _hb_this_host() {
     issueSweepAgentHost = "%s"
     blogSweepAgentHost = "%s"
     navidromeLdapSyncAgentHost = "%s"
-' "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
+    morningBriefAgentHost = "%s"
+' "$_h" "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
@@ -148,7 +149,8 @@ for fname, dd in docs.items():
     names |= set(dd['harness'])
 assert names == {'crush-signal', 'crush-switchboard', 'claude-code',
                  'claude-headless', 'stumpcloud-sweep', 'pr-sweep',
-                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names)
+                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync',
+                 'morning-brief'}, sorted(names)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
@@ -250,7 +252,8 @@ PY"
     issueSweepAgentHost = "%s"
     blogSweepAgentHost = "%s"
     navidromeLdapSyncAgentHost = "%s"
-' "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
+    morningBriefAgentHost = "%s"
+' "$_h" "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do

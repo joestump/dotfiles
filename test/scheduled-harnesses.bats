@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
-# The scheduled harnesses: five one-shot prompt harnesses, one drop-in file
+# The scheduled harnesses: six one-shot prompt harnesses, one drop-in file
 # each in dot_config/harness/harness.d/*.toml (stumpcloud-sweep every 6h,
-# pr-sweep daily, issue-sweep + blog-sweep + navidrome-ldap-sync weekly),
+# pr-sweep daily, morning-brief weekdays, issue-sweep + blog-sweep +
+# navidrome-ldap-sync weekly),
 # replacing the retired standalone stumpcloud-sweep systemd timer / launchd
 # agent. These tests pin the couplings: every scheduled entry points at a
 # prompt file that actually ships, the old units are gone from source AND
@@ -45,14 +46,14 @@ _agent_render() {
   # mktemp --suffix is GNU-only; BSD/macOS mktemp rejects it. chezmoi infers
   # the config format from the extension, so mint the .toml inside a temp dir.
   # EVERY sweep's host key is armed to THIS host so the declaration-shape
-  # tests below still see all five; the gates themselves are tested separately.
-  # All five are host-gated as of 2026-08-31 — arming only pr-sweep here would
-  # render the other four empty and fail every shape test silently.
+  # tests below still see all six; the gates themselves are tested separately.
+  # All six are host-gated as of 2026-08-31 — arming only pr-sweep here would
+  # render the others empty and fail every shape test silently.
   local cfgdir rc h
   cfgdir="$(mktemp -d)"
   h="$(_this_host)"
-  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = "%s"\n    stumpcloudSweepAgentHost = "%s"\n    issueSweepAgentHost = "%s"\n    blogSweepAgentHost = "%s"\n    navidromeLdapSyncAgentHost = "%s"\n' \
-    "$h" "$h" "$h" "$h" "$h" >"$cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = "%s"\n    stumpcloudSweepAgentHost = "%s"\n    issueSweepAgentHost = "%s"\n    blogSweepAgentHost = "%s"\n    navidromeLdapSyncAgentHost = "%s"\n    morningBriefAgentHost = "%s"\n' \
+    "$h" "$h" "$h" "$h" "$h" "$h" >"$cfgdir/chezmoi.toml"
   chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$1"
   rc=$?
   rm -rf "$cfgdir"
@@ -70,10 +71,10 @@ _agent_render_all() {
   done
 }
 
-@test "scheduled: five scheduled harnesses declared with prompt + cron" {
+@test "scheduled: six scheduled harnesses declared with prompt + cron" {
   run _agent_render_all
   [ "$status" -eq 0 ]
-  for name in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync; do
+  for name in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync morning-brief; do
     grep -qE "^\[harness\.$name\]" <<<"$output" || return 1
     # every scheduled entry needs `prompt` and a 5-field cron `schedule`
     grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -q '^prompt = ' || return 1
@@ -152,12 +153,12 @@ if bad:
   # always a prompt harness (`schedule` requires `prompt`), which defaults to
   # "no" instead -- the same value, arrived at silently. So the explicit line
   # is the only thing that states the intent, and the only thing that still
-  # holds if the prompt-harness default ever changes. Assert all five are
+  # holds if the prompt-harness default ever changes. Assert all six are
   # present and are "no".
-  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 5 ]
+  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 6 ]
 }
 
-@test "scheduled: cadences — sweep + pr daily, issue + blog + navidrome weekly" {
+@test "scheduled: cadences — sweep + pr daily, brief weekdays, issue + blog + navidrome weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* \*"'
   # daily, staggered 09:30 (agent) against the human side's 15:30
@@ -165,11 +166,13 @@ if bad:
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
   grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
   grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 0"'
+  # weekdays only — a brief delivered on Saturday trains you to ignore the thread
+  grep -A8 '^\[harness\.morning-brief\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 1-5"'
 }
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
   run _agent_render_all
-  for f in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync; do
+  for f in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync morning-brief; do
     grep -q "$f.prompt.md" <<<"$output" || return 1
     # pr-feedback/grooming are templates (identity vars); the sweep prompt is
     # identity-free markdown. Either way the template must render cleanly.
@@ -248,6 +251,7 @@ if bad:
   for f in "$PROMPTS_DIR"/pr-sweep.prompt.md.tmpl \
            "$PROMPTS_DIR"/issue-sweep.prompt.md.tmpl \
            "$PROMPTS_DIR"/navidrome-ldap-sync.prompt.md.tmpl \
+           "$PROMPTS_DIR"/morning-brief.prompt.md.tmpl \
            "$PROMPTS_DIR"/stumpcloud-sweep.prompt.md; do
     grep -qi '## Scope clamp' "$f"
     grep -qi 'Untrusted content' "$f"
@@ -266,13 +270,13 @@ if bad:
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output"
-  for name in pr-sweep issue-sweep stumpcloud-sweep blog-sweep navidrome-ldap-sync; do
+  for name in pr-sweep issue-sweep stumpcloud-sweep blog-sweep navidrome-ldap-sync morning-brief; do
     echo "$rendered" | grep -q "$name" || { echo "missing harness $name"; false; }
   done
   # one clamp sentence per scheduled harness
-  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 5 ]
-  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 5 ]
-  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 5 ]
+  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 6 ]
+  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 6 ]
+  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 6 ]
 }
 
 # The base agent rules ban force-pushing outright, but the sweep prompts are a
@@ -324,7 +328,9 @@ if bad:
            dot_config/harness/harness.d/issue-sweep.toml.tmpl \
            dot_config/dotfiles/stumpcloud-sweep.prompt.md \
            dot_config/dotfiles/pr-sweep.prompt.md.tmpl \
-           dot_config/dotfiles/issue-sweep.prompt.md.tmpl; do
+           dot_config/dotfiles/issue-sweep.prompt.md.tmpl \
+           dot_config/harness/harness.d/morning-brief.toml.tmpl \
+           dot_config/dotfiles/morning-brief.prompt.md.tmpl; do
     grep -q "$f" "$RELOAD_SCRIPT" || return 1
   done
   grep -q 'harness reload\|HARNESS_BIN" reload' "$RELOAD_SCRIPT" || return 1
@@ -337,6 +343,7 @@ if bad:
   # ship the prompt, and the drop-in must declare the table.
   grep -q 'issue-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
   grep -q 'stumpcloud-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
+  grep -q 'morning-brief.prompt.md' "$REPO_ROOT/.chezmoiignore"
   ! grep -q 'pr-sweep.prompt.md' "$REPO_ROOT/.chezmoiignore"
 
   # Agent-only drop-ins keep the suffix gate ON TOP OF the host gate; pr-sweep
@@ -346,6 +353,7 @@ if bad:
   # (asserted for all five in "every sweep drop-in is host-gated" below).
   grep -q 'hasSuffix "-agent"' "$HARNESS_D/issue-sweep.toml.tmpl"
   grep -q 'hasSuffix "-agent"' "$HARNESS_D/stumpcloud-sweep.toml.tmpl"
+  grep -q 'hasSuffix "-agent"' "$HARNESS_D/morning-brief.toml.tmpl"
   ! grep -q '{{ if hasSuffix "-agent"' "$HARNESS_D/pr-sweep.toml.tmpl"
   grep -q 'sweeps.prSweepAgentHost' "$HARNESS_D/pr-sweep.toml.tmpl"
 }
@@ -366,6 +374,7 @@ if bad:
   # and none of the agent-only ones
   ! grep -q '^\[harness\.issue-sweep\]' <<<"$out"
   ! grep -q '^\[harness\.stumpcloud-sweep\]' <<<"$out"
+  ! grep -q '^\[harness\.morning-brief\]' <<<"$out"
 }
 
 @test "scheduled: the two sweeps are disjoint — issues here, PRs there" {
@@ -417,7 +426,7 @@ if bad:
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output" name
-  for name in pr-sweep stumpcloud-sweep issue-sweep blog-sweep; do
+  for name in pr-sweep stumpcloud-sweep issue-sweep blog-sweep morning-brief; do
     grep -A12 "^\[harness\.$name\]" <<<"$rendered" | grep -q 'model = "litellm/Qwen3.8-27B"' \
       || { echo "$name is not pinned to the local model"; return 1; }
   done
@@ -437,6 +446,40 @@ if bad:
   for model in kimi-k3 kimi-k2.7-code glm-5.2 glm-5.1 deepseek-v4-pro qwen3.7-max qwen3.6-max qwen3.8-max; do
     ! grep -q "model = \"hyper/$model\"" <<<"$output" || return 1
   done
+}
+
+# The brief is the only sweep that writes NOTHING to a forge — it reads, and
+# hands off via Cairn. The draft got this wrong in the most dangerous way: its
+# Step 3 told the model to apply size/* and bug labels while every clamp in the
+# same file said it never labels anything. That is both a self-contradicting
+# prompt (the model picks one at 06:00 with nobody watching) and a collision
+# with issue-sweep, which owns size/* outright. Pin both halves.
+@test "scheduled: morning-brief reads and reports, and never writes to a forge" {
+  local f="$PROMPTS_DIR/morning-brief.prompt.md.tmpl"
+  grep -qi 'You read, compile, and report. You never write' "$f"
+  # it may ASSESS a size, but must not apply one — that is issue-sweep's job
+  grep -qi 'Do not apply the label' "$f"
+  grep -qi 'is the sole owner of' "$f"
+  # no instruction anywhere in the file to add or set a label
+  ! grep -qiE '^\s*-\s+\*\*Add labels' "$f" \
+    || { echo "morning-brief still instructs the model to apply labels"; return 1; }
+  # and the daemon one-liner carries the same clamp for when the file cannot load
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  local clamp
+  clamp=$(grep -A3 '^\[harness\.morning-brief\]' <<<"$output" | grep '^prompt =')
+  grep -q 'never merges, approves, closes, comments on, or labels' <<<"$clamp"
+  return 0
+}
+
+# The brief is worthless if it only watches GitHub: stumpcloud/stumpcloud is the
+# single tracker for all StumpCloud work and the stump.wtf products each keep
+# their own, so a GitHub-only issue step misses most new bug reports outright.
+@test "scheduled: morning-brief enumerates issues on BOTH forges" {
+  local f="$PROMPTS_DIR/morning-brief.prompt.md.tmpl"
+  grep -q 'stumpcloud/stumpcloud' "$f"
+  grep -q 'repos/issues/search' "$f"
+  grep -qi 'Renovate Dependency Dashboard' "$f"
 }
 
 @test "scheduled: blog-sweep opens a PR and never merges" {
@@ -561,6 +604,7 @@ if bad:
   grep -qE '^  issueSweepAgentHost: "tars"' "$REPO_ROOT/.chezmoidata.yaml"
   grep -qE '^  blogSweepAgentHost: "tars"' "$REPO_ROOT/.chezmoidata.yaml"
   grep -qE '^  navidromeLdapSyncAgentHost: "tars"' "$REPO_ROOT/.chezmoidata.yaml"
+  grep -qE '^  morningBriefAgentHost: "tars"' "$REPO_ROOT/.chezmoidata.yaml"
 }
 
 # Every sweep must name a host, not just an identity. The `-agent` suffix is an
@@ -588,7 +632,7 @@ if bad:
   # A SECOND agent box: correct identity suffix, wrong hostname. This is the
   # case the suffix-only gate could not express, and the one that would have
   # produced duplicate sweeps.
-  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = "other-box"\n    stumpcloudSweepAgentHost = "other-box"\n    issueSweepAgentHost = "other-box"\n    blogSweepAgentHost = "other-box"\n    navidromeLdapSyncAgentHost = "other-box"\n' \
+  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = "other-box"\n    stumpcloudSweepAgentHost = "other-box"\n    issueSweepAgentHost = "other-box"\n    blogSweepAgentHost = "other-box"\n    navidromeLdapSyncAgentHost = "other-box"\n    morningBriefAgentHost = "other-box"\n' \
     >"$cfgdir/chezmoi.toml"
   for f in "$HARNESS_D"/*.toml.tmpl; do
     run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f"
@@ -606,7 +650,7 @@ if bad:
   cfgdir="$(mktemp -d)"
   # Empty everything, on the real host, under the agent identity: the kill
   # switch the .chezmoidata comment advertises must actually work.
-  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = ""\n    stumpcloudSweepAgentHost = ""\n    issueSweepAgentHost = ""\n    blogSweepAgentHost = ""\n    navidromeLdapSyncAgentHost = ""\n' \
+  printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepAgentHost = ""\n    stumpcloudSweepAgentHost = ""\n    issueSweepAgentHost = ""\n    blogSweepAgentHost = ""\n    navidromeLdapSyncAgentHost = ""\n    morningBriefAgentHost = ""\n' \
     >"$cfgdir/chezmoi.toml"
   for f in "$HARNESS_D"/*.toml.tmpl; do
     run chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f"
