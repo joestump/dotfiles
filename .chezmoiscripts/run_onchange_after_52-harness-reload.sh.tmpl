@@ -25,8 +25,11 @@
 # already fired once); .chezmoiremove deletes the files.
 #
 #   config hash:  {{ include "dot_config/harness/harness.toml.tmpl" | sha256sum }}
-#   drop-in sweep: {{ include "dot_config/harness/harness.d/stumpcloud-sweep.toml.tmpl" | sha256sum }}
-#   drop-in pr:    {{ include "dot_config/harness/harness.d/pr-sweep.toml.tmpl" | sha256sum }}
+#   drop-in sweep dub:  {{ include "dot_config/harness/harness.d/stumpcloud-sweep-dub.toml.tmpl" | sha256sum }}
+#   drop-in sweep dtw:  {{ include "dot_config/harness/harness.d/stumpcloud-sweep-dtw.toml.tmpl" | sha256sum }}
+#   drop-in sweep pdx:  {{ include "dot_config/harness/harness.d/stumpcloud-sweep-pdx.toml.tmpl" | sha256sum }}
+#   drop-in pr gitea:   {{ include "dot_config/harness/harness.d/pr-sweep.toml.tmpl" | sha256sum }}
+#   drop-in pr github:  {{ include "dot_config/harness/harness.d/pr-sweep-github.toml.tmpl" | sha256sum }}
 #   drop-in issue: {{ include "dot_config/harness/harness.d/issue-sweep.toml.tmpl" | sha256sum }}
 #   sweep prompt: {{ include "dot_config/dotfiles/stumpcloud-sweep.prompt.md" | sha256sum }}
 #   pr prompt:    {{ include "dot_config/dotfiles/pr-sweep.prompt.md.tmpl" | sha256sum }}
