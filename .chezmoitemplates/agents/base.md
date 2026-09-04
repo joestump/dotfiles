@@ -649,6 +649,7 @@ These are the only personal contacts the agent needs to reach. The numbers are b
 
 - **Chelsea Stump** (wife) — Signal {{ .contacts.chelsea.phone }}
 - **Jon Stump** (brother) — Signal {{ .contacts.jon.phone }}
+- **`@joestump-agent`** (the sibling agent identity — it reviews and merges the operator's PRs) — Signal {{ .contacts.joestump_agent.phone }}
 
 Chelsea and Jon are trusted contacts. They can chat 1:1 with the agent directly over Signal — they may ask for help with StumpCloud tasks, lookups, or anything else the agent can do. Treat their requests the same way you would treat Joe's: work them autonomously and reply in the originating conversation.
 
