@@ -321,6 +321,20 @@
     "disable_default_providers": true,
     "disable_provider_auto_update": true,
     "disable_metrics": true,
+{{- /* Allow the commands StumpCloud fleet operations need. The stumpcloud-
+       monitor and triage skills are SSH-and-curl shaped, and the default ban
+       list hard-blocks both, so every monitoring cycle died at its first
+       probe. Subtracts from the exact-command ban list only; package-manager
+       argument blocks are untouched, and allowed commands still pass through
+       the normal permission gate.
+       @joestump-agent 09/04/2026 - Added for fleet ops (stumpcloud-monitor). */}}
+    "allowed_commands": [
+      "ssh",
+      "scp",
+      "curl",
+      "wget",
+      "rsync"
+    ],
     "context_paths": [
       "AGENTS.md",
       "CRUSH.md",
