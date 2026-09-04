@@ -148,9 +148,10 @@ for fname, dd in docs.items():
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
 assert names == {'crush-signal', 'crush-switchboard', 'claude-code',
-                 'claude-headless', 'stumpcloud-sweep', 'pr-sweep',
-                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync',
-                 'morning-brief'}, sorted(names)
+                 'claude-headless', 'stumpcloud-sweep-dub',
+                 'stumpcloud-sweep-dtw', 'stumpcloud-sweep-pdx',
+                 'pr-sweep', 'pr-sweep-github', 'morning-brief',
+                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
@@ -189,8 +190,8 @@ PY"
   for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
     run bash -c "chezmoi execute-template --config '$_cfg' --source '$REPO_ROOT' < '$_f' | grep -c '^\[harness\.' || true"
     case "$(basename "$_f")" in
-      pr-sweep.toml.tmpl) [ "$output" -eq 1 ] ;;
-      *)                  [ "$output" -eq 0 ] ;;
+      pr-sweep.toml.tmpl|pr-sweep-github.toml.tmpl) [ "$output" -eq 1 ] ;;
+      *)                                            [ "$output" -eq 0 ] ;;
     esac
   done
   rm -rf "$_cfgdir"

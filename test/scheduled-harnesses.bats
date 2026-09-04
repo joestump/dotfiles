@@ -71,10 +71,10 @@ _agent_render_all() {
   done
 }
 
-@test "scheduled: six scheduled harnesses declared with prompt + cron" {
+@test "scheduled: eight scheduled harnesses declared with prompt + cron" {
   run _agent_render_all
   [ "$status" -eq 0 ]
-  for name in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync morning-brief; do
+  for name in stumpcloud-sweep-dub stumpcloud-sweep-dtw stumpcloud-sweep-pdx               pr-sweep pr-sweep-github issue-sweep blog-sweep navidrome-ldap-sync               morning-brief; do
     grep -qE "^\[harness\.$name\]" <<<"$output" || return 1
     # every scheduled entry needs `prompt` and a 5-field cron `schedule`
     grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -q '^prompt = ' || return 1
@@ -155,12 +155,16 @@ if bad:
   # is the only thing that states the intent, and the only thing that still
   # holds if the prompt-harness default ever changes. Assert all six are
   # present and are "no".
-  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 6 ]
+  [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 9 ]
 }
 
 @test "scheduled: cadences — sweep + pr daily, brief weekdays, issue + blog + navidrome weekly" {
   run _agent_render_all
-  grep -A8 '^\[harness\.stumpcloud-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* \*"'
+  grep -A8 '^\[harness\.stumpcloud-sweep-dub\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* \*"'
+  grep -A8 '^\[harness\.stumpcloud-sweep-dtw\]' <<<"$output" | grep -q 'schedule = "20 7 \* \* \*"'
+  grep -A8 '^\[harness\.stumpcloud-sweep-pdx\]' <<<"$output" | grep -q 'schedule = "40 7 \* \* \*"'
+  # the GitHub half of the forge split, staggered off the Gitea half
+  grep -A8 '^\[harness\.pr-sweep-github\]' <<<"$output" | grep -q 'schedule = "0 10 \* \* \*"'
   # daily, staggered 09:30 (agent) against the human side's 15:30
   grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
@@ -172,14 +176,24 @@ if bad:
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
   run _agent_render_all
-  for f in stumpcloud-sweep pr-sweep issue-sweep blog-sweep navidrome-ldap-sync morning-brief; do
-    grep -q "$f.prompt.md" <<<"$output" || return 1
+  # the split sweeps share prompt files: map harness -> the prompt file its
+  # rendered prompt actually names
+  local file
+  for f in stumpcloud-sweep-dub stumpcloud-sweep-dtw stumpcloud-sweep-pdx            pr-sweep pr-sweep-github issue-sweep blog-sweep navidrome-ldap-sync            morning-brief; do
+    case "$f" in
+      stumpcloud-sweep-*) file="stumpcloud-sweep.prompt.md" ;;
+      pr-sweep*)          file="pr-sweep.prompt.md" ;;
+      *)                  file="$f.prompt.md" ;;
+    esac
+    grep -q "$file" <<<"$output" || return 1
     # pr-feedback/grooming are templates (identity vars); the sweep prompt is
     # identity-free markdown. Either way the template must render cleanly.
-    if [ -f "$PROMPTS_DIR/$f.prompt.md.tmpl" ]; then
+    # The split halves map onto a SHARED prompt file (the case above), so the
+    # existence/render check follows the mapped file, not the harness name.
+    if [ -f "$PROMPTS_DIR/$file.tmpl" ]; then
       command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-      chezmoi execute-template --source "$REPO_ROOT" < "$PROMPTS_DIR/$f.prompt.md.tmpl" >/dev/null || return 1
-    elif [ ! -f "$PROMPTS_DIR/$f.prompt.md" ]; then
+      chezmoi execute-template --source "$REPO_ROOT" < "$PROMPTS_DIR/$file.tmpl" >/dev/null || return 1
+    elif [ ! -f "$PROMPTS_DIR/$file" ]; then
       return 1
     fi
   done
@@ -270,13 +284,13 @@ if bad:
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output"
-  for name in pr-sweep issue-sweep stumpcloud-sweep blog-sweep navidrome-ldap-sync morning-brief; do
+  for name in pr-sweep pr-sweep-github stumpcloud-sweep-dub stumpcloud-sweep-dtw               stumpcloud-sweep-pdx issue-sweep blog-sweep navidrome-ldap-sync               morning-brief; do
     echo "$rendered" | grep -q "$name" || { echo "missing harness $name"; false; }
   done
   # one clamp sentence per scheduled harness
-  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 6 ]
-  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 6 ]
-  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 6 ]
+  [ "$(echo "$rendered" | grep -c 'untrusted data')" -eq 9 ]
+  [ "$(echo "$rendered" | grep -c 'prompt-injection attempt')" -eq 9 ]
+  [ "$(echo "$rendered" | grep -c 'it does nothing else')" -eq 9 ]
 }
 
 # The base agent rules ban force-pushing outright, but the sweep prompts are a
@@ -323,8 +337,11 @@ if bad:
   # only re-fires when the rendered script text changes, so the hashes of
   # everything the schedule depends on must be embedded in it.
   for f in dot_config/harness/harness.toml.tmpl \
-           dot_config/harness/harness.d/stumpcloud-sweep.toml.tmpl \
+           dot_config/harness/harness.d/stumpcloud-sweep-dub.toml.tmpl \
+           dot_config/harness/harness.d/stumpcloud-sweep-dtw.toml.tmpl \
+           dot_config/harness/harness.d/stumpcloud-sweep-pdx.toml.tmpl \
            dot_config/harness/harness.d/pr-sweep.toml.tmpl \
+           dot_config/harness/harness.d/pr-sweep-github.toml.tmpl \
            dot_config/harness/harness.d/issue-sweep.toml.tmpl \
            dot_config/dotfiles/stumpcloud-sweep.prompt.md \
            dot_config/dotfiles/pr-sweep.prompt.md.tmpl \
@@ -336,7 +353,7 @@ if bad:
   grep -q 'harness reload\|HARNESS_BIN" reload' "$RELOAD_SCRIPT" || return 1
 }
 
-@test "scheduled: human logins get pr-sweep and nothing else" {
+@test "scheduled: human logins get the pr sweeps and nothing else" {
   # pr-sweep is the ONE sweep that runs under both identities - that is what
   # keeps Joe reviewing the agent's PRs on a schedule instead of by hand. The
   # other two stay agent-only. Both gates have to agree: .chezmoiignore must
@@ -352,13 +369,14 @@ if bad:
   # each sweep runs on ONE machine rather than on every machine that renders it
   # (asserted for all five in "every sweep drop-in is host-gated" below).
   grep -q 'hasSuffix "-agent"' "$HARNESS_D/issue-sweep.toml.tmpl"
-  grep -q 'hasSuffix "-agent"' "$HARNESS_D/stumpcloud-sweep.toml.tmpl"
+  grep -q 'hasSuffix "-agent"' "$HARNESS_D/stumpcloud-sweep-dub.toml.tmpl"
+  grep -q 'hasSuffix "-agent"' "$HARNESS_D/pr-sweep-github.toml.tmpl"
   grep -q 'hasSuffix "-agent"' "$HARNESS_D/morning-brief.toml.tmpl"
   ! grep -q '{{ if hasSuffix "-agent"' "$HARNESS_D/pr-sweep.toml.tmpl"
   grep -q 'sweeps.prSweepAgentHost' "$HARNESS_D/pr-sweep.toml.tmpl"
 }
 
-@test "scheduled: a human login renders pr-sweep only, on its own cadence" {
+@test "scheduled: a human login renders only the two pr-sweep halves, on their own cadence" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   local cfgdir out
   cfgdir="$(mktemp -d)"
@@ -368,12 +386,15 @@ if bad:
     out+="$(chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f")"
   done
   rm -rf "$cfgdir"
-  # the one sweep a human runs, staggered off the agent's 09:30
+  # the two sweeps a human runs — both PR halves — staggered off the agent's
+  # 09:30 / 10:00
   grep -q '^\[harness\.pr-sweep\]' <<<"$out"
   grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* \*"'
+  grep -q '^\[harness\.pr-sweep-github\]' <<<"$out"
+  grep -A8 '^\[harness\.pr-sweep-github\]' <<<"$out" | grep -q 'schedule = "0 16 \* \* \*"'
   # and none of the agent-only ones
   ! grep -q '^\[harness\.issue-sweep\]' <<<"$out"
-  ! grep -q '^\[harness\.stumpcloud-sweep\]' <<<"$out"
+  ! grep -q '^\[harness\.stumpcloud-sweep-' <<<"$out"
   ! grep -q '^\[harness\.morning-brief\]' <<<"$out"
 }
 
@@ -426,7 +447,7 @@ if bad:
   run _agent_render_all
   [ "$status" -eq 0 ]
   local rendered="$output" name
-  for name in pr-sweep stumpcloud-sweep issue-sweep blog-sweep morning-brief; do
+  for name in pr-sweep pr-sweep-github stumpcloud-sweep-dub stumpcloud-sweep-dtw               stumpcloud-sweep-pdx issue-sweep blog-sweep morning-brief; do
     grep -A12 "^\[harness\.$name\]" <<<"$rendered" | grep -q 'model = "litellm/Qwen3.8-27B"' \
       || { echo "$name is not pinned to the local model"; return 1; }
   done
@@ -547,7 +568,7 @@ if bad:
 # The drop-ins are where a future editor adds the next scheduled sweep, so the
 # rule has to be visible there too, not only in the prompt files.
 @test "scheduled: drop-ins record the public-link rule for the attribution footer" {
-  for f in pr-sweep issue-sweep stumpcloud-sweep; do
+  for f in pr-sweep issue-sweep; do
     grep -q 'ATTRIBUTION LINKS ARE PUBLIC' "$REPO_ROOT/dot_config/harness/harness.d/$f.toml.tmpl"
   done
 }

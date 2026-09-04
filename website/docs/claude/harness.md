@@ -78,8 +78,11 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 | `crush-switchboard` | Crush on GLM-5.2 (Z.ai), `--yolo`, woken by **Switchboard** webhook doorbells | no |
 | `claude-code` | Claude Code in `~/src` with `--remote-control` — the phone becomes a second keyboard on *this* session | no |
 | `claude-headless` | Claude Code in `~/src` working the Switchboard queue | no |
-| `stumpcloud-sweep` | Scheduled: StumpCloud health sweep, every 6h | cron |
-| `pr-sweep` | Scheduled: own PRs + sibling review, PRs only; daily 09:30 agent / 15:30 human | cron |
+| `stumpcloud-sweep-dub` | Scheduled: StumpCloud health sweep (dub), daily 07:00 | cron |
+| `stumpcloud-sweep-dtw` | Scheduled: StumpCloud health sweep (dtw), daily 07:20 | cron |
+| `stumpcloud-sweep-pdx` | Scheduled: StumpCloud health sweep (pdx), daily 07:40 | cron |
+| `pr-sweep` | Scheduled: own PRs + sibling review, PRs only, Gitea; daily 09:30 agent / 15:30 human | cron |
+| `pr-sweep-github` | Scheduled: same as pr-sweep, GitHub only; daily 10:00 agent / 16:00 human | cron |
 | `issue-sweep` | Scheduled: issue triage + `size/*` labels, issues only; Mondays 07:00 | cron |
 
 **One channel consumer per server.** `crush-signal` carried `--channels
