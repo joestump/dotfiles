@@ -277,6 +277,10 @@ contacts:
     name: "Jon Stump"
     relation: "brother"
     phone: "+17347090582"
+  joestump_agent:
+    name: "joestump-agent"
+    relation: "agent identity (sibling forge account)"
+    phone: "+353871760709"
 
 # Claude Code permission posture, merged into ~/.claude/settings.json by
 # .chezmoiscripts/run_onchange_after_48-claude-settings-merge.sh. These are the
