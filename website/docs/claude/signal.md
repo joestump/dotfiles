@@ -131,6 +131,29 @@ a *gate* on who the agent may message, not an address it sends to. The signal-cl
 daemon itself runs in multi-account mode (no `-a`), so these env vars scope the
 signal-mcp client only.
 
+## Cross-identity messaging: joestump ↔ joestump-agent
+
+The human and the agent identities each hold their own Signal number, and the
+two message each other directly — a `joestump` session (e.g. kitt) can text the
+`joestump-agent` account, and that account can text back. The gates are the
+per-user OpenBao bags (`secret/users/<whoami>/signal`):
+
+| Direction | Bag | Key | Must contain |
+| --- | --- | --- | --- |
+| human → agent (send) | `joestump` | `SIGNAL_MCP_TRUSTED_RECIPIENTS` | the agent's `SIGNAL_MCP_ACCOUNT` number |
+| agent → human (send) | `joestump-agent` | `SIGNAL_MCP_TRUSTED_RECIPIENTS` | the human's `SIGNAL_MCP_OPERATOR` number |
+| agent accepts inbound | `joestump-agent` | `SIGNAL_MCP_TRUSTED_SENDERS` | the human's number |
+
+The human bag deliberately ships **no** `SIGNAL_MCP_TRUSTED_SENDERS`: on a
+`joestump` login the account is Joe's own and inbound stays unfiltered, with the
+crush-signal agent taking only `cc`-prefixed messages (see
+`crush-signal.env.tmpl`).
+
+`test/signal-wiring.bats` carries a guard over this table — it reads both bags
+via `vault kv get` (skips on boxes without a token) and fails naming the missing
+key and direction if either bag loses a number, so a dropped entry in OpenBao
+shows up in `make test` instead of as a dead Signal lane.
+
 > Signal renders **no markdown** — plain text, emoji, and bare `https://` URLs only.
 
 ## Driving an agent from Signal
