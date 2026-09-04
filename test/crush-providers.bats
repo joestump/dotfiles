@@ -142,3 +142,48 @@ for name, p in providers.items():
   run grep -nE '\{\{-? *if +env +"' "$TMPL"
   [ "$status" -ne 0 ]
 }
+
+@test "the litellm provider still renders pure discovery (no catalogue pin)" {
+  # Qwen3.8-27B is LISTED by litellm /v1/models, so per the invariant above
+  # it must not be hardcoded: the small-model pin below carries the
+  # behavior fix (thinking off) without shadowing the discovered catalogue.
+  run _render
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+p = json.load(sys.stdin)["providers"]["litellm"]
+assert p.get("models") in (None, []), p.get("models")
+'
+}
+
+@test "the small model is pinned to self-hosted Qwen with thinking disabled" {
+  # Title generation runs the small model on every prompt; the pin keeps
+  # it on the free StumpCloud gateway and the provider_options keep the
+  # title call from burning its budget on chain-of-thought.
+  run _render
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+cfg = json.load(sys.stdin)
+small = cfg["models"]["small"]
+assert small["model"] == "Qwen3.8-27B", small
+assert small["provider"] == "litellm", small
+extra = small["provider_options"]["extra_body"]
+kwargs = extra["chat_template_kwargs"]
+assert kwargs["enable_thinking"] is False, small
+# The large model selection must not be pinned by this change.
+assert "large" not in cfg.get("models", {}), cfg["models"]
+'
+}
+
+@test "the small model pin survives an empty environment" {
+  # Same invariant as the providers block: the render must not depend on
+  # which env a scheduled apply happens to have.
+  run _render
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | python3 -c '
+import json,sys
+cfg = json.load(sys.stdin)
+assert cfg["models"]["small"]["model"] == "Qwen3.8-27B"
+'
+}
