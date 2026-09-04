@@ -340,3 +340,64 @@ _run_venv_script() {
   [[ "$output" == *"signal-mcp at"* ]]
   [ -f "$fh/.config/dotfiles/.signal-mcp-head" ]
 }
+
+# ---------------------------------------------------------------------------
+# Cross-identity messaging: joestump <-> joestump-agent over Signal.
+#
+# Each identity holds its own Signal number (secret/users/<whoami>/signal ->
+# SIGNAL_MCP_ACCOUNT) and the two message each other directly. The gates are
+# the runtime allowlists signal-mcp reads from env:
+#
+#   human -> agent send     joestump bag       TRUSTED_RECIPIENTS holds the agent number
+#   agent -> human send     joestump-agent bag TRUSTED_RECIPIENTS holds the human number
+#   agent accepts inbound   joestump-agent bag TRUSTED_SENDERS holds the human number
+#
+# The bags live in OpenBao, not this repo, so nothing here can repair drift —
+# but the guard turns silent drift (a number dropped from one bag quietly
+# kills the cross-identity lane) into a red test on any box with a token.
+# Bag values are never printed: failures name the key and direction only.
+#
+# @joestump-agent 09/04/2026 - Added to lock in the joestump <-> joestump-agent
+#   Signal lane; the wiring was correct in OpenBao but nothing guarded it.
+# ---------------------------------------------------------------------------
+
+_cross_identity_guard() {
+  command -v vault >/dev/null 2>&1 || return 99
+  local hjson ajson
+  hjson="$(vault kv get -format=json secret/users/joestump/signal 2>/dev/null)" || return 99
+  ajson="$(vault kv get -format=json secret/users/joestump-agent/signal 2>/dev/null)" || return 99
+  HUMAN_BAG="$hjson" AGENT_BAG="$ajson" python3 - <<'PY'
+import json, os, sys
+
+def bag(var):
+    d = json.loads(os.environ[var])["data"]["data"]
+    return {k: [x.strip() for x in str(v).split(",")] for k, v in d.items()}
+
+human, agent = bag("HUMAN_BAG"), bag("AGENT_BAG")
+hnum = human.get("SIGNAL_MCP_OPERATOR", [None])[0]
+anum = agent.get("SIGNAL_MCP_ACCOUNT", [None])[0]
+fail = []
+if not hnum:
+    fail.append("joestump bag: SIGNAL_MCP_OPERATOR missing")
+if not anum:
+    fail.append("joestump-agent bag: SIGNAL_MCP_ACCOUNT missing")
+if hnum and anum:
+    if hnum not in agent.get("SIGNAL_MCP_TRUSTED_RECIPIENTS", []):
+        fail.append("joestump-agent bag: TRUSTED_RECIPIENTS missing the human number (agent -> human sends blocked)")
+    if hnum not in agent.get("SIGNAL_MCP_TRUSTED_SENDERS", []):
+        fail.append("joestump-agent bag: TRUSTED_SENDERS missing the human number (human -> agent inbound blocked)")
+    if anum not in human.get("SIGNAL_MCP_TRUSTED_RECIPIENTS", []):
+        fail.append("joestump bag: TRUSTED_RECIPIENTS missing the agent number (human -> agent sends blocked)")
+if fail:
+    sys.exit("\n".join(fail))
+PY
+}
+
+@test "OpenBao signal bags allow joestump <-> joestump-agent messaging" {
+  run _cross_identity_guard
+  case "$status" in
+    99) skip "no vault access from this box";;
+    0)  : ;;
+    *)  fail "$output" ;;
+  esac
+}
