@@ -147,11 +147,19 @@ for fname, dd in docs.items():
     over = set(dd['harness']) & names
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
-assert names == {'crush-signal', 'crush-switchboard', 'claude-code',
+# crush-switchboard is a POOL, so its member count is configuration
+# (.crushSwitchboardWorkers) rather than a fixed name. Assert the fixed
+# harnesses exactly, and the pool by shape — a frozen literal here would fail
+# every time the pool is resized, which is a knob, not a regression.
+pool = {n for n in names if n.startswith('crush-switchboard')}
+assert pool, 'no crush-switchboard worker rendered'
+assert 'crush-switchboard' in pool, sorted(pool)
+assert pool == {'crush-switchboard'} | {f'crush-switchboard-{i}' for i in range(2, len(pool) + 1)}, sorted(pool)
+assert names - pool == {'crush-signal', 'claude-code',
                  'claude-headless', 'stumpcloud-sweep-dub',
                  'stumpcloud-sweep-dtw', 'stumpcloud-sweep-pdx',
                  'pr-sweep', 'pr-sweep-github', 'morning-brief',
-                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names)
+                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names - pool)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
@@ -161,7 +169,8 @@ assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['serve
 # scheduled entries carry no enabled key at all (mutually exclusive with
 # schedule); the daemon fires them only on their cron. The interactive three
 # live in the main doc; a scheduled name may never appear there.
-interactive = {'crush-signal', 'crush-switchboard', 'claude-code', 'claude-headless'}
+interactive = {'crush-signal', 'claude-code', 'claude-headless'} | {
+    n for n in d['harness'] if n.startswith('crush-switchboard')}
 assert set(d['harness']) == interactive, sorted(d['harness'])
 for name in interactive:
     assert d['harness'][name]['enabled'] is False, name
@@ -664,4 +673,71 @@ assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
   # `harness reload` cannot bring the [server] listener up (the daemon calls
   # startRemote once at boot), so both branches must say restart, not reload.
   grep -q 'daemon RESTART, not a reload' "$Reload"
+}
+
+# --- crush-switchboard worker pool ---
+#
+# The pool is competing consumers on ONE vended endpoint: switchboard hands each
+# caller a different todo (FOR UPDATE SKIP LOCKED) so exactly one worker acts on
+# each. Everything below pins a coupling that silently degrades rather than
+# erroring — a pool whose workers are missing from the profiles exists but never
+# starts, and one whose workers drift onto different env files runs a different
+# model per worker.
+
+@test "harness pool: every declared worker is a real harness block" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  want="$(grep -E '^crushSwitchboardWorkers:' "$REPO_ROOT/.chezmoidata.yaml" | awk '{print $2}')"
+  got="$(printf '%s\n' "$output" | grep -cE '^\[harness\.crush-switchboard(-[0-9]+)?\]')"
+  [ "$got" -eq "$want" ]
+}
+
+@test "harness pool: worker 1 keeps the bare name, so a 1-worker box is unchanged" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # Not crush-switchboard-1: the bare name is what the profiles, the docs and
+  # `harness logs crush-switchboard` all already say.
+  printf '%s\n' "$output" | grep -qE '^\[harness\.crush-switchboard\]'
+  ! printf '%s\n' "$output" | grep -qE '^\[harness\.crush-switchboard-1\]'
+}
+
+@test "harness pool: every worker is listed in both profiles" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # A worker absent from the profile is declared but never autostarts — the pool
+  # would look configured and do nothing.
+  for name in $(printf '%s\n' "$output" | sed -nE 's/^\[harness\.(crush-switchboard(-[0-9]+)?)\]/\1/p'); do
+    [ "$(printf '%s\n' "$output" | grep -cE "^harnesses = .*\"${name}\"")" -eq 2 ]
+  done
+}
+
+@test "harness pool: all workers share one env file and therefore one model pin" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # The pool is homogeneous. A second env file would be a second place for the
+  # model pin to drift, and drift here is silent: harness would report the pin
+  # from one worker's description while another ran a different model.
+  uniq_envs="$(printf '%s\n' "$output" \
+    | awk '/^\[harness\.crush-switchboard(-[0-9]+)?\]/{f=1} f&&/^env_file/{print $3; f=0}' \
+    | sort -u | wc -l | tr -d ' ')"
+  [ "$uniq_envs" -eq 1 ]
+}
+
+@test "harness pool: the rendered toml stays valid with a pool" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/harness.toml"
+  # A template loop that emits a stray blank key or duplicate table would render
+  # fine as text and fail only when the daemon parsed it.
+  run python3 -c "
+import tomllib,sys
+d=tomllib.load(open('$BATS_TEST_TMPDIR/harness.toml','rb'))
+ws=[k for k in d['harness'] if k.startswith('crush-switchboard')]
+assert ws, 'no switchboard workers rendered'
+for w in ws:
+    h=d['harness'][w]
+    assert h['harness']=='crush', w
+    assert '--channels' in h['args'] and 'switchboard' in h['args'], w
+"
+  [ "$status" -eq 0 ]
 }

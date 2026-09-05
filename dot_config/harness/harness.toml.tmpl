@@ -179,15 +179,41 @@ enabled = false
 #   per box. It shipped unpinned, which meant every machine but the one it was
 #   hand-seeded on would have run crush's fallback model under this GLM-5.2
 #   description.
-[harness.crush-switchboard]
+{{- /* The crush-switchboard worker POOL. Count comes from .crushSwitchboardWorkers.
+
+     These are COMPETING CONSUMERS. Every worker attaches to the same vended
+     endpoint with the same credential, so switchboard hands each caller a
+     different todo (the claim scan holds FOR UPDATE SKIP LOCKED) and exactly one
+     worker acts on each. That is capacity. It is NOT the same as routing a
+     webhook to several endpoints, which gives every endpoint its own todo and
+     makes them all act — duplicated work, not shared work.
+
+     The pool is homogeneous, so every worker shares one env file and therefore
+     one CRUSH_GLOBAL_DATA and one model pin; only the name differs. The shared
+     data dir is deliberate: the only thing in it is the model pin and
+     projects.json, and a second copy per worker would be a second place for the
+     pin to drift.
+
+     Worker 1 keeps the bare name `crush-switchboard` so a one-worker machine is
+     byte-identical to what existed before this became a pool, and so
+     `harness logs crush-switchboard` keeps working in muscle memory and in the
+     profiles below.
+
+     @joestump-agent 09/05/2026 - Converted from a single harness to a pool. */ -}}
+{{- $workers := (.crushSwitchboardWorkers | int) -}}
+{{- if lt $workers 1 }}{{ $workers = 1 }}{{ end -}}
+{{- range $i := until $workers }}
+{{- $n := add $i 1 }}
+[harness.crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}]
 harness = "crush"
 args = ["--yolo", "--channels", "switchboard"]
-workdir = "{{ .chezmoi.homeDir }}/src"
-env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-switchboard.env"
-description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Switchboard channel (webhook todos)"
+workdir = "{{ $.chezmoi.homeDir }}/src"
+env_file = "{{ $.chezmoi.homeDir }}/.config/harness/crush-switchboard.env"
+description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Switchboard channel (webhook todos){{ if gt $workers 1 }} · worker {{ $n }}/{{ $workers }}{{ end }}"
 restart = "on-failure"
 restart_delay = 30
 enabled = false
+{{ end -}}
 
 # Claude Code in ~/src, driven from the Claude app / claude.ai via Remote Control.
 #
@@ -286,12 +312,12 @@ enabled = false
 # persisted active profile does not resolve (it silently starts nothing).
 [profile.default]
 description = "Everyday set — Crush Signal channel + Crush Switchboard worker + headless Claude worker"
-harnesses = ["crush-signal", "crush-switchboard", "claude-headless"]
+harnesses = ["crush-signal", {{ range $i := until (.crushSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}", {{ end }}"claude-headless"]
 autostart = true
 
 [profile.full]
 description = "All harnesses running"
-harnesses = ["crush-signal", "crush-switchboard", "claude-code", "claude-headless"]
+harnesses = ["crush-signal", {{ range $i := until (.crushSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}", {{ end }}"claude-code", "claude-headless"]
 autostart = false
 
 # Remote access — the SSH cockpit

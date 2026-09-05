@@ -110,6 +110,27 @@ outlineUrl: "https://outline.stump.rocks"
 # both the .chezmoiexternal.toml clone URL and the build script's remote guard.
 crushRepo: "https://github.com/joestump-agent/crush.git"
 
+# crush-switchboard worker pool — how many identical Crush instances drain the
+# Switchboard queue on this machine.
+#
+# They are COMPETING CONSUMERS, not a fan-out: every worker attaches to the SAME
+# vended endpoint with the SAME credential, so switchboard hands each caller a
+# different todo (the claim scan holds FOR UPDATE SKIP LOCKED) and exactly one
+# worker acts on each. That is the shape to want for capacity. Routing one
+# webhook to several ENDPOINTS is the other thing entirely — every endpoint gets
+# its own todo and they all act, which duplicates work rather than sharing it.
+#
+# Because the pool is homogeneous, every worker shares one CRUSH_GLOBAL_DATA and
+# therefore one model pin; only the harness name differs. Nothing here needs to
+# scale per worker.
+#
+# 1 restores the previous single-worker behaviour. Keep it modest: each worker is
+# a full model session, and zai is quota-metered, so the ceiling is the weekly
+# quota rather than the box.
+#
+# @joestump-agent 09/05/2026 - Added so more than one Crush can drain the queue.
+crushSwitchboardWorkers: 2
+
 # harness ("systemctl for your agents") — built from source by
 # run_after_32-install-harness, same model as crushRepo above: the repo ships no
 # release binaries, so there is nothing to download. Public repo on the stump.wtf
