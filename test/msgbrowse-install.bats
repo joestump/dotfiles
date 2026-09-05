@@ -83,6 +83,9 @@ SCRIPT="$REPO_ROOT/.chezmoiscripts/run_after_33-install-msgbrowse.sh.tmpl"
 # stub functions first; brew_sync resolves them at call time.
 source_brew_sync() {
   local rendered
-  rendered=$(chezmoi execute-template --source "$REPO_ROOT" < "$SCRIPT")
+  # --override-data forces the darwin branch: the script is darwin-only, so a
+  # plain render on a linux runner contains no brew_sync at all.
+  rendered=$(chezmoi execute-template --override-data '{"chezmoi":{"os":"darwin"}}' \
+    --source "$REPO_ROOT" < "$SCRIPT")
   eval "$(printf '%s\n' "$rendered" | sed -n '/^brew_sync()/,/^}/p')"
 }
