@@ -56,8 +56,11 @@ _home_with() {
 
 @test "neither cairn nor switchboard hardcodes a host in the merge scripts" {
   # Every half comes from OpenBao — hosts and switchboard's per-client URLs
-  # alike. A hostname reappearing here is the regression this guards.
-  run grep -nE 'https?://[^ ]*(cairn|switchboard)' \
+  # alike. A hostname reappearing here is the regression this guards, so the
+  # match is on the HOST part of the url only ([^/ ]*): the source-clone urls
+  # cairnRepo / switchboardRepo in chezmoidata point at gitea.stump.rocks and
+  # carry the tool name in the PATH, which is not a service host.
+  run grep -nE 'https?://[^/ ]*(cairn|switchboard)' \
     "$REPO_ROOT/.chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl" \
     "$REPO_ROOT/.chezmoiscripts/run_after_44-claude-desktop-mcp-merge.sh.tmpl" \
     "$REPO_ROOT/.chezmoidata.yaml"

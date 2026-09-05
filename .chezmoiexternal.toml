@@ -144,6 +144,34 @@
 [".local/share/harness-src".pull]
     args = ["--ff-only", "--quiet"]
 
+# ---------- cairn + switchboard CLIs — build sources ----------
+# Same model as harness-src above ({{ .cairnRepo }}, {{ .switchboardRepo }}): the
+# repos ship no release binaries, so chezmoi clones the source HERE and
+# `run_after_34-install-go-clis.sh` builds each to ~/.local/bin. Unlike harness,
+# BOTH repos are PRIVATE on the stump.wtf Gitea org, so they sit behind the same
+# credential guard as claude-personal above: an external that cannot
+# authenticate aborts the ENTIRE apply, and an unprovisioned node simply goes
+# without the two CLIs until it has credentials. Nothing is developed in these
+# clones (ff-only pull); Joe's dev checkouts are ~/src/cairn and ~/src/switchboard
+# and chezmoi deliberately does not manage them. chezmoi won't re-point an
+# EXISTING clone if a url changes, so the build script reconciles the remote.
+# Immediate pull + rebuild: `chezmoi apply --refresh-externals`.
+{{- if or (stat (joinPath .chezmoi.homeDir ".config/vault/secrets-static.env")) (stat (joinPath .chezmoi.homeDir ".git-credentials")) }}
+[".local/share/cairn-src"]
+    type = "git-repo"
+    url = "{{ .cairnRepo }}"
+    refreshPeriod = "168h"
+[".local/share/cairn-src".pull]
+    args = ["--ff-only", "--quiet"]
+
+[".local/share/switchboard-src"]
+    type = "git-repo"
+    url = "{{ .switchboardRepo }}"
+    refreshPeriod = "168h"
+[".local/share/switchboard-src".pull]
+    args = ["--ff-only", "--quiet"]
+{{- end }}
+
 # ---------- Crush Agent Skills sources ----------
 # Crush discovers Agent Skills (folders with SKILL.md) from options.skills_paths
 # in crush.json. Clone the skill repos into a Crush-owned, clearly-named dir so

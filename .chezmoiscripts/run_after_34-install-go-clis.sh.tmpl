@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# Build The Go CLIs We Maintain → ~/.local/bin
+#
+# cairn (artifact sharing, https://github.com/joestump/cairn) and switchboard
+# (the durable webhook→todo queue, https://joestump.github.io/switchboard/) are
+# built from their managed source clones the same way harness is — read
+# run_after_32-install-harness.sh.tmpl first; this is that model with the
+# per-tool parts folded into one function and without the daemon restart,
+# because neither of these is a daemon on the machines that apply this repo.
+#
+# Why a build and not a go-tools.txt line: both modules are named
+# github.com/joestump/… but the code is canonical on the PRIVATE stump.wtf Gitea
+# org, so `go install github.com/joestump/cairn/cmd/cairn@latest` has nothing to
+# resolve against. chezmoi clones the Gitea repos instead (credential-guarded
+# externals at ~/.local/share/{cairn,switchboard}-src) and this script builds from
+# the clones. Nothing is developed in those clones; Joe's dev checkouts are
+# ~/src/cairn and ~/src/switchboard, which chezmoi deliberately does not manage.
+#
+# Rerun model: runs on EVERY apply, fingerprints each clone by git HEAD in
+# ~/.config/dotfiles/.<tool>-build-state and rebuilds only when HEAD moves or the
+# binary is missing. Both tools are attempted even when one fails, and the script
+# exits non-zero at the END if any build failed twice — one retry absorbs a forge
+# that is still coming up after a reboot, and a silent stale binary is the
+# failure mode this repo keeps paying for (see the harness script's history).
+#
+# @joestump 09/06/2026 - Added. cairn and switchboard were installed by hand or
+#   not at all (this Mac had neither on PATH) while harness was managed.
+set -euo pipefail
+
+# ~/.local/bin may not be on PATH in the shell that invoked chezmoi (a login shell
+# opened before env.zsh added it). Add it so `command -v` resolves.
+export PATH="$HOME/.local/bin:$PATH"
+
+# Clean progress via the shared UI lib (spinner on a TTY, quiet otherwise);
+# fallback keeps the script working if the lib hasn't been applied yet. Tested
+# for existence rather than `. file || {…}`: under macOS's /bin/bash 3.2 a
+# failed `.` is fatal with set -e even inside an || list, so the sibling
+# scripts' idiom silently exits 1 when this ever runs on the system bash.
+if [ -r "$HOME/.config/dotfiles/ui-lib.sh" ]; then
+  . "$HOME/.config/dotfiles/ui-lib.sh"
+else
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+fi
+
+# Building needs the Go toolchain (Brewfile installs it on macOS; on a headless
+# Linux node without `go` this is a graceful no-op). GOTOOLCHAIN=auto lets an older
+# Go fetch the exact version each go.mod pins.
+command -v go >/dev/null 2>&1 || { echo "go toolchain absent; skipping cairn/switchboard builds"; exit 0; }
+
+# GOPRIVATE must be set HERE, not inherited: a chezmoi run script executes with
+# almost none of the login-shell environment, so the export in go.zsh.tmpl never
+# reaches it and a private module dies against the public proxy + sumdb. Same
+# trap the harness script documents.
+export GOPRIVATE="{{ trimPrefix "https://" .giteaUrl }}/*,github.com/{{ .githubUser }}/*,github.com/{{ .githubUser }}-agent/*"
+export GONOSUMDB="$GOPRIVATE"
+export GONOSUMCHECK=1
+
+failed=0
+
+# build_cli NAME REPO PKG [LDFLAGS]
+#
+# NAME is the binary and the clone dir stem (~/.local/share/NAME-src); REPO is
+# the configured clone url (the external clones it, we only reconcile the remote
+# if the url moved); PKG is the main package inside the clone; LDFLAGS may carry
+# @VERSION@, replaced by `git describe` so the binary reports the commit it was
+# built from. Never exits the script on failure — the caller decides once every
+# tool has had its turn.
+build_cli() {
+  local name="$1" repo="$2" pkg="$3" ldflags="${4:-}"
+  local src="$HOME/.local/share/${name}-src"
+  local bin="$HOME/.local/bin/${name}"
+  local state="$HOME/.config/dotfiles/.${name}-build-state"
+
+  heading "🛠  ${name}"
+
+  # The external clones the source; if it isn't there yet (credential-less node,
+  # or the first apply before externals landed), there is nothing to build.
+  if [ ! -d "$src/.git" ]; then
+    item dim "${name} source not cloned yet (${src}) — skipping"
+    return 0
+  fi
+
+  # chezmoi will NOT re-point an EXISTING clone when the configured url changes
+  # (it just pulls the old remote), so reconcile it here. Safe on a managed clone
+  # nothing is developed in.
+  if [ "$(git -C "$src" remote get-url origin 2>/dev/null)" != "$repo" ]; then
+    say "repointing ${name} clone → ${repo}"
+    git -C "$src" remote set-url origin "$repo"
+  fi
+
+  # Sync to origin's default branch on every apply so a czu builds what main has
+  # right now, without waiting for the external's refresh period.
+  if git -C "$src" fetch --quiet --prune origin; then
+    local def
+    def="$(git -C "$src" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+    git -C "$src" reset --hard "$def" >/dev/null 2>&1 || git -C "$src" reset --hard origin/main >/dev/null 2>&1 || true
+  else
+    warn "${name}: fetch failed — building from current local state"
+  fi
+
+  local head
+  head="$(git -C "$src" rev-parse HEAD 2>/dev/null || true)"
+  if [ -x "$bin" ] && [ -n "$head" ] && [ "$head" = "$(cat "$state" 2>/dev/null || true)" ]; then
+    item ok "${name} ${head:0:7} (up to date)"
+    return 0
+  fi
+
+  local ver
+  ver="$(git -C "$src" describe --tags --always --dirty 2>/dev/null || echo dev)"
+  mkdir -p "$(dirname "$bin")" "$(dirname "$state")"
+
+  local flags=(-trimpath)
+  if [ -n "$ldflags" ]; then
+    flags+=(-ldflags "${ldflags//@VERSION@/$ver}")
+  fi
+
+  say "building ${name} ${ver}…"
+  local attempt suffix=""
+  for attempt in 1 2; do
+    if ( cd "$src" && GOTOOLCHAIN=auto go build "${flags[@]}" -o "$bin" "$pkg" ); then
+      # The state file is only written on success, so a failed build never marks
+      # itself up to date; the next run retries from scratch.
+      printf '%s' "$head" >"$state"
+      [ "$attempt" = 2 ] && suffix=" (succeeded on retry)"
+      item ok "${name} ${ver} → ${bin}${suffix}"
+      return 0
+    fi
+    if [ "$attempt" = 1 ]; then
+      warn "${name} build failed — retrying once in 20s (forge may still be coming up)"
+      sleep 20
+    fi
+  done
+
+  warn "${name} build failed twice — 'cd ${src} && go build ${pkg}' by hand to see why"
+  failed=1
+  return 0
+}
+
+# cairn's Makefile builds with plain `go build` and carries no version variable,
+# so there is nothing to inject. switchboard's Makefile injects main.version from
+# `git describe`; mirror it so `switchboard version` reports the commit.
+build_cli cairn "{{ .cairnRepo }}" ./cmd/cairn
+build_cli switchboard "{{ .switchboardRepo }}" ./cmd/switchboard "-X main.version=@VERSION@"
+
+# Surface a real fault. This mirrors the harness script: exiting 0 here would let
+# czu report ok, keep the scheduled-state file green and never fire the Signal
+# alert, while the stale binary keeps running.
+if [ "$failed" -ne 0 ]; then
+  exit 1
+fi

@@ -417,3 +417,12 @@ sweeps:
   blogSweepAgentHost: "tars"
   navidromeLdapSyncAgentHost: "tars"
   morningBriefAgentHost: "tars"
+
+# cairn + switchboard CLIs — built from source by run_after_34-install-go-clis,
+# the harnessRepo model above. Both module paths are github.com/joestump/… but the
+# code is canonical on the PRIVATE stump.wtf Gitea org, so there is no public copy
+# to `go install` from: these are CLONE urls, and the externals that use them sit
+# behind the credential guard in .chezmoiexternal.toml. Single source of truth
+# for the clone url and the build script's remote guard.
+cairnRepo: "https://gitea.stump.rocks/stump.wtf/cairn.git"
+switchboardRepo: "https://gitea.stump.rocks/stump.wtf/switchboard.git"
