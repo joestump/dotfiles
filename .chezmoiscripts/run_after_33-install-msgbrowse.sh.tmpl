@@ -24,6 +24,11 @@
 # Everything soft-fails — an unreachable tap, or a cask upgrade that wants a
 # running app closed, must never abort the rest of the apply. It retries on the
 # next czu.
+#
+# @joestump-agent 09/03/2026 - Fixed the outdated check: `brew outdated <pkg>`
+#   exits 1 when the package IS outdated, so gating on the exit code made
+#   brew upgrade dead code and msgbrowse sat stale forever. Only the output
+#   of brew outdated may decide the branch.
 set -euo pipefail
 
 {{- if eq .chezmoi.os "darwin" }}
@@ -53,7 +58,11 @@ brew update --quiet >/dev/null 2>&1 || warn "brew update failed; installing from
 brew_sync() {
   local kind="$1" pkg="$2" label="$3"
   if brew list ${kind:+"$kind"} "$pkg" >/dev/null 2>&1; then
-    if brew outdated ${kind:+"$kind"} "$pkg" >/dev/null 2>&1 && [ -n "$(brew outdated ${kind:+"$kind"} "$pkg" 2>/dev/null)" ]; then
+    # `brew outdated <name>` exits 1 when the package IS outdated (0 when
+  # current), so the exit code must never gate this branch — only the output
+  # counts. The old `brew outdated ... && [ -n ... ]` made the upgrade path
+  # dead code: rc-1 fired exactly when an upgrade existed and read as current.
+  if [ -n "$(brew outdated ${kind:+"$kind"} "$pkg" 2>/dev/null)" ]; then
       if brew upgrade ${kind:+"$kind"} "$pkg" >/dev/null 2>&1; then item ok "$label upgraded"
       else warn "$label upgrade failed (app running?); retrying next apply"; fi
     else
