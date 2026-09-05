@@ -115,8 +115,11 @@ _render() {
   local rendered="$BATS_TEST_TMPDIR/ghostty-host-colors.zsh"
   printf '%s\n' "$output" > "$rendered"
   # Stub add-zsh-hook (normally provided by OMZ) and source the function.
-  # Leave TERM_PROGRAM unset so the guard returns early with no output.
+  # Unset TERM_PROGRAM explicitly: inheriting the developer's (or runner's)
+  # TERM_PROGRAM=ghostty makes the guard fire and the "no output" assert fail
+  # on exactly the machines that need the guard tested.
   run zsh -c '
+    unset TERM_PROGRAM
     add-zsh-hook() { :; }
     source "'"$rendered"'"
     HOST="testhost"
