@@ -147,16 +147,24 @@ for fname, dd in docs.items():
     over = set(dd['harness']) & names
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
-# crush-switchboard is a POOL, so its member count is configuration
-# (.crushSwitchboardWorkers) rather than a fixed name. Assert the fixed
-# harnesses exactly, and the pool by shape — a frozen literal here would fail
-# every time the pool is resized, which is a knob, not a regression.
-pool = {n for n in names if n.startswith('crush-switchboard')}
-assert pool, 'no crush-switchboard worker rendered'
-assert 'crush-switchboard' in pool, sorted(pool)
-assert pool == {'crush-switchboard'} | {f'crush-switchboard-{i}' for i in range(2, len(pool) + 1)}, sorted(pool)
+# crush-switchboard and claude-headless are both POOLS, so their member counts
+# are configuration (.crushSwitchboardWorkers / .claudeSwitchboardWorkers)
+# rather than fixed names. Assert the fixed harnesses exactly, and each pool by
+# shape — a frozen literal here would fail every time a pool is resized, which
+# is a knob, not a regression.
+def assert_pool(base):
+    p = {n for n in names if n == base or n.startswith(base + '-')}
+    # Guard against a sibling name being swallowed: only NUMERIC suffixes are
+    # pool members. Without this, adding a `claude-headless-experimental` would
+    # silently pass as worker "experimental" and vanish from the fixed set.
+    p = {n for n in p if n == base or n[len(base) + 1:].isdigit()}
+    assert p, f'no {base} worker rendered'
+    assert base in p, sorted(p)
+    assert p == {base} | {f'{base}-{i}' for i in range(2, len(p) + 1)}, sorted(p)
+    return p
+pool = assert_pool('crush-switchboard') | assert_pool('claude-headless')
 assert names - pool == {'crush-signal', 'claude-code',
-                 'claude-headless', 'stumpcloud-sweep-dub',
+                 'stumpcloud-sweep-dub',
                  'stumpcloud-sweep-dtw', 'stumpcloud-sweep-pdx',
                  'pr-sweep', 'pr-sweep-github', 'morning-brief',
                  'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names - pool)
@@ -169,8 +177,7 @@ assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['serve
 # scheduled entries carry no enabled key at all (mutually exclusive with
 # schedule); the daemon fires them only on their cron. The interactive three
 # live in the main doc; a scheduled name may never appear there.
-interactive = {'crush-signal', 'claude-code', 'claude-headless'} | {
-    n for n in d['harness'] if n.startswith('crush-switchboard')}
+interactive = {'crush-signal', 'claude-code'} | pool
 assert set(d['harness']) == interactive, sorted(d['harness'])
 for name in interactive:
     assert d['harness'][name]['enabled'] is False, name
@@ -721,6 +728,69 @@ assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
     | awk '/^\[harness\.crush-switchboard(-[0-9]+)?\]/{f=1} f&&/^env_file/{print $3; f=0}' \
     | sort -u | wc -l | tr -d ' ')"
   [ "$uniq_envs" -eq 1 ]
+}
+
+# --- claude-headless (Opus 5) worker pool ---
+#
+# Same competing-consumer shape as the crush pool above, on Claude Code's own
+# vended endpoint. What differs is the pin: model and effort are CLI flags
+# rather than a data-dir indirection, so the coupling that can silently rot here
+# is a worker whose flags drift from its siblings' — capacity that quietly runs
+# two different models under one description.
+
+@test "harness pool: every declared claude worker is a real harness block" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  want="$(grep -E '^claudeSwitchboardWorkers:' "$REPO_ROOT/.chezmoidata.yaml" | awk '{print $2}')"
+  got="$(printf '%s\n' "$output" | grep -cE '^\[harness\.claude-headless(-[0-9]+)?\]')"
+  [ "$got" -eq "$want" ]
+}
+
+@test "harness pool: claude worker 1 keeps the bare name" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # Not claude-headless-1: the bare name is what the profiles, the retirement
+  # script in run_onchange_after_51 and `harness logs claude-headless` all say.
+  printf '%s\n' "$output" | grep -qE '^\[harness\.claude-headless\]'
+  ! printf '%s\n' "$output" | grep -qE '^\[harness\.claude-headless-1\]'
+}
+
+@test "harness pool: every claude worker is listed in both profiles" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # A worker absent from the profile is declared but never autostarts — the pool
+  # would look configured and do nothing.
+  for name in $(printf '%s\n' "$output" | sed -nE 's/^\[harness\.(claude-headless(-[0-9]+)?)\]/\1/p'); do
+    [ "$(printf '%s\n' "$output" | grep -cE "^harnesses = .*\"${name}\"")" -eq 2 ]
+  done
+}
+
+@test "harness pool: every claude worker carries the same model and effort pin" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # The pin IS the args line here — there is no env file to diff — so two
+  # workers with different flags would run different models while sharing one
+  # description. Assert one distinct args line across the pool, and that it
+  # actually names the model and the effort rather than relying on defaults.
+  args="$(printf '%s\n' "$output" \
+    | awk '/^\[harness\.claude-headless(-[0-9]+)?\]/{f=1} f&&/^args =/{print; f=0}' | sort -u)"
+  [ "$(printf '%s\n' "$args" | wc -l | tr -d ' ')" -eq 1 ]
+  printf '%s\n' "$args" | grep -q -- '"--model", "opus"'
+  printf '%s\n' "$args" | grep -q -- '"--effort", "high"'
+}
+
+@test "harness pool: the metered claude workers do not respawn on a clean exit" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # restart = "always" respawns on a CLEAN exit, and a clean exit clears the
+  # daemon's consecutive-failure counter — so an exit-0 loop is the one loop
+  # give-up can never break. Opus at high effort costs money per launch, which
+  # puts these in the same economics as crush-signal.
+  n="$(printf '%s\n' "$output" \
+    | awk '/^\[harness\.claude-headless(-[0-9]+)?\]/{f=1} f&&/^restart =/{print $3; f=0}' \
+    | grep -c '"on-failure"')"
+  want="$(grep -E '^claudeSwitchboardWorkers:' "$REPO_ROOT/.chezmoidata.yaml" | awk '{print $2}')"
+  [ "$n" -eq "$want" ]
 }
 
 @test "harness pool: the rendered toml stays valid with a pool" {
