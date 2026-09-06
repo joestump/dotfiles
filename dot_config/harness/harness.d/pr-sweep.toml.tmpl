@@ -171,7 +171,11 @@ schedule = {{ if $isAgent }}"30 9 * * *"{{ else }}"30 15 * * *"{{ end }}
 model = "litellm/Qwen3.8-27B"
 auto_accept = true
 quiet = true
-workdir = "{{ .chezmoi.homeDir }}"
+workdir = "{{ .chezmoi.homeDir }}/sweeps"
 description = "PR sweep (Gitea) — own PRs + sibling reviews, PRs only · daily {{ if $isAgent }}09:30{{ else }}15:30{{ end }} · Qwen3.8-27B (local, ai01)"
 restart = "no"
 {{ end -}}
+
+# @joestump-agent 09/06/2026 - Workdir moved to ~/sweeps so the project
+#   crushrc there can strip MCP tool schemas from every sweep session
+#   (see dot_sweeps/crushrc).
