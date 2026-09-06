@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # The scheduled harnesses: six one-shot prompt harnesses, one drop-in file
 # each in dot_config/harness/harness.d/*.toml (stumpcloud-sweep every 6h,
-# pr-sweep daily, morning-brief weekdays, issue-sweep + blog-sweep +
+# pr-sweep daily, morning-brief daily 09:00 GMT, issue-sweep + blog-sweep +
 # navidrome-ldap-sync weekly),
 # replacing the retired standalone stumpcloud-sweep systemd timer / launchd
 # agent. These tests pin the couplings: every scheduled entry points at a
@@ -158,7 +158,7 @@ if bad:
   [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 9 ]
 }
 
-@test "scheduled: cadences — sweep + pr daily, brief weekdays, issue + blog + navidrome weekly" {
+@test "scheduled: cadences — sweep + pr daily, brief daily 09:00 GMT, issue + blog + navidrome weekly" {
   run _agent_render_all
   grep -A8 '^\[harness\.stumpcloud-sweep-dub\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* \*"'
   grep -A8 '^\[harness\.stumpcloud-sweep-dtw\]' <<<"$output" | grep -q 'schedule = "20 7 \* \* \*"'
@@ -170,8 +170,9 @@ if bad:
   grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
   grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
   grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 0"'
-  # weekdays only — a brief delivered on Saturday trains you to ignore the thread
-  grep -A8 '^\[harness\.morning-brief\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 1-5"'
+  # daily at 09:00 GMT — the cron is in the daemon's local time, so 05:00 on
+  # tars while it holds EDT (GMT-4); move it to 04:00 when EST returns
+  grep -A8 '^\[harness\.morning-brief\]' <<<"$output" | grep -q 'schedule = "0 5 \* \* \*"'
 }
 
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
