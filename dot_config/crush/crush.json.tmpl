@@ -339,6 +339,15 @@
     "disable_default_providers": true,
     "disable_provider_auto_update": true,
     "disable_metrics": true,
+{{- /* Crush aborts an LLM request after 60s with no stream data (its
+       default request_timeout). Every scheduled sweep runs on the local
+       Qwen3.8-27B, whose cold prefill of a full agent session regularly
+       takes longer than that — three StumpCloud sweeps died at exactly
+       1m0s on 09/05 with "LLM stream received no data for 1m0s". 300s
+       gives a slow prefill room to land while still bounding a hung
+       provider; sessions against fast cloud models never notice.
+       @joestump-agent 09/06/2026 - Raised from crush's 60s default. */}}
+    "request_timeout": 300,
 {{- /* Allow the commands StumpCloud fleet operations need. The stumpcloud-
        monitor and triage skills are SSH-and-curl shaped, and the default ban
        list hard-blocks both, so every monitoring cycle died at its first
