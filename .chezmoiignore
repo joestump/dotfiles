@@ -37,6 +37,16 @@ Library/
 .config/systemd/
 {{ end -}}
 
+# Halloy's config dir is OS-specific: ~/Library/Application Support/halloy on
+# macOS, ~/.config/halloy on Linux (both carry an identical template). Ignore
+# the one that doesn't apply to this machine.
+{{ if ne .chezmoi.os "darwin" -}}
+Library/Application Support/halloy/
+{{ end -}}
+{{ if ne .chezmoi.os "linux" -}}
+.config/halloy/
+{{ end -}}
+
 # The scheduled harness sweeps are AGENT jobs: only a login carrying the
 # `-agent` suffix (the bot half of the $USER / $USER-agent convention — see
 # the Identity section of .chezmoidata.yaml, overridable via agentIdentity)
