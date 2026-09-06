@@ -58,6 +58,14 @@ Library/LaunchAgents/rocks.stump.crush-signal-channel.plist
 .config/systemd/user/stumpcloud-sweep.timer
 Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist
 
+# stumpcloud-sweep drop-in — retired when the sweep split into per-site
+# drop-ins (stumpcloud-sweep-dtw/-dub/-pdx). The source file was deleted but
+# never listed here, so tars kept rendering a stale copy that still arms a
+# duplicate 07:00 sweep alongside the dub split, doubling the load the local
+# model carries in the morning window.
+# @joestump-agent 09/06/2026 - Found while pointing the sweeps at ~/sweeps.
+.config/harness/harness.d/stumpcloud-sweep.toml
+
 # Retired sweep drop-ins + prompts — issue-pr-grooming and pr-feedback-sweep
 # were renamed to issue-sweep and pr-sweep and split so that one owns issues and
 # the other owns PRs (they both used to close PRs). The daemon loads every

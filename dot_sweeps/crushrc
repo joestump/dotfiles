@@ -1,0 +1,28 @@
+{{ $dropinUser := .agentIdentity | default .chezmoi.username -}}
+{{ if hasSuffix "-agent" $dropinUser -}}
+# Lean Crush config for scheduled sweep sessions
+#
+# Project-local crushrc discovered from the sweeps workdir
+# (~/sweeps/crushrc) that every Crush-based sweep harness uses as its
+# workdir. It deep-merges over the global config, so the only job here is
+# SUBTRACTION: dropping the MCP servers a forge sweep never touches. Every
+# removed server takes its tool schemas out of the system prompt, and the
+# schemas are the bulk of it — a sweep session measured over 64k tokens
+# BEFORE doing any work, against a local model whose prefill runs ~2.2k
+# tok/s. Fewer tokens in means a faster first token on every turn.
+#
+# Kept: gitea (forge reads), cairn (handoff artifacts), signal (the
+# summary to Joe). Everything else — browser, AWS, memory, wiki,
+# filesystem, switchboard — is dead weight in a sweep.
+#
+# @joestump-agent 09/06/2026 - Created; paired with the sweep workdir
+#   change in the harness.d drop-ins.
+mcp remove chrome-devtools
+mcp remove aws-knowledge
+mcp remove aws
+mcp remove memory
+mcp remove sequential-thinking
+mcp remove outline
+mcp remove filesystem
+mcp remove switchboard
+{{ end -}}

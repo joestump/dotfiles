@@ -33,7 +33,11 @@ schedule = "40 7 * * *"
 model = "litellm/Qwen3.8-27B"
 auto_accept = true
 quiet = true
-workdir = "{{ .chezmoi.homeDir }}"
+workdir = "{{ .chezmoi.homeDir }}/sweeps"
 description = "StumpCloud health sweep (pdx) · daily 07:40 · Qwen3.8-27B (local, ai01)"
 restart = "no"
 {{ end -}}
+
+# @joestump-agent 09/06/2026 - Workdir moved to ~/sweeps so the project
+#   crushrc there can strip MCP tool schemas from every sweep session
+#   (see dot_sweeps/crushrc).
