@@ -131,6 +131,23 @@ crushRepo: "https://github.com/joestump-agent/crush.git"
 # @joestump-agent 09/05/2026 - Added so more than one Crush can drain the queue.
 crushSwitchboardWorkers: 2
 
+# How many Claude Code Switchboard workers each box runs (harness.toml.tmpl
+# renders one [harness.claude-headless*] block per worker, worker 1 keeping the
+# bare name).
+#
+# Same competing-consumer model as crushSwitchboardWorkers above, on a DIFFERENT
+# vended endpoint: Claude Code has its own switchboard endpoint, so this pool
+# shares work among itself and does not contend with the crush pool. What it is
+# for is different, though — these run Opus 5 at high effort, so they are the
+# escalation path for work the GLM workers hand back, not more of the same.
+#
+# Keep it small. Each worker is a full Opus session at high effort and both
+# boxes have their own account, so the ceiling is the plan's quota rather than
+# the box. 1 restores single-worker behaviour.
+#
+# @joestump 09/06/2026 - Added.
+claudeSwitchboardWorkers: 2
+
 # harness ("systemctl for your agents") — built from source by
 # run_after_32-install-harness, same model as crushRepo above: the repo ships no
 # release binaries, so there is nothing to download. Public repo on the stump.wtf

@@ -250,7 +250,7 @@ restart = "always"
 restart_delay = 5
 enabled = false
 
-# The always-on background worker: Claude Code sitting in ~/src waiting for
+# The always-on background workers: Claude Code sitting in ~/src waiting for
 # Switchboard doorbells and queue todos. Replaces the standalone
 # claude-headless.service + tmux while-loop the zsh-harnessd era used
 # (retired by run_onchange_after_51-harness-daemon-service).
@@ -259,14 +259,62 @@ enabled = false
 # the phone, crush-signal owns the Signal channel; this one just works the
 # queue. Same --dangerously-skip-permissions consequence as its siblings:
 # `enabled = false`, start it deliberately with `harness start claude-headless`.
-[harness.claude-headless]
+#
+# MODEL AND EFFORT ARE PINNED ON THE COMMAND LINE, unlike crush's. Claude Code
+# takes --model and --effort directly, so there is no data-dir indirection to
+# maintain and no env file: the flags below ARE the pin, and `harness list`'s
+# description cannot drift from them without someone editing both halves of the
+# same line. `opus` is the alias for the latest Opus, so this tracks new
+# releases rather than freezing on a dated model id.
+#
+# --effort high is the point of this pool. These workers pick up PR reviews and
+# issue handoffs that the GLM workers hand off or get wrong; running them at the
+# default effort would make them a slower duplicate of crush-switchboard rather
+# than the escalation path.
+#
+# WHY THIS IS A POOL AND NOT A SECOND HARNESS NAME. Adding a separate
+# claude-switchboard alongside claude-headless would put two differently-pinned
+# Claude sessions on the SAME vended endpoint, both draining the same queue —
+# capacity, yes, but with no way to say which model handled a given todo. One
+# pool with one pin keeps that answerable. Workers are competing consumers on a
+# single endpoint credential: switchboard's claim scan holds FOR UPDATE SKIP
+# LOCKED, so each caller gets a different todo and exactly one worker acts on
+# each. (Contrast fan-out, which gives every ENDPOINT its own copy and makes
+# them all act — that is duplicated work, not shared work.)
+#
+# Worker 1 keeps the bare name `claude-headless`, matching the crush pool's
+# convention: a one-worker box is byte-identical to what existed before, and
+# `harness logs claude-headless` keeps working in muscle memory and in the
+# profiles below.
+#
+# RESTART = ON-FAILURE, NOT ALWAYS — changed with the pin. It used to be
+# "always"/5 from the era when this ran an unmetered default model. Opus at high
+# effort is metered per launch, which puts it in the same economics as
+# crush-signal: a clean exit means the agent was told to quit and respawning
+# fights whoever did that, and worse, a clean exit CLEARS the consecutive-failure
+# counter, so "always" turns an exit-0 loop into the one loop the daemon's
+# give-up rule can never break. 30s delay for the same reason it carries there —
+# the budget is 6 attempts either way, so a longer delay spreads them over
+# minutes and lets a transient blip clear INSIDE the budget instead of burning
+# it in half a minute.
+#
+# @joestump 09/06/2026 - Converted from a single default-model harness to a pool
+#   of Opus 5 workers at high effort, one pool per box, count from
+#   .claudeSwitchboardWorkers. Restart policy moved to on-failure/30 to match
+#   the other metered agents.
+{{- $claudeWorkers := (.claudeSwitchboardWorkers | int) -}}
+{{- if lt $claudeWorkers 1 }}{{ $claudeWorkers = 1 }}{{ end -}}
+{{- range $i := until $claudeWorkers }}
+{{- $n := add $i 1 }}
+[harness.claude-headless{{ if gt $n 1 }}-{{ $n }}{{ end }}]
 harness = "claude-code"
-args = ["--dangerously-skip-permissions"]
-workdir = "{{ .chezmoi.homeDir }}/src"
-description = "Claude Code · ~/src · headless queue worker · skip-permissions"
-restart = "always"
-restart_delay = 5
+args = ["--dangerously-skip-permissions", "--model", "opus", "--effort", "high"]
+workdir = "{{ $.chezmoi.homeDir }}/src"
+description = "Claude Code · Opus 5 · effort high · ~/src · headless queue worker · skip-permissions{{ if gt $claudeWorkers 1 }} · worker {{ $n }}/{{ $claudeWorkers }}{{ end }}"
+restart = "on-failure"
+restart_delay = 30
 enabled = false
+{{ end -}}
 
 # Scheduled harnesses — one drop-in file each in harness.d/
 #
@@ -311,13 +359,13 @@ enabled = false
 # should carry it — see stump.wtf/harness#99 for what happens when the daemon's
 # persisted active profile does not resolve (it silently starts nothing).
 [profile.default]
-description = "Everyday set — Crush Signal channel + Crush Switchboard worker + headless Claude worker"
-harnesses = ["crush-signal", {{ range $i := until (.crushSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}", {{ end }}"claude-headless"]
+description = "Everyday set — Crush Signal channel + Crush Switchboard pool + headless Opus 5 pool"
+harnesses = ["crush-signal", {{ range $i := until (.crushSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}", {{ end }}{{ range $i := until (.claudeSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"claude-headless{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ if lt $n (int $.claudeSwitchboardWorkers) }}, {{ end }}{{ end }}]
 autostart = true
 
 [profile.full]
 description = "All harnesses running"
-harnesses = ["crush-signal", {{ range $i := until (.crushSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}", {{ end }}"claude-code", "claude-headless"]
+harnesses = ["crush-signal", {{ range $i := until (.crushSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}", {{ end }}"claude-code", {{ range $i := until (.claudeSwitchboardWorkers | int) }}{{ $n := add $i 1 }}"claude-headless{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ if lt $n (int $.claudeSwitchboardWorkers) }}, {{ end }}{{ end }}]
 autostart = false
 
 # Remote access — the SSH cockpit
