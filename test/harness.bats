@@ -581,7 +581,12 @@ assert all(v[\"provider\"] != \"hyper\" for v in m.values()), m
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   # crush matches --channels entries against MCP server names; a rename would
   # silently disable the channel.
-  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$CRUSH_JSON' | python3 -c '
+  #
+  # Rendered AS A WORKER HOST: since .switchboard.workerHosts landed, the
+  # switchboard MCP renders only on kitt/tars, so on any other machine this would
+  # fail for a reason that has nothing to do with naming. The invariant is about
+  # the worker render — that is the only place a channel exists to be broken.
+  run bash -c "sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHosts/true/g' '$CRUSH_JSON' | chezmoi execute-template --source '$REPO_ROOT' | python3 -c '
 import json,sys
 mcp = json.load(sys.stdin)[\"mcp\"]
 assert \"signal\" in mcp, sorted(mcp)

@@ -47,7 +47,17 @@ OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "
 # the Vault-Agent-rendered secrets-static.env (SWITCHBOARD_CLAUDE_CODE_API_KEY);
 # mcp_secret's live fallback avoids blanking a working token on a transient miss.
 # Claude Code ONLY — deliberately NOT added to the Claude Desktop merge (44).
+# WORKER HOSTS ONLY (.switchboard.workerHosts). The MCP is a worker capability:
+# holding it means receiving doorbells and being expected to drain them. A host
+# that holds it and does not drain silently collects todos nobody will work —
+# Joe's laptop accumulated 62 that way, which read as a Switchboard outage.
+# Rendering empty here makes the jq below skip the entry entirely, and the
+# REMOVAL branch further down deletes one already baked into a live config.
+{{ if has .chezmoi.hostname .switchboard.workerHosts -}}
 SB="$(mcp_secret switchboard SWITCHBOARD_CLAUDE_CODE_API_KEY "$(jq -r '(.mcpServers.switchboard.headers.Authorization // "") | ltrimstr("Bearer ")' "$CJ")")"
+{{- else -}}
+SB=""
+{{- end }}
 # cairn: native http + a STATIC Bearer, baked at apply time (same reason as outline
 # and switchboard — Claude Code doesn't expand ${VAR} in http headers). Crush has
 # had this server since it was stood up; both Claude clients were simply never
@@ -61,7 +71,11 @@ CN="$(mcp_secret cairn CAIRN_API_TOKEN "$(jq -r '(.mcpServers.cairn.headers.Auth
 # time. Fallback recovers the URL already in the live config, so a transient miss
 # leaves a working entry alone. SWITCHBOARD_CLAUDE_CODE_URL is the per-client full
 # MCP URL from OpenBao, matching SWITCHBOARD_CLAUDE_CODE_API_KEY.
+{{ if has .chezmoi.hostname .switchboard.workerHosts -}}
 SB_URL="$(mcp_env SWITCHBOARD_CLAUDE_CODE_URL "$(jq -r '.mcpServers.switchboard.url // ""' "$CJ")")"
+{{- else -}}
+SB_URL=""
+{{- end }}
 CN_URL="$(mcp_env CAIRN_BASE_URL "")"
 CN_URL="${CN_URL:+${CN_URL}/mcp}"
 CN_URL="${CN_URL:-$(jq -r '.mcpServers.cairn.url // ""' "$CJ")}"
@@ -96,8 +110,15 @@ desired="$(mcp_base | jq \
   # switchboard: native http + static Bearer (baked). Claude Code ONLY. Both halves
   # resolved above; only set when BOTH are non-empty so a fresh machine never bakes a
   # broken "Bearer " or a url-less entry (cf. dotfiles#15).
+  # An empty half skips the add; on a NON-worker host both are empty by construction
+  # (gated above), so the entry is deleted outright rather than merely not refreshed.
+  # Without the delete, a machine that was a worker before this gate existed would
+  # keep a live, doorbell-receiving entry forever — which is the exact state the gate
+  # exists to end.
   | (if $sb != "" and $sburl != "" then .switchboard = {type:"http", url:$sburl,
-                headers:{"Authorization": ("Bearer " + $sb)}} else . end)
+                headers:{"Authorization": ("Bearer " + $sb)}}
+     elif {{ if has .chezmoi.hostname .switchboard.workerHosts }}false{{ else }}true{{ end }} then del(.switchboard)
+     else . end)
   # cairn: native http + static Bearer (baked). Same both-halves rule as switchboard.
   | (if $cn != "" and $cnurl != "" then .cairn = {type:"http", url:$cnurl,
                 headers:{"Authorization": ("Bearer " + $cn)}} else . end)

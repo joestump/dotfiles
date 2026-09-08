@@ -77,7 +77,11 @@ _home_with() {
   # host AND slug, must ride the per-user OpenBao bag:
   #   crush        SWITCHBOARD_CRUSH_URL        (expanded by crush at runtime)
   #   claude code  SWITCHBOARD_CLAUDE_CODE_URL  (baked by run_after_43)
-  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$REPO_ROOT/dot_config/crush/crush.json.tmpl' | python3 -c '
+  # Rendered AS A WORKER HOST: the switchboard MCP is gated on
+  # .switchboard.workerHosts, so it is absent by design anywhere else and the
+  # lookup below would KeyError for an unrelated reason. The no-baked-slug
+  # invariant is about the render that actually ships an entry.
+  run bash -c "sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHosts/true/g' '$REPO_ROOT/dot_config/crush/crush.json.tmpl' | chezmoi execute-template --source '$REPO_ROOT' | python3 -c '
 import json,sys
 url = json.load(sys.stdin)[\"mcp\"][\"switchboard\"][\"url\"]
 assert url == \"\$SWITCHBOARD_CRUSH_URL\", url

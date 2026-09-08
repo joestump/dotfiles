@@ -410,6 +410,35 @@ ghostty:
 # exposed is real regardless of whether anything ever moves, and it is the
 # same shape as the 08/29 incident above: a gate that reads as "one machine"
 # but is not.
+# Switchboard — which machines drain the queue.
+#
+# The switchboard MCP is a WORKER capability, not a convenience: an agent that
+# holds it receives doorbells and is expected to claim, work and complete the
+# todos they carry. A machine that holds the MCP but never drains is worse than
+# one that does not hold it at all — todos route to it, sit unclaimed, and the
+# queue looks backed up while the real workers are idle.
+#
+# That is not hypothetical. Joe's laptop carried the Claude Code entry because
+# the merge script added it wherever the credential resolved, and its endpoint
+# quietly accumulated 62 todos it was never going to touch: an interactive
+# session is not a queue worker. It read as a Switchboard outage and was not one.
+#
+# So the MCP renders ONLY on the hosts listed here. Everything else — laptops,
+# workstations, a box you are only passing through — gets no switchboard entry
+# in either Claude Code or Crush.
+#
+# This does NOT gate the `switchboard` CLI, which authenticates as the HUMAN over
+# its own OAuth login and is how endpoints get vended and revoked. Operating the
+# service from a laptop stays possible; draining its queue from one does not.
+#
+# @joestump 09/08/2026 - Added, removing the laptop from the worker set.
+switchboard:
+  # Hostnames as `.chezmoi.hostname` sees them (short name, e.g. "kitt").
+  # Empty removes the MCP fleet-wide.
+  workerHosts:
+    - kitt
+    - tars
+
 sweeps:
   # Hostnames as `.chezmoi.hostname` sees them (short name, e.g. "kitt").
   # Empty disarms that identity's sweep fleet-wide.
