@@ -298,7 +298,14 @@
       },
       "timeout": 120,
       "disabled": false
-    },
+    }
+{{- /* Worker hosts only (.switchboard.workerHosts) — see the block in
+       .chezmoidata.yaml. Holding this MCP means receiving doorbells and being
+       expected to drain them; a host that holds it and does not drain silently
+       collects todos nobody will work. Note the comma placement: the entry
+       above must not be left with a trailing comma when this one is absent,
+       which is why the comma lives INSIDE the conditional. */}}
+{{- if has .chezmoi.hostname .switchboard.workerHosts }},
     "switchboard": {
       "type": "http",
       "url": "$SWITCHBOARD_CRUSH_URL",
@@ -308,6 +315,7 @@
       "timeout": 120,
       "disabled": false
     }
+{{- end }}
 {{ if eq .chezmoi.os "darwin" }},
     "msgbrowse": {
       "type": "http",
