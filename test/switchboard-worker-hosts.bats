@@ -69,13 +69,17 @@ print(\"ok\")
   [ "$status" -eq 0 ]
 }
 
-@test "switchboard: the Claude Code merge DELETES a stale entry off a worker host" {
-  # Emptying the two halves only skips the ADD. A machine that was a worker before
-  # this gate existed would otherwise keep a live, doorbell-receiving entry forever
-  # — which is the exact state the gate exists to end.
+@test "switchboard: the Claude Code merge DROPS a stale entry off a worker host" {
+  # Emptying the two halves only skips the ADD, and #239 shipped a del() inside the
+  # DESIRED object believing that removed it. It did not: mcp_merge is additive, so a
+  # key absent from `desired` is left alone in the live config. The laptop kept its
+  # entry through a full apply that reported "mcpServers already current".
+  #
+  # mcp_drop is the only thing that edits the live config, so that is what this
+  # asserts — the presence of a removal INTENT in the desired set proves nothing.
   run bash -c "sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHosts/false/g' '$MERGE' | chezmoi execute-template --source '$REPO_ROOT'"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"del(.switchboard)"* ]]
+  printf '%s\n' "$output" | grep -qE '^mcp_drop .*"\$CJ" .*\bswitchboard\b'
   printf '%s\n' "$output" | grep -qE '^SB=""'
   printf '%s\n' "$output" | grep -qE '^SB_URL=""'
 }
@@ -85,6 +89,6 @@ print(\"ok\")
   [ "$status" -eq 0 ]
   printf '%s\n' "$output" | grep -q 'SWITCHBOARD_CLAUDE_CODE_API_KEY'
   printf '%s\n' "$output" | grep -q 'SWITCHBOARD_CLAUDE_CODE_URL'
-  # The delete branch must be unreachable there, or a worker would lose its entry.
-  [[ "$output" == *"elif false then del(.switchboard)"* ]]
+  # And it must NOT be dropped there, or a worker would lose its entry every apply.
+  ! printf '%s\n' "$output" | grep -qE '^mcp_drop .*\bswitchboard\b' 
 }

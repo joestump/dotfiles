@@ -110,15 +110,14 @@ desired="$(mcp_base | jq \
   # switchboard: native http + static Bearer (baked). Claude Code ONLY. Both halves
   # resolved above; only set when BOTH are non-empty so a fresh machine never bakes a
   # broken "Bearer " or a url-less entry (cf. dotfiles#15).
-  # An empty half skips the add; on a NON-worker host both are empty by construction
-  # (gated above), so the entry is deleted outright rather than merely not refreshed.
-  # Without the delete, a machine that was a worker before this gate existed would
-  # keep a live, doorbell-receiving entry forever — which is the exact state the gate
-  # exists to end.
+  # An empty half skips the add. REMOVAL is not done here — see the mcp_drop below.
+  # Deleting from this object is INERT, which #239 shipped without noticing: this is
+  # the DESIRED set, and mcp_merge is additive (managed servers replace live ones,
+  # everything else is preserved), so a key absent from `desired` is left alone in the
+  # live config rather than removed from it. The laptop kept its entry through a full
+  # apply that reported "mcpServers already current".
   | (if $sb != "" and $sburl != "" then .switchboard = {type:"http", url:$sburl,
-                headers:{"Authorization": ("Bearer " + $sb)}}
-     elif {{ if has .chezmoi.hostname .switchboard.workerHosts }}false{{ else }}true{{ end }} then del(.switchboard)
-     else . end)
+                headers:{"Authorization": ("Bearer " + $sb)}} else . end)
   # cairn: native http + static Bearer (baked). Same both-halves rule as switchboard.
   | (if $cn != "" and $cnurl != "" then .cairn = {type:"http", url:$cnurl,
                 headers:{"Authorization": ("Bearer " + $cn)}} else . end)
@@ -131,5 +130,13 @@ desired="$(mcp_base | jq \
                env:{PATH:$sigpath}}
 ')"
 
-mcp_drop   "$CJ" github
+# Retirements. mcp_drop edits the LIVE config, which is the only way to REMOVE a
+# server — mcp_merge below only ever adds or replaces, so an entry that merely stops
+# being generated survives forever.
+#
+# switchboard is dropped on every NON-worker host (.switchboard.workerHosts). A
+# machine that was a worker before that gate existed otherwise keeps a live,
+# doorbell-receiving entry, and its endpoint quietly collects todos an interactive
+# session will never claim — 62 of them on Joe's laptop, in the case that prompted it.
+mcp_drop   "$CJ" github{{ if not (has .chezmoi.hostname .switchboard.workerHosts) }} switchboard{{ end }}
 mcp_merge "$CJ" "$desired"
