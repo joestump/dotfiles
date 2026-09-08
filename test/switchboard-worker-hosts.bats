@@ -15,7 +15,6 @@
 # things that would silently undo it.
 load test_helper
 
-DATA="$REPO_ROOT/.chezmoidata.yaml"
 CRUSH="$REPO_ROOT/dot_config/crush/crush.json.tmpl"
 MERGE="$REPO_ROOT/.chezmoiscripts/run_after_43-claude-code-mcp-merge.sh.tmpl"
 
@@ -28,14 +27,14 @@ _render_as_other()  { sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHos
   | chezmoi execute-template --source "$REPO_ROOT"; }
 
 @test "switchboard: the worker host list is declared and non-empty" {
-  run python3 -c "
-import yaml,sys
-d=yaml.safe_load(open('$DATA'))
-hosts=(d.get('switchboard') or {}).get('workerHosts') or []
-assert hosts, 'workerHosts is empty — that removes the MCP fleet-wide'
-print(' '.join(hosts))
-"
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # Read the key THROUGH chezmoi rather than parsing the YAML directly: it is what
+  # the two templates actually see, it needs no PyYAML (CI's python has none), and
+  # a key renamed or moved fails here instead of passing against a stale path.
+  run chezmoi execute-template --source "$REPO_ROOT" \
+    '{{ .switchboard.workerHosts | join " " }}'
   [ "$status" -eq 0 ]
+  [ -n "$output" ]   # empty removes the MCP fleet-wide, silently
   # kitt and tars are the boxes that actually run harness worker pools.
   [[ "$output" == *kitt* ]]
   [[ "$output" == *tars* ]]
