@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Sweep Completion Record
+#
+# The completion contract for scheduled sweeps: the last thing every sweep does
+# is run this helper, which writes one result JSON per run to
+# ~/sweeps/results/<job>/<UTC timestamp>.json and prints the path. harness
+# counts a crush exit 0 as success even when the model stopped mid-narration
+# with nothing done, so exit codes cannot tell a finished sweep from a dead one.
+# A result file can: no file means the run did not finish, whatever harness says.
+#
+# It validates everything it records, so a model that mangles an argument gets
+# a usage error it can read and retry instead of a silently wrong record.
+#
+# @joestump 09/11/2026 - Added with the lean sweep profile.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: sweep-finish --job NAME --outcome ok|partial|failed|noop --summary TEXT
+                    [--counts JSON-OBJECT] [--errors JSON-ARRAY]
+                    [--signal-sent true|false]
+
+  --job          the harness name, e.g. morning-brief
+  --outcome      ok       the run did its whole job
+                 partial  a budget or limit stopped it part-way
+                 failed   it could not do its job (say why in --errors)
+                 noop     nothing needed doing
+  --summary      one or two sentences, plain text
+  --counts       e.g. '{"prs_reviewed":3,"merged":1}'   (default {})
+  --errors       e.g. '["gitea 502 on repo list"]'       (default [])
+  --signal-sent  whether the Signal summary went out   (default false)
+USAGE
+  exit 2
+}
+
+job="" outcome="" summary="" counts='{}' errors='[]' signal_sent="false"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --job) job="${2:-}"; shift 2 || usage ;;
+    --outcome) outcome="${2:-}"; shift 2 || usage ;;
+    --summary) summary="${2:-}"; shift 2 || usage ;;
+    --counts) counts="${2:-}"; shift 2 || usage ;;
+    --errors) errors="${2:-}"; shift 2 || usage ;;
+    --signal-sent) signal_sent="${2:-}"; shift 2 || usage ;;
+    -h|--help) usage ;;
+    *) echo "sweep-finish: unknown argument: $1" >&2; usage ;;
+  esac
+done
+
+[ -n "$job" ] && [ -n "$outcome" ] && [ -n "$summary" ] || usage
+case "$job" in
+  *[!A-Za-z0-9._-]*|.*) echo "sweep-finish: --job must be a plain harness name" >&2; exit 2 ;;
+esac
+case "$outcome" in
+  ok|partial|failed|noop) ;;
+  *) echo "sweep-finish: --outcome must be ok, partial, failed or noop" >&2; exit 2 ;;
+esac
+case "$signal_sent" in
+  true|false) ;;
+  *) echo "sweep-finish: --signal-sent must be true or false" >&2; exit 2 ;;
+esac
+jq -e 'type == "object"' >/dev/null 2>&1 <<<"$counts" \
+  || { echo "sweep-finish: --counts must be a JSON object" >&2; exit 2; }
+jq -e 'type == "array"' >/dev/null 2>&1 <<<"$errors" \
+  || { echo "sweep-finish: --errors must be a JSON array" >&2; exit 2; }
+
+dir="${SWEEP_RESULTS_DIR:-$HOME/sweeps/results}/$job"
+mkdir -p "$dir"
+ts="$(date -u +%Y%m%dT%H%M%SZ)"
+out="$dir/$ts.json"
+
+jq -n \
+  --arg job "$job" \
+  --arg finished_at "$ts" \
+  --arg host "$(hostname -s 2>/dev/null || hostname)" \
+  --arg identity "$(id -un)" \
+  --arg outcome "$outcome" \
+  --arg summary "$summary" \
+  --argjson counts "$counts" \
+  --argjson errors "$errors" \
+  --argjson signal_sent "$signal_sent" \
+  '{job: $job, finished_at: $finished_at, host: $host, identity: $identity,
+    outcome: $outcome, summary: $summary, counts: $counts, errors: $errors,
+    signal_sent: $signal_sent}' >"$out.tmp"
+mv "$out.tmp" "$out"
+printf '%s\n' "$out"
