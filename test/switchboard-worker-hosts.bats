@@ -11,8 +11,12 @@
 # accumulated 62 todos an interactive session was never going to touch. It looked
 # like a Switchboard outage and was not one.
 #
-# So both templates gate on the same data key, and these tests pin the three
-# things that would silently undo it.
+# So crush.json gates on that data key, and these tests pin the things that would
+# silently undo it. Claude Code is no longer gated at all: its merge script drops
+# the entry on every host, because no Claude Code queue worker exists anywhere.
+#
+# @joestump 09/11/2026 - The Claude Code half went from "worker hosts only" to
+#   "nowhere" when the claude-headless pool was retired.
 load test_helper
 
 CRUSH="$REPO_ROOT/dot_config/crush/crush.json.tmpl"
@@ -69,26 +73,32 @@ print(\"ok\")
   [ "$status" -eq 0 ]
 }
 
-@test "switchboard: the Claude Code merge DROPS a stale entry off a worker host" {
-  # Emptying the two halves only skips the ADD, and #239 shipped a del() inside the
-  # DESIRED object believing that removed it. It did not: mcp_merge is additive, so a
-  # key absent from `desired` is left alone in the live config. The laptop kept its
-  # entry through a full apply that reported "mcpServers already current".
+@test "switchboard: the Claude Code merge DROPS the entry on every host, workers included" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # #239 shipped a del() inside the DESIRED object believing that removed it. It did
+  # not: mcp_merge is additive, so a key absent from `desired` is left alone in the
+  # live config. The laptop kept its entry through a full apply that reported
+  # "mcpServers already current". mcp_drop is the only thing that edits the live
+  # config, so that is what this asserts.
   #
-  # mcp_drop is the only thing that edits the live config, so that is what this
-  # asserts — the presence of a removal INTENT in the desired set proves nothing.
-  run bash -c "sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHosts/false/g' '$MERGE' | chezmoi execute-template --source '$REPO_ROOT'"
-  [ "$status" -eq 0 ]
-  printf '%s\n' "$output" | grep -qE '^mcp_drop .*"\$CJ" .*\bswitchboard\b'
-  printf '%s\n' "$output" | grep -qE '^SB=""'
-  printf '%s\n' "$output" | grep -qE '^SB_URL=""'
+  # Rendered both ways: kitt and tars carried a baked entry while claude-headless
+  # drained it, and they are exactly the boxes a worker-hosts-only drop would miss.
+  local gate
+  for gate in true false; do
+    run bash -c "sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHosts/$gate/g' '$MERGE' | chezmoi execute-template --source '$REPO_ROOT'"
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | grep -qE '^mcp_drop .*"\$CJ" .*\bswitchboard\b' \
+      || { echo "no switchboard drop with gate=$gate"; return 1; }
+  done
 }
 
-@test "switchboard: the Claude Code merge still bakes the entry on a worker host" {
-  run bash -c "sed -E 's/has \.chezmoi\.hostname \.switchboard\.workerHosts/true/g' '$MERGE' | chezmoi execute-template --source '$REPO_ROOT'"
+@test "switchboard: the Claude Code merge never bakes a switchboard entry" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # A bake here would be undone by the drop above on the same apply, so the pair
+  # would flap the entry in and out of ~/.claude.json every run. Counting
+  # assertions, not `! grep`, which set -e ignores mid-test.
+  run chezmoi execute-template --source "$REPO_ROOT" < "$MERGE"
   [ "$status" -eq 0 ]
-  printf '%s\n' "$output" | grep -q 'SWITCHBOARD_CLAUDE_CODE_API_KEY'
-  printf '%s\n' "$output" | grep -q 'SWITCHBOARD_CLAUDE_CODE_URL'
-  # And it must NOT be dropped there, or a worker would lose its entry every apply.
-  ! printf '%s\n' "$output" | grep -qE '^mcp_drop .*\bswitchboard\b' 
+  [ "$(grep -c 'SWITCHBOARD_CLAUDE_CODE' <<<"$output" || true)" -eq 0 ]
+  [ "$(grep -c '\.switchboard = ' <<<"$output" || true)" -eq 0 ]
 }

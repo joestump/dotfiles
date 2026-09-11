@@ -14,7 +14,7 @@
 # Manager.Reload only re-applies harness definitions — so enabling [server], or
 # moving its port, needs a daemon RESTART. This script deliberately does not do
 # that: a restart tears down every running harness (the Signal channel, the
-# Remote Control session), which is far too destructive to trigger from an
+# Switchboard workers), which is far too destructive to trigger from an
 # apply. It prints the caveat instead; restart on your own schedule with
 # `systemctl --user restart harness` / `launchctl kickstart -k
 # gui/$(id -u)/rocks.stump.harness`.
@@ -24,7 +24,19 @@
 # harness.toml. Stop + disable them here (covers machines where the units have
 # already fired once); .chezmoiremove deletes the files.
 #
+# A reload is also how a RETIRED harness leaves a running daemon: Manager.Reload
+# stops and drops any harness the new config no longer declares. That is what
+# takes claude-code and the claude-headless pool off tars and kitt.
+#
+# @joestump 09/11/2026 - Hashed the blog-sweep and navidrome-ldap-sync drop-ins
+#   and prompts as well. They were missing, so an edit to only one of those files
+#   never reloaded the daemon and the old definition kept firing.
+#
 #   config hash:  {{ include "dot_config/harness/harness.toml.tmpl" | sha256sum }}
+#   drop-in blog:       {{ include "dot_config/harness/harness.d/blog-sweep.toml.tmpl" | sha256sum }}
+#   drop-in navidrome:  {{ include "dot_config/harness/harness.d/navidrome-ldap-sync.toml.tmpl" | sha256sum }}
+#   blog prompt:      {{ include "dot_config/dotfiles/blog-sweep.prompt.md.tmpl" | sha256sum }}
+#   navidrome prompt: {{ include "dot_config/dotfiles/navidrome-ldap-sync.prompt.md.tmpl" | sha256sum }}
 #   drop-in sweep dub:  {{ include "dot_config/harness/harness.d/stumpcloud-sweep-dub.toml.tmpl" | sha256sum }}
 #   drop-in sweep dtw:  {{ include "dot_config/harness/harness.d/stumpcloud-sweep-dtw.toml.tmpl" | sha256sum }}
 #   drop-in sweep pdx:  {{ include "dot_config/harness/harness.d/stumpcloud-sweep-pdx.toml.tmpl" | sha256sum }}

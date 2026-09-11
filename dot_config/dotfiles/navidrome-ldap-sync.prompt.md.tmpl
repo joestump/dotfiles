@@ -6,16 +6,19 @@ fork.
 
 ## What to do
 
-Load the **`personal:navidrome-ldap-sync`** skill and execute it in full. That
-skill is the complete specification for this run: it carries the rebase
+Load the **`navidrome-ldap-sync`** skill (Crush names it that; Claude Code
+calls the same skill `personal:navidrome-ldap-sync`) and execute it in full.
+That skill is the complete specification for this run: it carries the rebase
 procedure, the `-ldap` tagging rules, the release-note format, and the traps
 that have bitten this job before. Do not improvise a sync outside it, and do not
 substitute your own git commands for the ones it specifies.
 
-If the skill will not load, **stop and report that** — do not fall back to
-sync-by-memory. A sync run from memory is exactly how this job spent months
-force-pushing upstream tags into the fork and publishing images with no LDAP
-support in them.
+If your skill tool cannot resolve it by name, read the skill file directly —
+`{{ .chezmoi.homeDir }}/.config/claude-marketplaces/claude-personal/skills/navidrome-ldap-sync/SKILL.md`
+— which is the same document. If that file is missing too, **stop and report
+that** — do not fall back to sync-by-memory. A sync run from memory is exactly
+how this job spent months force-pushing upstream tags into the fork and
+publishing images with no LDAP support in them.
 
 ## The two failures this run exists to prevent
 

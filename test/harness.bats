@@ -2,8 +2,9 @@
 # Tests for the harness seed (dot_config/harness/*, dot_local/share/crush-signal/*).
 #
 # Two crush harnesses ship in the seed — crush-signal (Signal channel) and
-# crush-switchboard (Switchboard doorbells) — plus claude-code (Claude Code driven
-# from the Claude app via Remote Control). Each crush harness owns exactly one
+# crush-switchboard (Switchboard doorbells, a worker pool). The Claude Code
+# harnesses (claude-code, claude-headless) were retired on 2026-09-11; the last
+# test in this file keeps them out. Each crush harness owns exactly one
 # channel and carries its OWN model pin, because each repoints CRUSH_GLOBAL_DATA. The
 # files have to agree with each other and with dot_config/crush/crush.json.tmpl or the
 # harness silently runs the wrong model, or with no Signal channel. These assertions
@@ -147,37 +148,35 @@ for fname, dd in docs.items():
     over = set(dd['harness']) & names
     assert not over, (fname, 'duplicate harness across config+drop-ins', over)
     names |= set(dd['harness'])
-# crush-switchboard and claude-headless are both POOLS, so their member counts
-# are configuration (.crushSwitchboardWorkers / .claudeSwitchboardWorkers)
-# rather than fixed names. Assert the fixed harnesses exactly, and each pool by
-# shape — a frozen literal here would fail every time a pool is resized, which
-# is a knob, not a regression.
+# crush-switchboard is a POOL, so its member count is configuration
+# (.crushSwitchboardWorkers) rather than a fixed name. Assert the fixed harnesses
+# exactly, and the pool by shape — a frozen literal here would fail every time
+# the pool is resized, which is a knob, not a regression.
 def assert_pool(base):
     p = {n for n in names if n == base or n.startswith(base + '-')}
     # Guard against a sibling name being swallowed: only NUMERIC suffixes are
-    # pool members. Without this, adding a `claude-headless-experimental` would
+    # pool members. Without this, adding a `crush-switchboard-experimental` would
     # silently pass as worker "experimental" and vanish from the fixed set.
     p = {n for n in p if n == base or n[len(base) + 1:].isdigit()}
     assert p, f'no {base} worker rendered'
     assert base in p, sorted(p)
     assert p == {base} | {f'{base}-{i}' for i in range(2, len(p) + 1)}, sorted(p)
     return p
-pool = assert_pool('crush-switchboard') | assert_pool('claude-headless')
-assert names - pool == {'crush-signal', 'claude-code',
+pool = assert_pool('crush-switchboard')
+assert names - pool == {'crush-signal',
                  'stumpcloud-sweep-dub',
                  'stumpcloud-sweep-dtw', 'stumpcloud-sweep-pdx',
                  'pr-sweep', 'pr-sweep-github', 'morning-brief',
                  'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names - pool)
 assert d['harness']['crush-signal']['harness'] == 'crush'
-assert d['harness']['claude-code']['harness'] == 'claude-code'
 # The drop-in directory is wired: without [server].harness_d the daemon never
 # reads harness.d and every scheduled task silently stops existing.
 assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['server']
 # All run with permission prompts off, so none may autostart on boot. The
 # scheduled entries carry no enabled key at all (mutually exclusive with
-# schedule); the daemon fires them only on their cron. The interactive three
+# schedule); the daemon fires them only on their cron. The interactive ones
 # live in the main doc; a scheduled name may never appear there.
-interactive = {'crush-signal', 'claude-code'} | pool
+interactive = {'crush-signal'} | pool
 assert set(d['harness']) == interactive, sorted(d['harness'])
 for name in interactive:
     assert d['harness'][name]['enabled'] is False, name
@@ -251,8 +250,8 @@ PY"
   # restart itself is "always" OR "on-failure" for a long-running harness.
   # "always" respawns on a CLEAN exit too, and a clean exit clears the
   # consecutive-failure counter — so exit-0 looping is the one loop give-up
-  # cannot break. That is survivable for the Claude harnesses (flat-rate) and
-  # not for a metered one; see the crush-signal check below.
+  # cannot break. That is not survivable for a metered harness; see the
+  # crush-signal check below.
   # EXCEPTION - scheduled one-shots: config validation rejects restart=always
   # (respawning a one-shot after its clean exit makes the schedule meaningless);
   # they pin on-failure so a crashed run retries, and need no delay. They live
@@ -313,25 +312,6 @@ import sys, tomllib
 h = tomllib.loads(sys.stdin.read())[\"harness\"][\"crush-signal\"]
 assert h[\"restart\"] == \"on-failure\", h[\"restart\"]
 assert h[\"restart_delay\"] >= 30, h[\"restart_delay\"]
-'"
-  [ "$status" -eq 0 ]
-}
-
-@test "harness: claude-code is Remote Control + skip-permissions, no Signal wiring" {
-  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # The phone drives this one through Remote Control, not the Signal channel: the
-  # signal MCP in ~/.claude.json is wired WITHOUT --channel, and crush-signal now
-  # answers every trusted-sender message unprefixed. An env_file here would be the
-  # tell that someone gave claude a channel too — which now guarantees duplicate
-  # replies, since neither agent would be filtering.
-  run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$HARNESS_TOML' | python3 -c '
-import tomllib,sys
-h = tomllib.load(sys.stdin.buffer)[\"harness\"][\"claude-code\"]
-assert \"--remote-control\" in h[\"args\"], h[\"args\"]
-assert \"--dangerously-skip-permissions\" in h[\"args\"], h[\"args\"]
-assert h[\"workdir\"].endswith(\"/src\"), h[\"workdir\"]
-assert \"env_file\" not in h, h
 '"
   [ "$status" -eq 0 ]
 }
@@ -735,69 +715,6 @@ assert tomllib.load(sys.stdin.buffer)[\"server\"][\"enabled\"] is True
   [ "$uniq_envs" -eq 1 ]
 }
 
-# --- claude-headless (Opus 5) worker pool ---
-#
-# Same competing-consumer shape as the crush pool above, on Claude Code's own
-# vended endpoint. What differs is the pin: model and effort are CLI flags
-# rather than a data-dir indirection, so the coupling that can silently rot here
-# is a worker whose flags drift from its siblings' — capacity that quietly runs
-# two different models under one description.
-
-@test "harness pool: every declared claude worker is a real harness block" {
-  run _render "$HARNESS_TOML"
-  [ "$status" -eq 0 ]
-  want="$(grep -E '^claudeSwitchboardWorkers:' "$REPO_ROOT/.chezmoidata.yaml" | awk '{print $2}')"
-  got="$(printf '%s\n' "$output" | grep -cE '^\[harness\.claude-headless(-[0-9]+)?\]')"
-  [ "$got" -eq "$want" ]
-}
-
-@test "harness pool: claude worker 1 keeps the bare name" {
-  run _render "$HARNESS_TOML"
-  [ "$status" -eq 0 ]
-  # Not claude-headless-1: the bare name is what the profiles, the retirement
-  # script in run_onchange_after_51 and `harness logs claude-headless` all say.
-  printf '%s\n' "$output" | grep -qE '^\[harness\.claude-headless\]'
-  ! printf '%s\n' "$output" | grep -qE '^\[harness\.claude-headless-1\]'
-}
-
-@test "harness pool: every claude worker is listed in both profiles" {
-  run _render "$HARNESS_TOML"
-  [ "$status" -eq 0 ]
-  # A worker absent from the profile is declared but never autostarts — the pool
-  # would look configured and do nothing.
-  for name in $(printf '%s\n' "$output" | sed -nE 's/^\[harness\.(claude-headless(-[0-9]+)?)\]/\1/p'); do
-    [ "$(printf '%s\n' "$output" | grep -cE "^harnesses = .*\"${name}\"")" -eq 2 ]
-  done
-}
-
-@test "harness pool: every claude worker carries the same model and effort pin" {
-  run _render "$HARNESS_TOML"
-  [ "$status" -eq 0 ]
-  # The pin IS the args line here — there is no env file to diff — so two
-  # workers with different flags would run different models while sharing one
-  # description. Assert one distinct args line across the pool, and that it
-  # actually names the model and the effort rather than relying on defaults.
-  args="$(printf '%s\n' "$output" \
-    | awk '/^\[harness\.claude-headless(-[0-9]+)?\]/{f=1} f&&/^args =/{print; f=0}' | sort -u)"
-  [ "$(printf '%s\n' "$args" | wc -l | tr -d ' ')" -eq 1 ]
-  printf '%s\n' "$args" | grep -q -- '"--model", "opus"'
-  printf '%s\n' "$args" | grep -q -- '"--effort", "high"'
-}
-
-@test "harness pool: the metered claude workers do not respawn on a clean exit" {
-  run _render "$HARNESS_TOML"
-  [ "$status" -eq 0 ]
-  # restart = "always" respawns on a CLEAN exit, and a clean exit clears the
-  # daemon's consecutive-failure counter — so an exit-0 loop is the one loop
-  # give-up can never break. Opus at high effort costs money per launch, which
-  # puts these in the same economics as crush-signal.
-  n="$(printf '%s\n' "$output" \
-    | awk '/^\[harness\.claude-headless(-[0-9]+)?\]/{f=1} f&&/^restart =/{print $3; f=0}' \
-    | grep -c '"on-failure"')"
-  want="$(grep -E '^claudeSwitchboardWorkers:' "$REPO_ROOT/.chezmoidata.yaml" | awk '{print $2}')"
-  [ "$n" -eq "$want" ]
-}
-
 @test "harness pool: the rendered toml stays valid with a pool" {
   run _render "$HARNESS_TOML"
   [ "$status" -eq 0 ]
@@ -815,4 +732,23 @@ for w in ws:
     assert '--channels' in h['args'] and 'switchboard' in h['args'], w
 "
   [ "$status" -eq 0 ]
+}
+
+# --- retired: the Claude Code harnesses ---
+#
+# claude-code (Remote Control) and the claude-headless Opus worker pool were
+# removed on 2026-09-11: nothing runs Claude Code in the background any more. A
+# re-add would quietly bring back a metered session on a switchboard endpoint
+# nobody drains, so pin the absence everywhere it used to be declared.
+#
+# @joestump 09/11/2026 - Replaced the claude-headless pool tests with this one.
+
+@test "harness: the Claude Code harnesses stay retired (tables, profiles, data)" {
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  # Counting assertions, not `! grep`, which set -e ignores mid-test.
+  [ "$(grep -cE '^\[harness\.claude-(code|headless(-[0-9]+)?)\]' <<<"$output" || true)" -eq 0 ]
+  [ "$(grep -cE '^harnesses = .*"claude-' <<<"$output" || true)" -eq 0 ]
+  [ "$(grep -c 'claudeSwitchboardWorkers' "$REPO_ROOT/.chezmoidata.yaml" || true)" -eq 0 ]
+  [ "$(grep -c 'claudeSwitchboardWorkers' "$HARNESS_TOML" || true)" -eq 0 ]
 }

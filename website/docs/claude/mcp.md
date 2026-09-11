@@ -12,7 +12,7 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
   key (OAuth tokens, session state) and any hand-added servers. Only `.mcpServers`
   is rewritten, and the merge **aborts** if any top-level key would drop.
 - **Per-app shape:** Code tags each server with `type` and reaches the remote
-  servers (`outline`, `cairn`, `switchboard`) over native `http`; Desktop
+  servers (`outline`, `cairn`) over native `http`; Desktop
   omits `type` and reaches them through the `npx mcp-remote` stdio bridge.
 - **No Docker.** Every server is a plain stdio launcher (`npx`/`go`) or a remote
   HTTP endpoint — nothing here needs a container runtime.
@@ -22,9 +22,9 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 - **Service base URLs come from OpenBao too** (`mcp_env`), not from the repo — so
   moving a service is one `vault kv put`, and Crush, Code and Desktop all follow.
   Switchboard's minted `/mcp/<client>` slug is a per-user credential-path, so it
-  rides OpenBao as well, as a full per-client URL (`SWITCHBOARD_CRUSH_URL` /
-  `SWITCHBOARD_CLAUDE_CODE_URL`) — committed data renders identically on every
-  box, which is exactly what a per-identity value must never do.
+  rides OpenBao as well, as a full per-client URL (`SWITCHBOARD_CRUSH_URL`) —
+  committed data renders identically on every box, which is exactly what a
+  per-identity value must never do.
 
 ## The servers
 
@@ -37,7 +37,14 @@ into both apps by `run_onchange_after_claude-{code,desktop}-mcp-merge.sh`:
 | `karakeep` | Karakeep bookmarks (`karakeep.stump.rocks`) | stdio | `npx @karakeep/mcp` | both |
 | `outline` | Outline wiki (`outline.stump.rocks`) | `http` (Code) · `mcp-remote` (Desktop) | native / `npx mcp-remote` | both |
 | `signal` | Signal send/receive/react | stdio | `uv run` → signal-cli daemon | both · [setup →](./signal) |
-| `switchboard` | Durable webhook→todo queue (`$SWITCHBOARD_CLAUDE_CODE_URL`) | `http` | native | **Code only** |
+
+:::note[No `switchboard` server in Claude Code]
+Switchboard is a queue-**worker** capability, and the only queue workers left
+are the `crush-switchboard` harnesses, so the server lives in Crush's config
+alone (on the `.switchboard.workerHosts` boxes). `run_after_43` actively
+**drops** a `switchboard` entry from `~/.claude.json` on every host: an entry
+that nothing drains just collects todos.
+:::
 
 :::note[No `github` server — use the `gh` CLI]
 The hosted GitHub MCP (`api.githubcopilot.com`) was retired. Every GitHub
@@ -52,7 +59,7 @@ separate, still-live MCP server for the self-hosted forge.
 
 ### Where each token comes from
 
-Five servers need a credential; each is sourced differently so **nothing secret is
+Four servers need a credential; each is sourced differently so **nothing secret is
 ever written to the chezmoi repo**. `aws` is the exception that proves the rule —
 it needs credentials but stores none, because it signs with SigV4 from the
 standard boto chain (see below).
@@ -67,8 +74,6 @@ the KV path, then `:`, then the field (env-var) name. e.g.
 | `gitea` | `GITEA_TOKEN` | **Not in the config** — gitea-mcp inherits it from the login shell (`env.zsh`, from `secret/users/<you>/gitea:GITEA_TOKEN`) |
 | `outline` | `Authorization: Bearer …` | `secret/users/<you>/outline:OUTLINE_API_TOKEN`, via the Vault-Agent-rendered `secrets-static.env`, baked as a static header (Code can't expand `${VAR}` in HTTP headers) |
 | `cairn` | `Authorization: Bearer …` | `secret/users/<you>/cairn:CAIRN_API_TOKEN`, baked as a static header — same reason as outline. The **endpoint** comes from OpenBao too (`CAIRN_BASE_URL`) |
-| `switchboard` | `Authorization: Bearer …` | `secret/users/<you>/switchboard:SWITCHBOARD_CLAUDE_CODE_API_KEY`, baked as a static header. The endpoint is the per-client `SWITCHBOARD_CLAUDE_CODE_URL` from the same bag (full URL incl. the minted `/mcp/<client>` slug) |
-
 ### `aws` — the one with no token
 
 The AWS MCP Server is **remote and managed by AWS**; `mcp-proxy-for-aws` is a

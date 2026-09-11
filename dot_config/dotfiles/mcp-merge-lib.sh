@@ -24,9 +24,8 @@ mcp_secret() { mcp_env "$2" "$3"; }
 # mcp_env <env-var> <live-fallback>
 #   The same read as mcp_secret, for the NON-secret half of a server definition —
 #   a service base URL. Those are pushed in from OpenBao alongside the tokens
-#   (CAIRN_BASE_URL, SWITCHBOARD_CLAUDE_CODE_URL), so an endpoint move is one OpenBao
-#   write rather than a commit here, and Crush already reaches both servers through
-#   exactly these vars. Named honestly so a base URL isn't dressed up as a
+#   (CAIRN_BASE_URL), so an endpoint move is one OpenBao write rather than a commit
+#   here, and Crush already reaches the server through exactly that var. Named honestly so a base URL isn't dressed up as a
 #   credential. Falls back to the live value so a transient miss never blanks a
 #   working config.
 mcp_env() {

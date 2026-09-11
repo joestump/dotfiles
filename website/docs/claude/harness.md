@@ -6,9 +6,9 @@ title: Harness
 # Harness — supervised agents
 
 [`harness`](https://github.com/stump-wtf/harness) is *systemctl for your
-agents*: a Go daemon that supervises long-running agent sessions (Crush, Claude
-Code), keeps them alive across crashes, lets you attach to their terminals, and
-fires one-shot scheduled runs from its own cron.
+agents*: a Go daemon that supervises long-running agent sessions (Crush, on
+these boxes), keeps them alive across crashes, lets you attach to their
+terminals, and fires one-shot scheduled runs from its own cron.
 
 It replaced the `zsh-harnessd` era — a pile of `harness@.service` units,
 LaunchAgents, `tmux` servers and a standalone `claude-headless.service`. All of
@@ -24,8 +24,6 @@ flowchart TD
     env --> unit --> d
     d --> a1["crush-signal<br/>Crush · Signal channel"]
     d --> a1b["crush-switchboard<br/>Crush · Switchboard doorbells"]
-    d --> a2["claude-code<br/>Remote Control"]
-    d --> a3["claude-headless<br/>Switchboard queue worker"]
     d --> a4["scheduled sweeps<br/>cron, one-shot"]
     d --> ssh["SSH cockpit<br/>ssh -p 23234 host → TUI"]
 ```
@@ -76,8 +74,6 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 | --- | --- | :---: |
 | `crush-signal` | Crush on GLM-5.2 (Z.ai), `--yolo`, driven from the **Signal** channel | no |
 | `crush-switchboard` | Crush on GLM-5.2 (Z.ai), `--yolo`, woken by **Switchboard** webhook doorbells | no |
-| `claude-code` | Claude Code in `~/src` with `--remote-control` — the phone becomes a second keyboard on *this* session | no |
-| `claude-headless` | Claude Code in `~/src` working the Switchboard queue | no |
 | `stumpcloud-sweep-dub` | Scheduled: StumpCloud health sweep (dub), daily 07:00 | cron |
 | `stumpcloud-sweep-dtw` | Scheduled: StumpCloud health sweep (dtw), daily 07:20 | cron |
 | `stumpcloud-sweep-pdx` | Scheduled: StumpCloud health sweep (pdx), daily 07:40 | cron |
@@ -93,14 +89,22 @@ The channels are split one-per-harness now, and each crush harness points
 `CRUSH_GLOBAL_DATA` at its own data dir — so each also carries its own
 chezmoi-managed model pin under `~/.local/share/<harness>/crush.json`.
 
+:::note[No Claude Code harnesses]
+`claude-code` (Remote Control) and the `claude-headless` Switchboard worker pool
+were retired on 2026-09-11 — nothing runs Claude Code in the background any
+more. Applying the change reloads the daemon, which stops and drops both. The
+Claude Code `switchboard` MCP entry went with them: `run_after_43` drops it from
+`~/.claude.json` on every host, because an endpoint nobody drains only collects
+todos.
+:::
+
 The three scheduled ones are **gated on the `-agent` login suffix** — a human
 login renders only the interactive agents. Their instructions live in
 chezmoi-managed prompt files (`~/.config/dotfiles/*.prompt.md`), so editing a
 prompt propagates with a normal `czu` and re-fires the reload.
 
 Every interactive harness ships `enabled = false`: they all run with permission
-prompts off (`--yolo` / `--dangerously-skip-permissions`), so **nothing
-autostarts**. Start one deliberately.
+prompts off (`--yolo`), so **nothing autostarts**. Start one deliberately.
 
 ### Restart policy
 
@@ -124,16 +128,16 @@ Named sets that `harness use-profile` switches between. Exactly one carries
 
 | Profile | Harnesses |
 | --- | --- |
-| `default` | `crush-signal`, `crush-switchboard`, `claude-headless` |
-| `full` | `crush-signal`, `crush-switchboard`, `claude-code`, `claude-headless` |
+| `default` | `crush-signal`, the `crush-switchboard` pool |
+| `full` | same as `default` — kept so a box whose persisted active profile is `full` still starts its harnesses |
 
 ## Driving it
 
 ```bash
 harness                       # the TUI dashboard (also: harness list)
 harness describe crush-signal
-harness start claude-headless
-harness logs claude-code --lines 200 --follow
+harness start crush-switchboard
+harness logs crush-signal --lines 200 --follow
 harness attach crush-signal   # …--ro to watch without typing
 harness profiles && harness use-profile full
 harness reload                # re-read harness definitions

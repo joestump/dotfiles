@@ -42,40 +42,17 @@ GT="$(mcp_secret gitea    GITEA_TOKEN                  "$(jq -r '.mcpServers.git
 # apply time from the Vault-Agent-rendered secrets (like karakeep/gitea). The token
 # never lands in the chezmoi repo.
 OT="$( . "$HOME/.config/vault/secrets-static.env" >/dev/null 2>&1; printf '%s' "${OUTLINE_API_TOKEN:-}" )"
-# switchboard: native http + a STATIC Bearer, baked here at apply time (same reason as
-# outline — Claude Code doesn't expand ${VAR} in http headers). Token from OpenBao via
-# the Vault-Agent-rendered secrets-static.env (SWITCHBOARD_CLAUDE_CODE_API_KEY);
-# mcp_secret's live fallback avoids blanking a working token on a transient miss.
-# Claude Code ONLY — deliberately NOT added to the Claude Desktop merge (44).
-# WORKER HOSTS ONLY (.switchboard.workerHosts). The MCP is a worker capability:
-# holding it means receiving doorbells and being expected to drain them. A host
-# that holds it and does not drain silently collects todos nobody will work —
-# Joe's laptop accumulated 62 that way, which read as a Switchboard outage.
-# Rendering empty here makes the jq below skip the entry entirely, and the
-# REMOVAL branch further down deletes one already baked into a live config.
-{{ if has .chezmoi.hostname .switchboard.workerHosts -}}
-SB="$(mcp_secret switchboard SWITCHBOARD_CLAUDE_CODE_API_KEY "$(jq -r '(.mcpServers.switchboard.headers.Authorization // "") | ltrimstr("Bearer ")' "$CJ")")"
-{{- else -}}
-SB=""
-{{- end }}
 # cairn: native http + a STATIC Bearer, baked at apply time (same reason as outline
-# and switchboard — Claude Code doesn't expand ${VAR} in http headers). Crush has
-# had this server since it was stood up; both Claude clients were simply never
-# given it, so agents here could not read or post trajectories at all.
+# — Claude Code doesn't expand ${VAR} in http headers). Crush has had this server
+# since it was stood up; both Claude clients were simply never given it, so agents
+# here could not read or post trajectories at all.
 CN="$(mcp_secret cairn CAIRN_API_TOKEN "$(jq -r '(.mcpServers.cairn.headers.Authorization // "") | ltrimstr("Bearer ")' "$CJ")")"
 
-# Both base URLs are pushed in from OpenBao (secrets-static.env), same as the
-# tokens — NOT hardcoded here. Crush already reaches both servers through these
-# very vars ($CAIRN_BASE_URL, $SWITCHBOARD_CRUSH_URL); it expands them at runtime,
-# whereas Claude Code doesn't expand ${VAR} in an http url, so bake them at apply
-# time. Fallback recovers the URL already in the live config, so a transient miss
-# leaves a working entry alone. SWITCHBOARD_CLAUDE_CODE_URL is the per-client full
-# MCP URL from OpenBao, matching SWITCHBOARD_CLAUDE_CODE_API_KEY.
-{{ if has .chezmoi.hostname .switchboard.workerHosts -}}
-SB_URL="$(mcp_env SWITCHBOARD_CLAUDE_CODE_URL "$(jq -r '.mcpServers.switchboard.url // ""' "$CJ")")"
-{{- else -}}
-SB_URL=""
-{{- end }}
+# The cairn base URL is pushed in from OpenBao (secrets-static.env), same as the
+# token — NOT hardcoded here. Crush reaches the server through the very same var
+# ($CAIRN_BASE_URL); it expands it at runtime, whereas Claude Code doesn't expand
+# ${VAR} in an http url, so bake it at apply time. Fallback recovers the URL already
+# in the live config, so a transient miss leaves a working entry alone.
 CN_URL="$(mcp_env CAIRN_BASE_URL "")"
 CN_URL="${CN_URL:+${CN_URL}/mcp}"
 CN_URL="${CN_URL:-$(jq -r '.mcpServers.cairn.url // ""' "$CJ")}"
@@ -94,8 +71,8 @@ SIG_PATH="{{ .chezmoi.homeDir }}/.local/bin:/usr/bin:/bin:/usr/local/bin"
 SIG_DIR="{{ .chezmoi.homeDir }}/src/signal-mcp"
 
 desired="$(mcp_base | jq \
-  --arg kk "$KK" --arg ot "$OT" --arg gt "$GT" --arg sb "$SB" --arg cn "$CN" \
-  --arg sburl "$SB_URL" --arg cnurl "$CN_URL" \
+  --arg kk "$KK" --arg ot "$OT" --arg gt "$GT" --arg cn "$CN" \
+  --arg cnurl "$CN_URL" \
   --arg uv "$SIG_UV" --arg sigdir "$SIG_DIR" --arg sigpath "$SIG_PATH" '
     (if $kk != "" then .karakeep.env.KARAKEEP_API_KEY = $kk else . end)
   # gitea: stdio subprocess reading GITEA_ACCESS_TOKEN from its own env, so it no
@@ -107,18 +84,9 @@ desired="$(mcp_base | jq \
   # outline: native http + a STATIC Bearer token (no OAuth/refresh tokens), baked.
   | (if $ot != "" then .outline = {type:"http", url:"https://outline.stump.rocks/mcp",
                 headers:{"Authorization": ("Bearer " + $ot)}} else . end)
-  # switchboard: native http + static Bearer (baked). Claude Code ONLY. Both halves
-  # resolved above; only set when BOTH are non-empty so a fresh machine never bakes a
-  # broken "Bearer " or a url-less entry (cf. dotfiles#15).
-  # An empty half skips the add. REMOVAL is not done here — see the mcp_drop below.
-  # Deleting from this object is INERT, which #239 shipped without noticing: this is
-  # the DESIRED set, and mcp_merge is additive (managed servers replace live ones,
-  # everything else is preserved), so a key absent from `desired` is left alone in the
-  # live config rather than removed from it. The laptop kept its entry through a full
-  # apply that reported "mcpServers already current".
-  | (if $sb != "" and $sburl != "" then .switchboard = {type:"http", url:$sburl,
-                headers:{"Authorization": ("Bearer " + $sb)}} else . end)
-  # cairn: native http + static Bearer (baked). Same both-halves rule as switchboard.
+  # cairn: native http + static Bearer (baked). Both halves resolved above; only set
+  # when BOTH are non-empty so a fresh machine never bakes a broken "Bearer " or a
+  # url-less entry (cf. dotfiles#15).
   | (if $cn != "" and $cnurl != "" then .cairn = {type:"http", url:$cnurl,
                 headers:{"Authorization": ("Bearer " + $cn)}} else . end)
   # msgbrowse: local-only http mcp; darwin only (Claude Code is macOS-desktop-native).
@@ -134,9 +102,21 @@ desired="$(mcp_base | jq \
 # server — mcp_merge below only ever adds or replaces, so an entry that merely stops
 # being generated survives forever.
 #
-# switchboard is dropped on every NON-worker host (.switchboard.workerHosts). A
-# machine that was a worker before that gate existed otherwise keeps a live,
-# doorbell-receiving entry, and its endpoint quietly collects todos an interactive
-# session will never claim — 62 of them on Joe's laptop, in the case that prompted it.
-mcp_drop   "$CJ" github{{ if not (has .chezmoi.hostname .switchboard.workerHosts) }} switchboard{{ end }}
+# Leaving a server out of `desired` is NOT a removal, which #239 shipped without
+# noticing: mcp_merge is additive (managed servers replace live ones, everything else
+# is preserved), so a key absent from `desired` stays in the live config. The laptop
+# kept its switchboard entry through a full apply that reported "mcpServers already
+# current". Only mcp_drop removes.
+#
+# switchboard is dropped on EVERY host, worker hosts included. The MCP is a worker
+# capability — holding it means receiving doorbells and being expected to drain them
+# — and Claude Code has no queue worker left, so any entry is an endpoint that
+# quietly collects todos nobody claims. That is the failure that put 62 of them on
+# Joe's laptop; with the claude-headless pool gone it would be kitt and tars next.
+# Crush's switchboard MCP (crush.json.tmpl, gated on .switchboard.workerHosts) stays.
+#
+# @joestump 09/11/2026 - Stopped baking switchboard anywhere and drop it on every
+#   host: the claude-headless pool that drained the Claude Code endpoint was
+#   retired (stump.wtf/switchboard#185).
+mcp_drop   "$CJ" github switchboard
 mcp_merge "$CJ" "$desired"

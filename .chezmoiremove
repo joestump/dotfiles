@@ -77,3 +77,13 @@ Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist
 .config/harness/harness.d/pr-feedback-sweep.toml
 .config/dotfiles/issue-pr-grooming.prompt.md
 .config/dotfiles/pr-feedback-sweep.prompt.md
+
+# pr-sweep cost-freeze backup — a hand-made copy of the rendered pr-sweep.toml
+# left in harness.d/ on tars and kitt during the 08/29 pr-sweep cost freeze. It is
+# the one entry here this repo never rendered itself, listed anyway because it is
+# a stale copy OF a file this repo owns, sitting in a directory this repo owns.
+# The daemon loads only *.toml so it never armed, but it still reads like live
+# config with the pre-freeze schedule in it, and this removes it from both boxes
+# without anyone running rm by hand.
+# @joestump 09/11/2026 - Added while retiring the Claude Code harnesses.
+.config/harness/harness.d/pr-sweep.toml.bak-costfreeze

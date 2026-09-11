@@ -175,6 +175,29 @@ if bad:
   grep -A8 '^\[harness\.morning-brief\]' <<<"$output" | grep -q 'schedule = "0 5 \* \* \*"'
 }
 
+# Nothing runs Claude Code in the background any more (09/11/2026). The last
+# scheduled holdout was navidrome-ldap-sync; it moved to crush. Pin it for every
+# render the fleet can produce — agent identity with every sweep armed, and a
+# human identity — so a drop-in cannot quietly bring the harness kind back.
+@test "scheduled: no harness in any render runs under the claude-code kind" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^harness = "claude-code"' <<<"$output" || true)" -eq 0 ] \
+    || { echo "agent render still declares harness = \"claude-code\""; return 1; }
+
+  local cfgdir out f
+  cfgdir="$(mktemp -d)"
+  printf '[data]\n    agentIdentity = "ci-human"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n' "$(_this_host)" >"$cfgdir/chezmoi.toml"
+  out=""
+  for f in "$HARNESS_TOML" "$HARNESS_D"/*.toml.tmpl; do
+    out+="$(chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f")"$'\n'
+  done
+  rm -rf "$cfgdir"
+  [ "$(grep -c '^harness = "claude-code"' <<<"$out" || true)" -eq 0 ] \
+    || { echo "human render still declares harness = \"claude-code\""; return 1; }
+}
+
 @test "scheduled: each scheduled prompt points at a prompt file that ships" {
   run _agent_render_all
   # the split sweeps share prompt files: map harness -> the prompt file its
@@ -338,6 +361,10 @@ if bad:
   # only re-fires when the rendered script text changes, so the hashes of
   # everything the schedule depends on must be embedded in it.
   for f in dot_config/harness/harness.toml.tmpl \
+           dot_config/harness/harness.d/blog-sweep.toml.tmpl \
+           dot_config/harness/harness.d/navidrome-ldap-sync.toml.tmpl \
+           dot_config/dotfiles/blog-sweep.prompt.md.tmpl \
+           dot_config/dotfiles/navidrome-ldap-sync.prompt.md.tmpl \
            dot_config/harness/harness.d/stumpcloud-sweep-dub.toml.tmpl \
            dot_config/harness/harness.d/stumpcloud-sweep-dtw.toml.tmpl \
            dot_config/harness/harness.d/stumpcloud-sweep-pdx.toml.tmpl \
