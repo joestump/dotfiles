@@ -116,6 +116,23 @@ _hb_this_host() {
   # the config format from the extension, so mint the .toml inside a temp dir.
   _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
   _h="$(_hb_this_host)"
+  # The difficulty-lane workers render only on .switchboard.laneHost for a
+  # -agent login, so this render includes them on the lane host and nowhere
+  # else. Derive the names from .switchboard.lanes instead of freezing a
+  # literal: the worker set is a knob (same reasoning as the pool below), and
+  # a frozen list here fails on the lane host the moment a worker is added.
+  #
+  # @joestump-agent 09/11/2026 - Added with the difficulty lanes; the frozen
+  #   seeded set failed on tars the first time the workers rendered.
+  _lane_host="$(chezmoi execute-template --source "$REPO_ROOT" <<<'{{ .switchboard.laneHost }}')"
+  _lane_names=""
+  if [[ "$_h" == "$_lane_host" ]]; then
+    _lane_names="$(chezmoi execute-template --source "$REPO_ROOT" <<'TMPL'
+{{ range $lane := .switchboard.lanes }}{{ range $w := $lane.workers }}{{ $w.name }}
+{{ end }}{{ end }}
+TMPL
+)"
+  fi
   printf '[data]
     agentIdentity = "ci-agent"
 [data.sweeps]
@@ -135,7 +152,9 @@ _hb_this_host() {
   }
   run _render_all
   [ "$status" -eq 0 ]
-  run bash -c "python3 - '$_cfgdir' <<'PY'
+  _lane_args=""
+  for _ln in $_lane_names; do _lane_args="$_lane_args '$_ln'"; done
+  run bash -c "python3 - '$_cfgdir'$_lane_args <<'PY'
 import glob, os, sys, tomllib
 cfgdir = sys.argv[1]
 docs = {os.path.basename(p): tomllib.load(open(p, 'rb')) for p in sorted(glob.glob(cfgdir + '/*.toml'))}
@@ -163,11 +182,12 @@ def assert_pool(base):
     assert p == {base} | {f'{base}-{i}' for i in range(2, len(p) + 1)}, sorted(p)
     return p
 pool = assert_pool('crush-switchboard')
-assert names - pool == {'crush-signal',
+lanes = {a for a in sys.argv[2:]}
+assert names - pool == ({'crush-signal',
                  'stumpcloud-sweep-dub',
                  'stumpcloud-sweep-dtw', 'stumpcloud-sweep-pdx',
                  'pr-sweep', 'pr-sweep-github', 'morning-brief',
-                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names - pool)
+                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'} | lanes), sorted(names - pool)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 # The drop-in directory is wired: without [server].harness_d the daemon never
 # reads harness.d and every scheduled task silently stops existing.
@@ -176,7 +196,7 @@ assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['serve
 # scheduled entries carry no enabled key at all (mutually exclusive with
 # schedule); the daemon fires them only on their cron. The interactive ones
 # live in the main doc; a scheduled name may never appear there.
-interactive = {'crush-signal'} | pool
+interactive = {'crush-signal'} | pool | lanes
 assert set(d['harness']) == interactive, sorted(d['harness'])
 for name in interactive:
     assert d['harness'][name]['enabled'] is False, name
