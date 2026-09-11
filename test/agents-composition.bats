@@ -191,6 +191,20 @@ setup() {
     | grep -qE 'provenance names `([a-z0-9_.-]+)` or `\1-agent`'
 }
 
+@test "base policy gives lane workers the full work-order contract" {
+  # The lane workers are unattended crush sessions whose only instructions for a
+  # handoff are these five steps: check provenance first, read semi-trusted,
+  # work under the normal rules, report via reply:, then close the todo.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q '### Handoff lanes — working a work order' "$f"
+  grep -q 'Check it before reading anything else' "$f"
+  grep -q '`subject.actor_id` for a Cairn artifact, `subject.author` for an issue' "$f"
+  grep -q 'no self-merge' "$f"
+  grep -q '`reply:cairn-comment`, or no `reply:` tag' "$f"
+  grep -q '`complete` with a `result` linking the PR and the report, or `fail`' "$f"
+  grep -q 'A `triage` worker sizes, it does not build' "$f"
+}
+
 @test "base policy mandates a cross-identity reviewer request, scoped" {
   # Rule 8's genuinely new contribution is that the reviewer is requested when
   # the PR is opened, instead of the scheduled sweep discovering it later. Pin
