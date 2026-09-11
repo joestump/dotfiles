@@ -74,12 +74,20 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 | --- | --- | :---: |
 | `crush-signal` | Crush on GLM-5.2 (Z.ai), `--yolo`, driven from the **Signal** channel | no |
 | `crush-switchboard` | Crush on GLM-5.2 (Z.ai), `--yolo`, woken by **Switchboard** webhook doorbells | no |
-| `stumpcloud-sweep-dub` | Scheduled: StumpCloud health sweep (dub), daily 07:00 | cron |
-| `stumpcloud-sweep-dtw` | Scheduled: StumpCloud health sweep (dtw), daily 07:20 | cron |
-| `stumpcloud-sweep-pdx` | Scheduled: StumpCloud health sweep (pdx), daily 07:40 | cron |
-| `pr-sweep` | Scheduled: own PRs + sibling review, PRs only, Gitea; daily 09:30 agent / 15:30 human | cron |
-| `pr-sweep-github` | Scheduled: same as pr-sweep, GitHub only; daily 10:00 agent / 16:00 human | cron |
-| `issue-sweep` | Scheduled: issue triage + `size/*` labels, issues only; Mondays 07:00 | cron |
+| `stumpcloud-sweep-dub` | Scheduled: StumpCloud health sweep (dub), daily 07:00 GMT | cron |
+| `stumpcloud-sweep-dtw` | Scheduled: StumpCloud health sweep (dtw), daily 07:20 GMT | cron |
+| `stumpcloud-sweep-pdx` | Scheduled: StumpCloud health sweep (pdx), daily 07:40 GMT | cron |
+| `pr-sweep` | Scheduled: own PRs + sibling review, PRs only, Gitea; daily 09:30 GMT agent / 15:30 GMT human | cron |
+| `pr-sweep-github` | Scheduled: same as pr-sweep, GitHub only; daily 10:00 GMT agent / 16:00 GMT human | cron |
+| `morning-brief` | Scheduled: read-only brief of PR activity, merged PRs and new bugs; daily 09:00 GMT | cron |
+| `issue-sweep` | Scheduled: issue triage + `size/*` labels, issues only; Mondays 07:00 GMT | cron |
+| `blog-sweep` | Scheduled: drafts a studio blog post, opens a PR, never merges; Fridays 16:00 GMT | cron |
+| `navidrome-ldap-sync` | Scheduled: navidrome-ldap fork sync + `-ldap` release tags; Sundays 06:00 GMT | cron |
+
+**Schedules are GMT.** Every drop-in writes its cron as `CRON_TZ=UTC <cron>`.
+The daemon evaluates a bare five-field cron in the box's *local* time — tars and
+kitt run America/Detroit — so without the prefix a GMT-authored `30 9 * * *`
+fires at 13:30 GMT in summer and 14:30 in winter.
 
 **One channel consumer per server.** `crush-signal` carried `--channels
 switchboard` alongside `signal` until 2026-08-29, and the two sessions raced for
@@ -98,8 +106,10 @@ Claude Code `switchboard` MCP entry went with them: `run_after_43` drops it from
 todos.
 :::
 
-The three scheduled ones are **gated on the `-agent` login suffix** — a human
-login renders only the interactive agents. Their instructions live in
+The scheduled ones are **gated on the login identity and on one designated host
+each** (`.sweeps.*Host` in `.chezmoidata.yaml`); `pr-sweep` and
+`pr-sweep-github` are the only ones that render for the human identity too.
+Their instructions live in
 chezmoi-managed prompt files (`~/.config/dotfiles/*.prompt.md`), so editing a
 prompt propagates with a normal `czu` and re-fires the reload.
 

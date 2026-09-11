@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# The scheduled harnesses: six one-shot prompt harnesses, one drop-in file
-# each in dot_config/harness/harness.d/*.toml (stumpcloud-sweep every 6h,
-# pr-sweep daily, morning-brief daily 09:00 GMT, issue-sweep + blog-sweep +
-# navidrome-ldap-sync weekly),
+# The scheduled harnesses: one-shot prompt harnesses, one drop-in file each
+# in dot_config/harness/harness.d/*.toml (the three stumpcloud-sweep sites,
+# both pr-sweep halves and morning-brief daily; issue-sweep + blog-sweep +
+# navidrome-ldap-sync weekly — every schedule pinned to GMT by CRON_TZ=UTC),
 # replacing the retired standalone stumpcloud-sweep systemd timer / launchd
 # agent. These tests pin the couplings: every scheduled entry points at a
 # prompt file that actually ships, the old units are gone from source AND
@@ -14,6 +14,10 @@
 # `.chezmoidata.yaml`'s `sweeps:` block. Both halves are required — an identity
 # can exist on many machines, so the suffix alone stops being a single-runner
 # rule the moment a second agent box exists.
+#
+# @joestump 09/11/2026 - Every schedule now carries CRON_TZ=UTC. The daemon
+#   reads a bare cron in the box's local time, and tars and kitt run
+#   America/Detroit, so the GMT-authored times had been firing 4-5h late.
 load test_helper
 
 HARNESS_TOML="$REPO_ROOT/dot_config/harness/harness.toml.tmpl"
@@ -76,9 +80,9 @@ _agent_render_all() {
   [ "$status" -eq 0 ]
   for name in stumpcloud-sweep-dub stumpcloud-sweep-dtw stumpcloud-sweep-pdx               pr-sweep pr-sweep-github issue-sweep blog-sweep navidrome-ldap-sync               morning-brief; do
     grep -qE "^\[harness\.$name\]" <<<"$output" || return 1
-    # every scheduled entry needs `prompt` and a 5-field cron `schedule`
+    # every scheduled entry needs `prompt` and a GMT-pinned 5-field cron `schedule`
     grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -q '^prompt = ' || return 1
-    grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -Eq '^schedule = "[0-9*/,]+ [0-9*/,]+ [0-9*/,-]+ [0-9A-Za-z*/,-]+ [0-7A-Za-z*/,-]*"' || return 1
+    grep -A8 "^\[harness\.$name\]" <<<"$output" | grep -Eq '^schedule = "CRON_TZ=UTC [0-9*/,]+ [0-9*/,]+ [0-9*/,-]+ [0-9A-Za-z*/,-]+ [0-7A-Za-z*/,-]*"' || return 1
     # schedule/profile membership is mutually exclusive — none may appear in a profile
     if sed -n '/^\[profile/,/^$/p' "$HARNESS_TOML" | grep -q "\"$name\""; then
       return 1
@@ -158,21 +162,73 @@ if bad:
   [ "$(grep -c '^restart = "no"' <<<"$output")" -eq 9 ]
 }
 
-@test "scheduled: cadences — sweep + pr daily, brief daily 09:00 GMT, issue + blog + navidrome weekly" {
+@test "scheduled: cadences (GMT) — sweep + pr + brief daily, issue + blog + navidrome weekly" {
   run _agent_render_all
-  grep -A8 '^\[harness\.stumpcloud-sweep-dub\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* \*"'
-  grep -A8 '^\[harness\.stumpcloud-sweep-dtw\]' <<<"$output" | grep -q 'schedule = "20 7 \* \* \*"'
-  grep -A8 '^\[harness\.stumpcloud-sweep-pdx\]' <<<"$output" | grep -q 'schedule = "40 7 \* \* \*"'
+  grep -A8 '^\[harness\.stumpcloud-sweep-dub\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 0 7 \* \* \*"'
+  grep -A8 '^\[harness\.stumpcloud-sweep-dtw\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 20 7 \* \* \*"'
+  grep -A8 '^\[harness\.stumpcloud-sweep-pdx\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 40 7 \* \* \*"'
   # the GitHub half of the forge split, staggered off the Gitea half
-  grep -A8 '^\[harness\.pr-sweep-github\]' <<<"$output" | grep -q 'schedule = "0 10 \* \* \*"'
+  grep -A8 '^\[harness\.pr-sweep-github\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 0 10 \* \* \*"'
   # daily, staggered 09:30 (agent) against the human side's 15:30
-  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "30 9 \* \* \*"'
-  grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "0 7 \* \* 1"'
-  grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "0 16 \* \* 5"'
-  grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "0 6 \* \* 0"'
-  # daily at 09:00 GMT — the cron is in the daemon's local time, so 05:00 on
-  # tars while it holds EDT (GMT-4); move it to 04:00 when EST returns
-  grep -A8 '^\[harness\.morning-brief\]' <<<"$output" | grep -q 'schedule = "0 5 \* \* \*"'
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 30 9 \* \* \*"'
+  grep -A8 '^\[harness\.issue-sweep\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 0 7 \* \* 1"'
+  grep -A8 '^\[harness\.blog-sweep\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 0 16 \* \* 5"'
+  grep -A8 '^\[harness\.navidrome-ldap-sync\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 0 6 \* \* 0"'
+  # 09:00 GMT, written as 09:00. It used to be 05:00 to fake GMT on an EDT box,
+  # which needed hand-moving to 04:00 every November.
+  grep -A8 '^\[harness\.morning-brief\]' <<<"$output" | grep -q 'schedule = "CRON_TZ=UTC 0 9 \* \* \*"'
+}
+
+# The daemon's scheduler evaluates a bare cron in the box's LOCAL time (harness
+# internal/scheduler: cron.WithLocation(time.Local)), and tars and kitt both run
+# America/Detroit. Every time in these drop-ins is authored as GMT, so without
+# the prefix each sweep fired four hours late, five in winter. robfig/cron honours
+# a per-entry CRON_TZ= prefix in both the config validator (cron.ParseStandard)
+# and the scheduler (AddFunc), which is what makes the prefix the fix.
+@test "scheduled: every schedule is pinned to GMT with CRON_TZ=UTC" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # Source level: every quoted spec on every schedule line, so BOTH identity
+  # branches of pr-sweep / pr-sweep-github are covered even though one render
+  # only ever shows one of them.
+  run python3 - "$HARNESS_D" <<'PY'
+import glob, re, sys
+bad = []
+for path in sorted(glob.glob(sys.argv[1] + "/*.toml.tmpl")):
+    for line in open(path, encoding="utf-8"):
+        if not line.startswith("schedule = "):
+            continue
+        specs = re.findall(r'"([^"]*)"', line)
+        if not specs:
+            bad.append(f"{path}: no quoted spec: {line.strip()}")
+        for s in specs:
+            if not s.startswith("CRON_TZ=UTC ") or len(s.split()) != 6:
+                bad.append(f"{path}: {s!r}")
+        # No trailing comment: morning-brief's "09:00 GMT while tars is on EDT"
+        # note lived exactly there, and it was wrong half the year.
+        if "#" in line.rsplit('"', 1)[-1]:
+            bad.append(f"{path}: trailing comment on the schedule line")
+if bad:
+    sys.exit("\n".join(bad))
+PY
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+
+  # Render level: every schedule line that reaches a daemon, agent and human.
+  run _agent_render_all
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^schedule = ' <<<"$output" || true)" -eq 9 ]
+  [ "$(grep -c '^schedule = "CRON_TZ=UTC [^"]*"$' <<<"$output" || true)" -eq 9 ]
+
+  local cfgdir out f
+  cfgdir="$(mktemp -d)"
+  printf '[data]\n    agentIdentity = "ci-human"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n' "$(_this_host)" >"$cfgdir/chezmoi.toml"
+  out=""
+  for f in "$HARNESS_D"/*.toml.tmpl; do
+    out+="$(chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$f")"$'\n'
+  done
+  rm -rf "$cfgdir"
+  [ "$(grep -c '^schedule = ' <<<"$out" || true)" -eq 2 ]
+  [ "$(grep -c '^schedule = "CRON_TZ=UTC [^"]*"$' <<<"$out" || true)" -eq 2 ]
 }
 
 # Nothing runs Claude Code in the background any more (09/11/2026). The last
@@ -417,9 +473,9 @@ if bad:
   # the two sweeps a human runs — both PR halves — staggered off the agent's
   # 09:30 / 10:00
   grep -q '^\[harness\.pr-sweep\]' <<<"$out"
-  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "30 15 \* \* \*"'
+  grep -A8 '^\[harness\.pr-sweep\]' <<<"$out" | grep -q 'schedule = "CRON_TZ=UTC 30 15 \* \* \*"'
   grep -q '^\[harness\.pr-sweep-github\]' <<<"$out"
-  grep -A8 '^\[harness\.pr-sweep-github\]' <<<"$out" | grep -q 'schedule = "0 16 \* \* \*"'
+  grep -A8 '^\[harness\.pr-sweep-github\]' <<<"$out" | grep -q 'schedule = "CRON_TZ=UTC 0 16 \* \* \*"'
   # and none of the agent-only ones
   ! grep -q '^\[harness\.issue-sweep\]' <<<"$out"
   ! grep -q '^\[harness\.stumpcloud-sweep-' <<<"$out"
@@ -723,7 +779,7 @@ if bad:
     < "$HARNESS_D/pr-sweep.toml.tmpl"
   [ "$status" -eq 0 ]
   grep -q '^\[harness\.pr-sweep\]' <<<"$output"
-  grep -q 'schedule = "30 15 \* \* \*"' <<<"$output"
+  grep -q 'schedule = "CRON_TZ=UTC 30 15 \* \* \*"' <<<"$output"
 
   # the agent identity on the HUMAN's host -> nothing: the gate is per identity
   printf '[data]\n    agentIdentity = "ci-agent"\n[data.sweeps]\n    prSweepHumanHost = "%s"\n    prSweepAgentHost = "some-other-box"\n' \

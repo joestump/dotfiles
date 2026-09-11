@@ -89,10 +89,15 @@ never renders them.
 
 | Harness | Schedule | What it does |
 | --- | --- | --- |
-| `stumpcloud-sweep-dub` / `-dtw` / `-pdx` | daily 07:00 / 07:20 / 07:40 | Site-scoped: each run root-causes anything degraded in its own site (dub/dtw/pdx); files OMGs at MEDIUM+ |
-| `pr-sweep` | daily 09:30 (agent) · 15:30 (human) | PRs only, Gitea — own PRs (feedback, fixes, merge) plus review/approval of the sibling identity’s. Runs under BOTH identities |
-| `pr-sweep-github` | daily 10:00 (agent) · 16:00 (human) | PRs only, GitHub — same job as pr-sweep against github.com |
-| `issue-sweep` | Mondays 07:00 | Issues only — evidence-based triage (close only what is provably done) plus `size/*` labelling |
+| `stumpcloud-sweep-dub` / `-dtw` / `-pdx` | daily 07:00 / 07:20 / 07:40 GMT | Site-scoped: each run root-causes anything degraded in its own site (dub/dtw/pdx); files OMGs at MEDIUM+ |
+| `pr-sweep` | daily 09:30 GMT (agent) · 15:30 GMT (human) | PRs only, Gitea — own PRs (feedback, fixes, merge) plus review/approval of the sibling identity’s. Runs under BOTH identities |
+| `pr-sweep-github` | daily 10:00 GMT (agent) · 16:00 GMT (human) | PRs only, GitHub — same job as pr-sweep against github.com |
+| `issue-sweep` | Mondays 07:00 GMT | Issues only — evidence-based triage (close only what is provably done) plus `size/*` labelling |
+
+Every schedule is written as `CRON_TZ=UTC <cron>`, so it fires at the GMT time
+shown whatever timezone the box itself runs in. A bare five-field cron would be
+read in the box's local time instead — on the America/Detroit boxes that is four
+or five hours later than it looks.
 
 Their instructions live in chezmoi-managed prompt files
 (`~/.config/dotfiles/*.prompt.md`), so a prompt edit propagates on a normal `czu`

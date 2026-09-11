@@ -253,6 +253,13 @@ enabled = false
 #
 # @joestump-agent 08/19/2026 - Moved them out to harness.d/ drop-ins per the
 #   harness_d pattern; schedules and prompts unchanged.
+#
+# Every `schedule` is written `CRON_TZ=UTC <cron>`. The daemon's scheduler runs
+# cron in the box's LOCAL time (internal/scheduler: WithLocation(time.Local)),
+# and robfig/cron honours a per-entry CRON_TZ= prefix, so the prefix is what
+# makes the drop-in times mean GMT on tars and kitt (America/Detroit).
+#
+# @joestump 09/11/2026 - Pinned every schedule to GMT.
 
 # ── Profiles ─────────────────────────────────────────────────────────────────
 # Named sets that `harness use-profile <name>` switches between. These existed
