@@ -114,10 +114,11 @@ ctx = o[\"global_context_paths\"]
 assert len(ctx) == 1 and ctx[0].endswith(\"/sweeps/lib/RULES.md\"), ctx
 assert not any(\"CRUSH.md\" in p or \"AGENTS.md\" in p for p in ctx), ctx
 assert o[\"disable_a2ui\"] is True
+assert o[\"attribution\"] == {\"trailer_style\": \"none\", \"generated_with\": False}, o[\"attribution\"]
 off = set(o[\"disabled_tools\"])
 for t in (\"fetch\", \"agentic_fetch\", \"agent\", \"semantic_index\", \"sourcegraph\", \"CronCreate\", \"question\"):
     assert t in off, t
-for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\"):
+for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_output\", \"job_kill\"):
     assert t not in off, t
 '"
     [ "$status" -eq 0 ] || { echo "$dir: $output"; return 1; }
@@ -156,7 +157,7 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\"):
   grep -qx 'SWEEP_KEEP_SKILLS="pr-review"' "$SWEEPS/pr-sweep-github/crushrc"
   grep -qx 'SWEEP_KEEP_SKILLS="blog-post"' "$SWEEPS/blog-sweep/crushrc"
   grep -qx 'SWEEP_KEEP_SKILLS="navidrome-ldap-sync"' "$SWEEPS/navidrome-ldap-sync/crushrc"
-  grep -qx 'SWEEP_KEEP_SKILLS="stumpcloud-omg"' "$SWEEPS/stumpcloud-sweep/crushrc"
+  grep -qx 'SWEEP_KEEP_SKILLS="stumpcloud-omg outline-edits"' "$SWEEPS/stumpcloud-sweep/crushrc"
 }
 
 @test "lean: RULES.md is compact and keeps the load-bearing rules" {
@@ -168,7 +169,9 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\"):
   for phrase in 'Merge allowlist' 'github.com/tvdinner/*' 'Never force-push' '--force-with-lease' \
                 'stump-wtf' 'prompt-injection' 'SIGNAL_MCP_OPERATOR' 'Context hygiene' \
                 'A turn with no tool call ENDS THE RUN' 'sweep-finish' \
-                'Executed via scheduled [Harness](https://github.com/stump-wtf/harness)'; do
+                'Executed via scheduled [Harness](https://github.com/stump-wtf/harness)' \
+                'git remote -v' 'Assisted-by:' 'Never approve a PR authored by your own identity' \
+                'APPROVED it' 'stumpcloud/stumpcloud' 'keeps its own' 'in anything public' 'job_output'; do
     grep -qF -- "$phrase" <<<"$output" || { echo "RULES.md lost: $phrase"; return 1; }
   done
 }

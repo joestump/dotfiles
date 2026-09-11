@@ -5,5 +5,9 @@
 # job keeps (stumpcloud-omg, for incident writeups) and then runs the shared filter that disables every other one.
 #
 # @joestump 09/11/2026 - Added with the lean sweep profile.
-SWEEP_KEEP_SKILLS="stumpcloud-omg"
+#
+# @joestump 09/11/2026 - Review: also keep outline-edits. stumpcloud-omg builds
+#   its Outline formatting (callouts, chips, mentions) on that skill, so with it
+#   disabled an OMG writeup loses the mechanics it is told to load.
+SWEEP_KEEP_SKILLS="stumpcloud-omg outline-edits"
 source "$HOME/sweeps/lib/lean.crushrc"

@@ -21,6 +21,9 @@
   new server silently rides into every sweep; test/lean-sweeps.bats checks it.
 
   @joestump 09/11/2026 - Added with the lean sweep profile.
+
+  @joestump 09/11/2026 - Review: job_output and job_kill back on, and
+    attribution trailers switched off (see the notes on each below).
 */ -}}
 {{- $servers := list "aws" "aws-knowledge" "cairn" "chrome-devtools" "filesystem" "gitea" "memory" "msgbrowse" "outline" "sequential-thinking" "signal" "switchboard" -}}
 {{- $mcp := dict -}}
@@ -31,10 +34,20 @@
        error inside it aborts the whole crush run (crush fetch.go returns a Go
        error instead of a tool error), so sweeps check HTTP with curl instead.
        agent is a read-only search sub-agent in crush — it cannot run bash, so
-       it is no help with deep per-PR or per-host work. */ -}}
-{{- $off := list "agent" "agentic_fetch" "call_mcp_prompt" "crush_info" "crush_logs" "CronCreate" "CronDelete" "CronList" "download" "fetch" "job_kill" "job_output" "list_mcp_prompts" "list_mcp_resources" "lsp_call_hierarchy" "lsp_definition" "lsp_diagnostics" "lsp_references" "lsp_rename" "lsp_replace_symbol" "lsp_restart" "lsp_symbols" "question" "read_mcp_resource" "semantic_index" "semantic_search" "sourcegraph" "todos" -}}
+       it is no help with deep per-PR or per-host work. job_output and job_kill
+       stay ON: crush's bash tool moves any command still running after 60s
+       into a background job that only job_output can read, so without it a
+       make test, a build or a playbook run returns nothing (commands were
+       auto-backgrounded in five sweep sessions between 09/06 and 09/11). */ -}}
+{{- $off := list "agent" "agentic_fetch" "call_mcp_prompt" "crush_info" "crush_logs" "CronCreate" "CronDelete" "CronList" "download" "fetch" "list_mcp_prompts" "list_mcp_resources" "lsp_call_hierarchy" "lsp_definition" "lsp_diagnostics" "lsp_references" "lsp_rename" "lsp_replace_symbol" "lsp_restart" "lsp_symbols" "question" "read_mcp_resource" "semantic_index" "semantic_search" "sourcegraph" "todos" -}}
 {{- range $t := list "edit" "multiedit" -}}
 {{- if not (has $t $.tools) }}{{ $off = append $off $t }}{{ end -}}
 {{- end -}}
-{{- $opts := dict "disable_a2ui" true "disabled_tools" $off "global_context_paths" (list (printf "%s/sweeps/lib/RULES.md" $.home)) -}}
+{{- /* attribution: with no attribution key anywhere, crush defaults to an
+       Assisted-by trailer plus a "Generated with Crush" line and writes both
+       into its bash tool's commit and PR instructions. The full CRUSH.md
+       countered that with its "no default footers" rule; RULES.md is too short
+       to win that argument every time, so the sweep config switches it off. */ -}}
+{{- $attribution := dict "trailer_style" "none" "generated_with" false -}}
+{{- $opts := dict "attribution" $attribution "disable_a2ui" true "disabled_tools" $off "global_context_paths" (list (printf "%s/sweeps/lib/RULES.md" $.home)) -}}
 {{ dict "mcp" $mcp "options" $opts | toPrettyJson }}
