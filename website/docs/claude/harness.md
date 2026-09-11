@@ -74,6 +74,7 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 | --- | --- | :---: |
 | `crush-signal` | Crush on GLM-5.2 (Z.ai), `--yolo`, driven from the **Signal** channel | no |
 | `crush-switchboard` | Crush on GLM-5.2 (Z.ai), `--yolo`, woken by **Switchboard** webhook doorbells | no |
+| `crush-lane-*`, `crush-triage` | Difficulty-lane workers, one per lane and provider, each draining its lane's Switchboard queue; lane host and agent login only (see below) | no |
 | `stumpcloud-sweep-dub` | Scheduled: StumpCloud health sweep (dub), daily 07:00 GMT | cron |
 | `stumpcloud-sweep-dtw` | Scheduled: StumpCloud health sweep (dtw), daily 07:20 GMT | cron |
 | `stumpcloud-sweep-pdx` | Scheduled: StumpCloud health sweep (pdx), daily 07:40 GMT | cron |
@@ -105,6 +106,41 @@ Claude Code `switchboard` MCP entry went with them: `run_after_43` drops it from
 `~/.claude.json` on every host, because an endpoint nobody drains only collects
 todos.
 :::
+
+### Difficulty lanes
+
+Switchboard routes work by difficulty (ADR-0025 in `stump.wtf/switchboard`). A
+Cairn artifact tagged `handoff` plus `lane:<s|m|l|vision>`, or an issue's
+`size/*` label, lands on that lane's queue. An unsized issue lands on `triage`,
+which labels it and lets the label event re-route it. `hold` (XL, or anything
+that needs Joe) has no worker.
+
+| Queue | Workers | Model |
+| --- | --- | --- |
+| `lane-s` | `crush-lane-s` | `litellm/Qwen3.8-27B` (local, ai01) |
+| `lane-m` | `crush-lane-m-zai`, `crush-lane-m-hyper` | `zai/glm-5.3-flash`, `hyper/glm-5.3-flash` |
+| `lane-l` | `crush-lane-l-zai`, `crush-lane-l-hyper` | `zai/glm-5.3`, `hyper/glm-5.3` |
+| `lane-vision` | `crush-lane-vision` | `hyper/deepseek-v4.1-flash` |
+| `triage` | `crush-triage` | `litellm/Qwen3.8-27B` |
+
+- **The set is data.** `.switchboard.lanes` in `.chezmoidata.yaml` names each
+  queue, its endpoint's env prefix and its workers. Each worker gets a harness
+  table, `~/.config/harness/<name>.env`, and a pin at
+  `~/.local/share/<name>/crush.json` carrying its model plus a `switchboard`
+  MCP aimed at its lane's endpoint (`$<PREFIX>_URL`, `$<PREFIX>_API_KEY`).
+- **Workers of one lane compete** for that lane's endpoint, so each todo runs
+  once. When Z.ai's weekly cap runs out, the Z.ai worker parks in `failed` and
+  its Hyper twin keeps draining.
+- **One host, agent login.** Lanes render only on `.switchboard.laneHost`, and
+  only for a `-agent` login. That gives one set of consumers per queue, and
+  agent-authored work still gets the human identity's review.
+- **The worker contract** lives in the shared agent rules: check the work
+  order's verified provenance, do the task under every normal clamp, report via
+  the `reply:` tag, then complete or fail the todo.
+- **Hyper is pay-per-token.** Watch its dashboard, not `harness list`.
+
+LiteLLM carries only the local Qwen. Z.ai and Hyper are always crush's native
+providers.
 
 The scheduled ones are **gated on the login identity and on one designated host
 each** (`.sweeps.*Host` in `.chezmoidata.yaml`); `pr-sweep` and
@@ -155,7 +191,7 @@ Named sets that `harness use-profile` switches between. Exactly one carries
 
 | Profile | Harnesses |
 | --- | --- |
-| `default` | `crush-signal`, the `crush-switchboard` pool |
+| `default` | `crush-signal`, the `crush-switchboard` pool, and the lane workers on the lane host |
 | `full` | same as `default` — kept so a box whose persisted active profile is `full` still starts its harnesses |
 
 ## Driving it

@@ -428,6 +428,80 @@ switchboard:
     - kitt
     - tars
 
+  # Difficulty lanes — which Crush workers drain which Switchboard queue.
+  #
+  # Switchboard routes work by difficulty (stump.wtf/switchboard ADR-0025): a
+  # Cairn artifact tagged `handoff` + `lane:<s|m|l|vision>`, or an issue's
+  # size/* label, lands on that lane's queue, and an unsized issue lands on
+  # `triage`. `hold` (XL, needs Joe) has no worker by design. Each queue is its
+  # own vended endpoint scoped to exactly that queue; its URL and key reach
+  # crush as <endpointEnv>_URL and <endpointEnv>_API_KEY, rendered by Vault
+  # Agent from OpenBao like every other secret. Workers of one queue are
+  # competing consumers on its endpoint: each claim hands out a different todo.
+  #
+  # A lane is a difficulty, not a provider, so a lane can hold workers on more
+  # than one provider. When Z.ai's weekly cap runs out, the Z.ai worker parks
+  # in `failed` and its Hyper twin keeps draining the same queue. LiteLLM
+  # carries the local Qwen only; Z.ai and Hyper are always crush's native
+  # providers.
+  #
+  # laneHost is the ONE box that runs the lanes, and only a -agent login
+  # renders them. One set of consumers per queue is what makes each handoff
+  # run exactly once, and agent-authored work still gets reviewed by the human
+  # identity. Empty disarms the lanes fleet-wide.
+  #
+  # Every worker named here needs dot_config/harness/<name>.env.tmpl,
+  # dot_local/share/<name>/private_crush.json.tmpl and a czu reassert entry;
+  # test/switchboard-lanes.bats checks all three.
+  #
+  # @joestump 09/11/2026 - Added. The per-provider lane shape builds on the
+  #   09/09 lanes draft.
+  laneHost: "tars"
+  lanes:
+    - queue: lane-s
+      endpointEnv: SWITCHBOARD_LANE_S
+      workers:
+        - name: crush-lane-s
+          provider: litellm
+          model: Qwen3.8-27B
+          label: "ai01 · Qwen3.8-27B (local)"
+    - queue: lane-m
+      endpointEnv: SWITCHBOARD_LANE_M
+      workers:
+        - name: crush-lane-m-zai
+          provider: zai
+          model: glm-5.3-flash
+          label: "Z.ai · GLM-5.3 Flash"
+        - name: crush-lane-m-hyper
+          provider: hyper
+          model: glm-5.3-flash
+          label: "Hyper · GLM-5.3 Flash"
+    - queue: lane-l
+      endpointEnv: SWITCHBOARD_LANE_L
+      workers:
+        - name: crush-lane-l-zai
+          provider: zai
+          model: glm-5.3
+          label: "Z.ai · GLM-5.3"
+        - name: crush-lane-l-hyper
+          provider: hyper
+          model: glm-5.3
+          label: "Hyper · GLM-5.3"
+    - queue: lane-vision
+      endpointEnv: SWITCHBOARD_LANE_VISION
+      workers:
+        - name: crush-lane-vision
+          provider: hyper
+          model: deepseek-v4.1-flash
+          label: "Hyper · DeepSeek V4.1 Flash (vision)"
+    - queue: triage
+      endpointEnv: SWITCHBOARD_TRIAGE
+      workers:
+        - name: crush-triage
+          provider: litellm
+          model: Qwen3.8-27B
+          label: "ai01 · Qwen3.8-27B (local)"
+
 sweeps:
   # Hostnames as `.chezmoi.hostname` sees them (short name, e.g. "kitt").
   # Empty disarms that identity's sweep fleet-wide.

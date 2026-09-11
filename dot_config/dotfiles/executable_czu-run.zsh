@@ -156,11 +156,22 @@ set -a; [ -r "$HOME/.config/vault/secrets-static.env" ] && . "$HOME/.config/vaul
 # Each harness gets its own CRUSH_GLOBAL_DATA, so each needs its own reassert
 # entry — a pin that is not listed here stops landing the first time the TUI
 # touches it.
+#
+# The difficulty-lane workers (.switchboard.lanes) each have a pin too, and it
+# also carries the lane's switchboard MCP, so a TUI rewrite could point a
+# worker at the wrong queue as well as the wrong model.
 czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" \
   "$HOME/.config/crush/crush.json" \
   "$HOME/.config/harness/harness.toml" \
   "$HOME/.local/share/crush-signal/crush.json" \
   "$HOME/.local/share/crush-switchboard/crush.json" \
+  "$HOME/.local/share/crush-lane-s/crush.json" \
+  "$HOME/.local/share/crush-lane-m-zai/crush.json" \
+  "$HOME/.local/share/crush-lane-m-hyper/crush.json" \
+  "$HOME/.local/share/crush-lane-l-zai/crush.json" \
+  "$HOME/.local/share/crush-lane-l-hyper/crush.json" \
+  "$HOME/.local/share/crush-lane-vision/crush.json" \
+  "$HOME/.local/share/crush-triage/crush.json" \
   "$HOME/.gitconfig")"
 for czu_reassert_line in ${(f)czu_reassert_out}; do
   case "$czu_reassert_line" in

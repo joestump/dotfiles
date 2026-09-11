@@ -469,8 +469,14 @@ assert swb.count(\"--channels\") == 1 and \"switchboard\" in swb, swb
   #
   # @joestump-agent 08/30/2026 - large moved glm-5.2 -> glm-5.3-flash, so both
   # slots are now the same model.
-  local pin
+  #
+  # @joestump 09/11/2026 - The difficulty-lane workers are exempt: a lane is a
+  # difficulty served by several providers, Hyper included on purpose, and
+  # test/switchboard-lanes.bats pins each of them to its declared model.
+  local pin name
   for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
+    name="$(basename "$(dirname "$pin")")"
+    grep -qE "^ +- name: $name\$" "$REPO_ROOT/.chezmoidata.yaml" && continue
     run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$pin' | python3 -c '
 import json,sys
 m = json.load(sys.stdin)[\"models\"]

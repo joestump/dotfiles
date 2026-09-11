@@ -1,0 +1,32 @@
+{{- /*
+  Lane Worker Crush Pin (partial)
+
+  Rendered into every ~/.local/share/<lane worker>/crush.json, the
+  CRUSH_GLOBAL_DATA config of one difficulty-lane worker. It merges OVER the
+  global ~/.config/crush/crush.json, and it carries two things the global
+  config cannot: the worker's model, and its lane's switchboard MCP. The
+  global entry attaches to the crush-switchboard pool's endpoint; a lane
+  worker must attach to its own lane's endpoint instead, or it would drain
+  the pool's queue. The url and key stay $VAR references that crush expands
+  at runtime from the Vault Agent env, so nothing secret is committed.
+
+  Same MANAGED + private_ + czu-reassert rules as the crush-signal pin: see
+  dot_local/share/crush-signal/private_crush.json.tmpl.
+
+  Arguments, as a dict:
+    .name  the worker's harness name, as declared in .switchboard.lanes
+    .data  the template root
+
+  @joestump 09/11/2026 - Added with the difficulty lanes.
+*/ -}}
+{{- $found := dict -}}
+{{- range $lane := .data.switchboard.lanes -}}
+{{- range $w := $lane.workers -}}
+{{- if eq $w.name $.name }}{{ $_ := set $found "worker" $w }}{{ $_ := set $found "lane" $lane }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- if not (hasKey $found "worker") }}{{ fail (printf "lane worker %q is not declared in .switchboard.lanes" .name) }}{{ end -}}
+{{- $pin := dict "model" $found.worker.model "provider" $found.worker.provider -}}
+{{- $env := $found.lane.endpointEnv -}}
+{{- $switchboard := dict "type" "http" "url" (printf "$%s_URL" $env) "headers" (dict "Authorization" (printf "Bearer $%s_API_KEY" $env)) "timeout" 120 "disabled" false -}}
+{{ dict "$schema" "https://charm.land/crush.json" "models" (dict "large" $pin "small" $pin) "mcp" (dict "switchboard" $switchboard) | toPrettyJson }}

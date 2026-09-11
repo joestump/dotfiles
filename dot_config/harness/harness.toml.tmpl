@@ -221,6 +221,51 @@ restart_delay = 30
 enabled = false
 {{ end -}}
 
+# Difficulty lanes — one Crush worker per lane and provider
+#
+# Switchboard routes work by difficulty (stump.wtf/switchboard ADR-0025): a
+# tagged Cairn handoff or an issue's size/* label lands on lane-s, lane-m,
+# lane-l or lane-vision, and an unsized issue lands on triage. Each queue is its
+# own vended endpoint scoped to that queue, and each worker's pin attaches its
+# switchboard MCP to its lane's endpoint, so the workers of one lane are
+# competing consumers: the crush-switchboard pool's exactly-once shape, one
+# queue each. hold has no worker.
+#
+# The worker set is data (.switchboard.lanes in .chezmoidata.yaml). Each
+# worker has its own env file and CRUSH_GLOBAL_DATA pin dir, because the pin
+# holds both its model and its lane's MCP url and key names
+# (.chezmoitemplates/harness/lane-pin.json.tmpl).
+#
+# ONE HOST, AGENT IDENTITY. Lanes render only on .switchboard.laneHost and only
+# for a -agent login: one set of consumers per queue, and agent-authored work
+# still gets the human identity's review.
+#
+# HYPER IS A BILL. Hyper is pay-per-token and tops itself up (see the 08/29
+# note in harness.d/pr-sweep.toml.tmpl). A worker spends only while it works a
+# todo, and each Hyper worker except vision shares its queue with a Z.ai twin,
+# but a flood on lane-m or lane-l is still a Hyper invoice. Watch the Hyper
+# dashboard, not `harness list`.
+#
+# @joestump 09/11/2026 - Added the difficulty lanes.
+{{- $laneUser := .agentIdentity | default .chezmoi.username -}}
+{{- $laneWorkers := list -}}
+{{- if and .switchboard.laneHost (eq .chezmoi.hostname .switchboard.laneHost) (hasSuffix "-agent" $laneUser) -}}
+{{- range $lane := .switchboard.lanes -}}
+{{- range $w := $lane.workers -}}
+{{- $laneWorkers = append $laneWorkers $w.name }}
+[harness.{{ $w.name }}]
+harness = "crush"
+args = ["--yolo", "--channels", "switchboard"]
+workdir = "{{ $.chezmoi.homeDir }}/src"
+env_file = "{{ $.chezmoi.homeDir }}/.config/harness/{{ $w.name }}.env"
+description = "Crush · {{ $w.label }} · YOLO · Switchboard {{ $lane.queue }}"
+restart = "on-failure"
+restart_delay = 30
+enabled = false
+{{ end -}}
+{{- end -}}
+{{- end }}
+
 # Scheduled harnesses — one drop-in file each in harness.d/
 #
 # One-shot prompt harnesses fired by the daemon's own cron scheduler live in
@@ -278,14 +323,17 @@ enabled = false
 #
 # @joestump 09/11/2026 - Dropped claude-code and the claude-headless pool from
 #   both profiles.
+#
+# @joestump 09/11/2026 - The difficulty-lane workers join both profiles on the
+#   lane host.
 [profile.default]
-description = "Everyday set — Crush Signal channel + Crush Switchboard pool"
-harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}]
+description = "Everyday set — Crush Signal channel + Crush Switchboard pool{{ if $laneWorkers }} + difficulty lanes{{ end }}"
+harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}{{ range $n := $laneWorkers }}, "{{ $n }}"{{ end }}]
 autostart = true
 
 [profile.full]
-description = "All harnesses running — Crush Signal channel + Crush Switchboard pool"
-harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}]
+description = "All harnesses running — Crush Signal channel + Crush Switchboard pool{{ if $laneWorkers }} + difficulty lanes{{ end }}"
+harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}{{ range $n := $laneWorkers }}, "{{ $n }}"{{ end }}]
 autostart = false
 
 # Remote access — the SSH cockpit
