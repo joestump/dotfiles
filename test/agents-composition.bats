@@ -171,6 +171,26 @@ setup() {
   grep -q 'Unattended sessions clamp harder' "$REPO_ROOT/.chezmoitemplates/agents/base.md"
 }
 
+@test "base policy admits verified agent handoffs narrowly, and only by provenance" {
+  # A handoff todo is the one place fetched text may choose the task, so every
+  # guard on it is pinned: a verified work order, provenance from Cairn's actor
+  # or the issue author (never a tag or the body), the semi-trusted clamp, and
+  # a refusal that does not retry.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'Verified agent handoffs are the one narrow exception' "$f"
+  grep -q '`verified: true`' "$f"
+  grep -q 'never count as provenance' "$f"
+  grep -q 'semi-trusted' "$f"
+  grep -q 'never \*what you may do\*' "$f"
+  grep -q 'with a `refused:` result' "$f"
+  grep -q 'not provenance: a worker trusts Cairn' "$f"
+  # The allowlist is the two identities, derived from whoami like everything
+  # else here, so it renders correctly on any login.
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  chezmoi execute-template --source "$REPO_ROOT" <<< '{{ template "agents/base.md" . }}' \
+    | grep -qE 'provenance names `([a-z0-9_.-]+)` or `\1-agent`'
+}
+
 @test "base policy mandates a cross-identity reviewer request, scoped" {
   # Rule 8's genuinely new contribution is that the reviewer is requested when
   # the PR is opened, instead of the scheduled sweep discovering it later. Pin
