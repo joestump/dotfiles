@@ -116,23 +116,6 @@ _hb_this_host() {
   # the config format from the extension, so mint the .toml inside a temp dir.
   _cfgdir="$(mktemp -d)"; _cfgdir2="$(mktemp -d)"; _cfg="$_cfgdir2/chezmoi.toml"
   _h="$(_hb_this_host)"
-  # The difficulty-lane workers render only on .switchboard.laneHost for a
-  # -agent login, so this render includes them on the lane host and nowhere
-  # else. Derive the names from .switchboard.lanes instead of freezing a
-  # literal: the worker set is a knob (same reasoning as the pool below), and
-  # a frozen list here fails on the lane host the moment a worker is added.
-  #
-  # @joestump-agent 09/11/2026 - Added with the difficulty lanes; the frozen
-  #   seeded set failed on tars the first time the workers rendered.
-  _lane_host="$(chezmoi execute-template --source "$REPO_ROOT" <<<'{{ .switchboard.laneHost }}')"
-  _lane_names=""
-  if [[ "$_h" == "$_lane_host" ]]; then
-    _lane_names="$(chezmoi execute-template --source "$REPO_ROOT" <<'TMPL'
-{{ range $lane := .switchboard.lanes }}{{ range $w := $lane.workers }}{{ $w.name }}
-{{ end }}{{ end }}
-TMPL
-)"
-  fi
   printf '[data]
     agentIdentity = "ci-agent"
 [data.sweeps]
@@ -143,6 +126,24 @@ TMPL
     navidromeLdapSyncAgentHost = "%s"
     morningBriefAgentHost = "%s"
 ' "$_h" "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
+  # The difficulty-lane workers render only for an ARMED lane: on
+  # .switchboard.laneHost, for a -agent login, with the lane's credentials in
+  # the secrets file. Derive the expected names through the same partial the
+  # template uses, under the same config, instead of freezing a literal: the
+  # worker set is a knob (same reasoning as the pool below), and a frozen list
+  # fails on the lane host the moment a lane arms.
+  #
+  # @joestump-agent 09/11/2026 - Added with the difficulty lanes; the frozen
+  #   seeded set failed on tars the first time the workers rendered.
+  #
+  # @joestump 09/11/2026 - Derived through armed-lanes.tmpl, now that lanes
+  #   also wait for their credentials. A host-only check expected workers on
+  #   tars before any lane endpoint was vended.
+  _lane_names="$(chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT" <<'TMPL'
+{{ $armed := includeTemplate "harness/armed-lanes.tmpl" . | trim | splitList " " }}{{ range $lane := .switchboard.lanes }}{{ if has $lane.queue $armed }}{{ range $w := $lane.workers }}{{ $w.name }}
+{{ end }}{{ end }}{{ end }}
+TMPL
+)"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
