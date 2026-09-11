@@ -7,7 +7,7 @@
 # session at 76,290 tokens before reading anything: the full CRUSH.md, 67
 # skills, 35 builtin tools and ten MCP servers that the #234 crushrc was meant
 # to remove and never did. The lean profile — sweeps/ plus
-# .chezmoitemplates/sweeps/crush.json — starts at ~11.6k.
+# .chezmoitemplates/sweeps/crush.json.tmpl — starts at ~11.6k.
 #
 # These tests pin what would silently undo that: a drop-in pointed back at a
 # shared workdir, an MCP server added to crush.json that no sweep switches off,
@@ -94,7 +94,7 @@ for d in dirs:
     off = {k for k, v in c["mcp"].items() if v == {"disabled": True}}
     kept = servers - off
     if not kept <= may_keep:
-        bad.append(f"{d}: keeps {sorted(kept - may_keep)} — add the server to .chezmoitemplates/sweeps/crush.json")
+        bad.append(f"{d}: keeps {sorted(kept - may_keep)} — add the server to .chezmoitemplates/sweeps/crush.json.tmpl")
     if "signal" not in kept:
         bad.append(f"{d}: switched off signal, so it cannot send its summary")
 if bad:
