@@ -84,7 +84,9 @@ Tags, lowercase, sized from the ladder (size a PR too):
 - `source:morning-brief/<yyyy-mm-dd>`, `reply:cairn-comment`
 
 Size XL, or anything that needs Joe: leave `handoff` and `lane:` off, so nothing
-routes it, and mark it "needs Joe" in the summary.
+routes it, and mark it "needs Joe" in the summary. If `artifact_create` rejects
+`tags`, create the artifact without them and put "⚠️ Cairn rejected tags" in
+the summary.
 
 ## Step 5 — finish
 
