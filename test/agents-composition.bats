@@ -185,28 +185,29 @@ setup() {
   # Switchboard's contract: a refused work order FAILS, so it dead-letters
   # where a human sees it, rather than completing silently.
   grep -q '`fail` the todo with a `refused:` reason' "$f"
-  grep -q 'not provenance: a worker trusts Cairn' "$f"
-  # The allowlist is the two identities, derived from whoami like everything
-  # else here, so it renders correctly on any login.
-  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
-  chezmoi execute-template --source "$REPO_ROOT" <<< '{{ template "agents/base.md" . }}' \
-    | grep -qE 'provenance names `([a-z0-9_.-]+)` or `\1-agent`'
+  grep -q 'not provenance: the router trusts Cairn' "$f"
+  # Cairn's actor_id is an OAuth login and on_behalf_of is self-reported, so
+  # the router enforces the allowlist and the worker gates on the work order.
+  grep -q 'only Switchboard.s router writes' "$f"
+  grep -q '`on_behalf_of` (a client.s self-reported name)' "$f"
 }
 
 @test "base policy gives lane workers the full work-order contract" {
   # The lane workers are unattended crush sessions whose only instructions for a
-  # handoff are these five steps: check provenance first, read semi-trusted,
-  # work under the normal rules, report via reply:, then close the todo.
+  # handoff are these five steps: check the work order first, read
+  # semi-trusted, work under the normal rules, report via reply:, then close
+  # the todo.
   local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
   grep -q '### Handoff lanes — working a work order' "$f"
   grep -q 'Check it before reading anything else' "$f"
-  grep -q '`authorized_by.rule_id` is set' "$f"
-  grep -q '`subject.actor_id` for a Cairn artifact; `subject.author` or `subject.sender` for an issue' "$f"
+  grep -q '`authorized_by.rule_id` is non-empty, and `lane` is the queue you drain' "$f"
+  # A literal actor check would refuse every handoff created over OAuth MCP.
+  grep -q 'Do not re-check `subject.actor_id` against agent names' "$f"
   grep -q '`fail` with `refused: <the check>`' "$f"
   grep -q 'no self-merge' "$f"
   # A worker that relabels the issue it executes re-routes it as a new work order.
   grep -q 'Never add or remove a `size/\*` label on the issue you are executing' "$f"
-  grep -q '`reply:cairn-comment` means `artifact_comment`' "$f"
+  grep -q '`reply:cairn-comment`, or no `reply:` tag, means `artifact_comment` on `subject.handle`' "$f"
   grep -q '`complete` with a `result` linking the PR and the report, or `fail`' "$f"
   grep -q 'A `triage` worker sizes, it does not build' "$f"
   grep -q 'or `HUMAN`' "$f"
