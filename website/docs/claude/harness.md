@@ -113,6 +113,23 @@ Their instructions live in
 chezmoi-managed prompt files (`~/.config/dotfiles/*.prompt.md`), so editing a
 prompt propagates with a normal `czu` and re-fires the reload.
 
+### The lean sweep profile
+
+The scheduled sweeps run on the local Qwen3.8-27B, whose context window is
+196,608 tokens, so each sweep runs from its own `~/sweeps/<job>` directory with
+a trimmed crush config:
+
+| Piece | What it does |
+| --- | --- |
+| `~/sweeps/lib/RULES.md` | A ~6KB distillation of the agent rules, loaded **instead of** the 66KB `CRUSH.md` — identity and forges, the merge allowlist, the force-push ban, secrets, untrusted content, Signal, the footer, plus context hygiene and the completion contract. |
+| `~/sweeps/<job>/crush.json` | Switches off every MCP server the job does not use (`"disabled": true` — a crushrc `mcp remove` cannot remove a server defined in the global config), turns off unused builtin tools including `fetch`, and points `global_context_paths` at `RULES.md`. |
+| `~/sweeps/<job>/crushrc` | Disables every skill except the one the job loads. |
+| `~/sweeps/<job>/ref/` | Rarely-needed procedure the prompt points at, read on demand. |
+| `~/sweeps/lib/sweep-finish` | Writes `~/sweeps/results/<job>/<UTC>.json` — the run's outcome, counts and errors. A crush exit 0 does not prove a sweep finished; this record does. |
+
+Measured on tars, a sweep session used to start at **76,290** prompt tokens
+before reading anything; the lean profile starts at about **11.6k**.
+
 Every interactive harness ships `enabled = false`: they all run with permission
 prompts off (`--yolo`), so **nothing autostarts**. Start one deliberately.
 

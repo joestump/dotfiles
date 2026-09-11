@@ -1,0 +1,37 @@
+# Lean Sweep Skills Filter
+#
+# Sourced by every ~/sweeps/<job>/crushrc. Crush lists every skill it discovers
+# (name, description, path) in the system prompt: 67 skills, ~13k tokens on
+# tars, for a sweep that uses one skill at most. skills_paths come from the
+# global crush.json and JSON arrays merge by concatenation, so a project config
+# cannot shorten that list. It can disable names, which is what this does: every
+# SKILL.md crush could discover is disabled unless its name is listed in
+# SWEEP_KEEP_SKILLS (space-separated), which the per-job crushrc sets first.
+#
+# The directories mirror options.skills_paths in dot_config/crush/crush.json.tmpl
+# plus crush's built-in global skill dirs (GlobalSkillsDirs) and its embedded
+# skills. test/lean-sweeps.bats keeps the first list in step with crush.json.
+#
+# @joestump 09/11/2026 - Added with the lean sweep profile.
+_sweep_keep=" ${SWEEP_KEEP_SKILLS:-} "
+_sweep_dirs="$HOME/.config/crush/skills $HOME/.config/crush/skills-ext $HOME/.config/claude-marketplaces/claude-personal/skills $HOME/.config/agents/skills $HOME/.agents/skills $HOME/.claude/skills"
+
+for _dir in $_sweep_dirs; do
+  [ -d "$_dir" ] || continue
+  for _f in $(find -L "$_dir" -maxdepth 5 -name SKILL.md 2>/dev/null); do
+    _n=$(sed -n 's/^name:[[:space:]]*//p' "$_f" | head -n 1 | tr -d "\"'")
+    [ -n "$_n" ] || _n=$(basename "$(dirname "$_f")")
+    case "$_sweep_keep" in
+      *" $_n "*) ;;
+      *) option disable-skill "$_n" ;;
+    esac
+  done
+done
+
+# Crush's embedded skills are not on disk, so they are named here.
+for _n in a2ui crush-config crush-hooks jq; do
+  case "$_sweep_keep" in
+    *" $_n "*) ;;
+    *) option disable-skill "$_n" ;;
+  esac
+done

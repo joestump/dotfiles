@@ -1,0 +1,40 @@
+{{- /*
+  Lean Sweep Crush Config (partial)
+
+  Rendered into every ~/sweeps/<job>/crush.json. Crush merges a project
+  crush.json OVER the global ~/.config/crush/crush.json, so this can only add
+  or override. That is why every unneeded MCP server is switched off with
+  "disabled": true rather than removed: a crushrc `mcp remove` deletes only
+  from its own file, which made the #234 sweeps crushrc a no-op — every sweep
+  kept all ten servers and 163 MCP tool schemas.
+
+  Measured on tars against litellm/Qwen3.8-27B (vLLM prompt tokens for a
+  trivial run): the old sweeps profile started every session at 76,290 tokens,
+  this profile at 11,596 with signal as the only server.
+
+  Arguments, as a dict:
+    .home   the home directory (for the RULES.md path)
+    .mcp    MCP servers this job keeps
+    .tools  optional builtin tools this job keeps ("edit", "multiedit")
+
+  $servers must name every MCP server in dot_config/crush/crush.json.tmpl, or a
+  new server silently rides into every sweep; test/lean-sweeps.bats checks it.
+
+  @joestump 09/11/2026 - Added with the lean sweep profile.
+*/ -}}
+{{- $servers := list "aws" "aws-knowledge" "cairn" "chrome-devtools" "filesystem" "gitea" "memory" "msgbrowse" "outline" "sequential-thinking" "signal" "switchboard" -}}
+{{- $mcp := dict -}}
+{{- range $s := $servers -}}
+{{- if not (has $s $.mcp) }}{{ $_ := set $mcp $s (dict "disabled" true) }}{{ end -}}
+{{- end -}}
+{{- /* Builtin tools no unattended sweep uses. fetch is here on purpose: a network
+       error inside it aborts the whole crush run (crush fetch.go returns a Go
+       error instead of a tool error), so sweeps check HTTP with curl instead.
+       agent is a read-only search sub-agent in crush — it cannot run bash, so
+       it is no help with deep per-PR or per-host work. */ -}}
+{{- $off := list "agent" "agentic_fetch" "call_mcp_prompt" "crush_info" "crush_logs" "CronCreate" "CronDelete" "CronList" "download" "fetch" "job_kill" "job_output" "list_mcp_prompts" "list_mcp_resources" "lsp_call_hierarchy" "lsp_definition" "lsp_diagnostics" "lsp_references" "lsp_rename" "lsp_replace_symbol" "lsp_restart" "lsp_symbols" "question" "read_mcp_resource" "semantic_index" "semantic_search" "sourcegraph" "todos" -}}
+{{- range $t := list "edit" "multiedit" -}}
+{{- if not (has $t $.tools) }}{{ $off = append $off $t }}{{ end -}}
+{{- end -}}
+{{- $opts := dict "disable_a2ui" true "disabled_tools" $off "global_context_paths" (list (printf "%s/sweeps/lib/RULES.md" $.home)) -}}
+{{ dict "mcp" $mcp "options" $opts | toPrettyJson }}

@@ -1,0 +1,9 @@
+# Lean Sweep Session: issue-sweep
+#
+# The per-job half of the lean sweep profile. crush.json beside this file sets
+# the MCP servers, builtin tools and rules file; this file names the skills the
+# job keeps (none: triage runs on REST) and then runs the shared filter that disables every other one.
+#
+# @joestump 09/11/2026 - Added with the lean sweep profile.
+SWEEP_KEEP_SKILLS=""
+source "$HOME/sweeps/lib/lean.crushrc"

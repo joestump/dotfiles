@@ -66,3 +66,15 @@ Library/Application Support/halloy/
 .config/dotfiles/issue-sweep.prompt.md
 .config/dotfiles/morning-brief.prompt.md
 {{ end -}}
+
+# ~/sweeps is the lean sweep profile: the per-job crush configs, the compact
+# rules file, the reference procedures and the result records. Only a machine
+# named by one of the .sweeps.*Host keys runs a sweep, so only that machine
+# gets the tree — a laptop that arms nothing gets none of it.
+#
+# @joestump 09/11/2026 - Added with the lean sweep profile.
+{{ $sweepHosts := list .sweeps.prSweepAgentHost .sweeps.prSweepHumanHost .sweeps.stumpcloudSweepAgentHost .sweeps.issueSweepAgentHost .sweeps.blogSweepAgentHost .sweeps.navidromeLdapSyncAgentHost .sweeps.morningBriefAgentHost -}}
+{{ if not (has .chezmoi.hostname $sweepHosts) -}}
+sweeps
+sweeps/**
+{{ end -}}

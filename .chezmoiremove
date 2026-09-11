@@ -78,6 +78,16 @@ Library/LaunchAgents/rocks.stump.stumpcloud-sweep.plist
 .config/dotfiles/issue-pr-grooming.prompt.md
 .config/dotfiles/pr-feedback-sweep.prompt.md
 
+# The #234 sweeps crushrc — retired by the lean sweep profile. Every sweep now
+# runs from its own ~/sweeps/<job>/ directory with its own crushrc and
+# crush.json, so the shared ~/sweeps/crushrc no longer applies to anything. It
+# also never worked: its `mcp remove` lines delete only from the crushrc's own
+# builder, not from the merged global config, so every sweep kept all ten MCP
+# servers. The old shared data dir ~/sweeps/.crush (session history) is left
+# alone on purpose; delete it by hand once nobody needs those transcripts.
+# @joestump 09/11/2026 - Added with the lean sweep profile.
+sweeps/crushrc
+
 # pr-sweep cost-freeze backup — a hand-made copy of the rendered pr-sweep.toml
 # left in harness.d/ on tars and kitt during the 08/29 pr-sweep cost freeze. It is
 # the one entry here this repo never rendered itself, listed anyway because it is
