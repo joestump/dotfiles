@@ -23,6 +23,10 @@
     never printing credential-bearing git output, no harness commit trailers,
     issue-tracker placement, no Gitea links in any public post — and matched
     the self-merge rule to pr-sweep's Tier B instead of forbidding it outright.
+
+  @joestump 09/11/2026 - The footer names `@<human>` on a human login. kitt's
+    pr-sweep posts with Joe's own accounts, and the identity-free footer read
+    as if the agent account had posted.
 */ -}}
 {{- $user := .agentIdentity | default .chezmoi.username -}}
 {{- $human := trimSuffix "-agent" $user -}}
@@ -149,7 +153,14 @@ anyone else.
 Every forge post you make — comment, review, PR or issue body — ends with a
 blank line and then this line, with no horizontal rule before it:
 
-    Executed via scheduled [Harness]({{ .harnessPublicUrl }}) using [`<model>`](<model URL>) in [Crush](https://github.com/charmbracelet/crush)
+    Executed via scheduled [Harness]({{ .harnessPublicUrl }}) using [`<model>`](<model URL>) in [Crush](https://github.com/charmbracelet/crush){{ if not (hasSuffix "-agent" $user) }} on behalf of `@{{ $human }}`{{ end }}
+
+{{ if hasSuffix "-agent" $user -}}
+You post as yourself, so the footer names no one else.
+{{- else -}}
+You post with `{{ $human }}`'s own accounts, so the footer says so. Keep the
+handle in backticks so it does not notify.
+{{- end }}
 
 Your harness prompt names `<model>` and its URL. Use exactly those, and never
 name a model or harness you are not running as. Commit messages carry no

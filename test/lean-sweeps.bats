@@ -176,6 +176,21 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_outpu
   done
 }
 
+# kitt's pr-sweep posts with the human's own accounts. The footer says so there,
+# and only there: on the agent login it would misattribute the agent's work.
+@test "lean: the RULES.md footer names the human only on a human login" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local cfgdir human agent
+  cfgdir="$(mktemp -d)"
+  printf '[data]\n    agentIdentity = "ci"\n' >"$cfgdir/human.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$cfgdir/agent.toml"
+  human="$(chezmoi execute-template --config "$cfgdir/human.toml" --source "$REPO_ROOT" < "$SWEEPS/lib/RULES.md.tmpl")"
+  agent="$(chezmoi execute-template --config "$cfgdir/agent.toml" --source "$REPO_ROOT" < "$SWEEPS/lib/RULES.md.tmpl")"
+  rm -rf "$cfgdir"
+  grep -qF 'in [Crush](https://github.com/charmbracelet/crush) on behalf of `@ci`' <<<"$human"
+  [ "$(grep -c 'on behalf of' <<<"$agent" || true)" -eq 0 ]
+}
+
 # Budgets are RENDERED bytes, set ~15-25% above each prompt as shipped. These
 # files run ~3.9 bytes per token (the captured 308KB request came to 76,290 vLLM
 # prompt tokens), so pr-sweep at its 9KB ceiling is ~2.3k tokens. With the
