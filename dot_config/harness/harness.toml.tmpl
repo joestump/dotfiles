@@ -240,6 +240,20 @@ enabled = false
 # for a -agent login: one set of consumers per queue, and agent-authored work
 # still gets the human identity's review.
 #
+# OFF UNTIL ITS CREDENTIALS EXIST. A lane also renders only when the Vault
+# Agent secrets file carries both its <endpointEnv>_URL and _API_KEY
+# (.chezmoitemplates/harness/armed-lanes.tmpl). A worker with no endpoint
+# would sit green in `harness list` and drain nothing. With no lane armed,
+# this file declares exactly what it did before the lanes existed.
+#
+# ARMING NEEDS A DAEMON RESTART. The daemon loads secrets-static.env once, at
+# start, and every harness inherits that environment. After a lane's
+# credentials land, czu renders its workers here, and `harness reload` adds
+# them stopped. The next daemon restart (`systemctl --user restart harness`,
+# or the one a harness rebuild does) loads the new credentials, and the
+# autostart profile below starts the workers. Never `harness start` a new lane
+# worker before that restart: it would run without its credentials.
+#
 # HYPER IS A BILL. Hyper is pay-per-token and tops itself up (see the 08/29
 # note in harness.d/pr-sweep.toml.tmpl). A worker spends only while it works a
 # todo, and each Hyper worker except vision shares its queue with a Z.ai twin,
@@ -247,10 +261,10 @@ enabled = false
 # dashboard, not `harness list`.
 #
 # @joestump 09/11/2026 - Added the difficulty lanes.
-{{- $laneUser := .agentIdentity | default .chezmoi.username -}}
+{{- $armedLanes := includeTemplate "harness/armed-lanes.tmpl" . | trim | splitList " " -}}
 {{- $laneWorkers := list -}}
-{{- if and .switchboard.laneHost (eq .chezmoi.hostname .switchboard.laneHost) (hasSuffix "-agent" $laneUser) -}}
 {{- range $lane := .switchboard.lanes -}}
+{{- if has $lane.queue $armedLanes -}}
 {{- range $w := $lane.workers -}}
 {{- $laneWorkers = append $laneWorkers $w.name }}
 [harness.{{ $w.name }}]

@@ -7,12 +7,14 @@
 # only work together: a worker with no pin runs crush's fallback model (see
 # test/harness.bats), and a pin aimed at the wrong endpoint drains the wrong
 # queue. These tests pin those couplings, the one-host rule that makes each
-# handoff run exactly once, and the provider rules.
+# handoff run exactly once, the provider rules, and the arming rule: a lane
+# renders nothing until its credentials exist.
 #
 # @joestump 09/11/2026 - Added with the difficulty lanes.
 load test_helper
 
 HARNESS_TOML="$REPO_ROOT/dot_config/harness/harness.toml.tmpl"
+RELOAD="$REPO_ROOT/.chezmoiscripts/run_onchange_after_52-harness-reload.sh.tmpl"
 CZU_RUN="$REPO_ROOT/dot_config/dotfiles/executable_czu-run.zsh"
 
 # Evaluate a template against the repo's own data.
@@ -27,17 +29,32 @@ _workers() {
 {{ end }}{{ end }}' | sed '/^$/d'
 }
 
-# Render harness.toml as identity $1 with the lane host set to $2.
+# A fake Vault Agent secrets file carrying credentials for the given endpoint
+# prefixes, in the file's own `export KEY='value'` shape. Prints its path.
+_secrets() {
+  local f p
+  f="$(mktemp "$BATS_TEST_TMPDIR/secrets.XXXXXX")"
+  for p in "$@"; do
+    printf "export %s_URL='https://switchboard.invalid/mcp/fixture'\nexport %s_API_KEY='fixture'\n" "$p" "$p" >>"$f"
+  done
+  echo "$f"
+}
+
+_all_prefixes() { _q '{{ range .switchboard.lanes }}{{ .endpointEnv }} {{ end }}'; }
+
+# Render harness.toml as identity $1, lane host $2, secrets file $3.
 _render_toml() {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   local cfgdir rc
   cfgdir="$(mktemp -d)"
-  printf '[data]\n    agentIdentity = "%s"\n[data.switchboard]\n    laneHost = "%s"\n' "$1" "$2" >"$cfgdir/chezmoi.toml"
+  printf '[data]\n    agentIdentity = "%s"\n[data.switchboard]\n    laneHost = "%s"\n    laneSecretsFile = "%s"\n' "$1" "$2" "$3" >"$cfgdir/chezmoi.toml"
   chezmoi execute-template --config "$cfgdir/chezmoi.toml" --source "$REPO_ROOT" < "$HARNESS_TOML"
   rc=$?
   rm -rf "$cfgdir"
   return $rc
 }
+
+_lane_tables() { grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$1" || true; }
 
 @test "lanes: the queues are the lanes Switchboard routes, and hold has no worker" {
   run _q '{{ range .switchboard.lanes }}{{ .queue }} {{ end }}'
@@ -60,7 +77,7 @@ _render_toml() {
 }
 
 @test "lanes: every worker ships an env file, a pin and a czu reassert entry" {
-  local name queue provider model env dir declared
+  local name dir declared
   declared=" $(_workers | cut -d'|' -f1 | tr '\n' ' ') "
   [ "$declared" != "  " ]
   for name in $declared; do
@@ -114,11 +131,12 @@ assert sb["disabled"] is False, name
   done < <(_workers)
 }
 
-@test "lanes: the lane host's agent login declares every worker, in both profiles" {
+@test "lanes: the armed lane host declares every worker, in both profiles" {
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
   local toml
   toml="$BATS_TEST_TMPDIR/harness.toml"
-  _render_toml ci-agent "$(_q '{{ .chezmoi.hostname }}')" >"$toml"
+  # shellcheck disable=SC2046
+  _render_toml ci-agent "$(_q '{{ .chezmoi.hostname }}')" "$(_secrets $(_all_prefixes))" >"$toml"
   _workers | python3 -c '
 import sys, tomllib
 d = tomllib.load(open(sys.argv[1], "rb"))
@@ -136,13 +154,56 @@ for line in sys.stdin:
 }
 
 @test "lanes: a human login, or any other host, declares no lane worker" {
+  local this secrets
+  this="$(_q '{{ .chezmoi.hostname }}')"
+  # shellcheck disable=SC2046
+  secrets="$(_secrets $(_all_prefixes))"
+  run _render_toml ci "$this" "$secrets"
+  [ "$status" -eq 0 ]
+  [ "$(_lane_tables "$output")" -eq 0 ]
+  run _render_toml ci-agent "not-$this" "$secrets"
+  [ "$status" -eq 0 ]
+  [ "$(_lane_tables "$output")" -eq 0 ]
+  [ "$(grep -c 'difficulty lanes"' <<<"$output" || true)" -eq 0 ]
+}
+
+# Merging the lanes must be safe before switchboard ships them: a lane worker
+# whose endpoint was never vended starts green and drains nothing, and one in
+# the autostart profile would start that way on the next daemon restart. So
+# with no credentials, harness.toml must be byte-identical to a render with the
+# lanes switched off entirely.
+@test "lanes: with no credentials, nothing renders and the rest is unchanged" {
+  local this off empty
+  this="$(_q '{{ .chezmoi.hostname }}')"
+  off="$(_render_toml ci-agent "" "/nonexistent/secrets.env")"
+  [ "$(_lane_tables "$off")" -eq 0 ]
+  # No secrets file at all.
+  run _render_toml ci-agent "$this" "/nonexistent/secrets.env"
+  [ "$status" -eq 0 ]; [ "$output" = "$off" ]
+  # A secrets file carrying only today's keys.
+  run _render_toml ci-agent "$this" "$(_secrets SWITCHBOARD_CRUSH SWITCHBOARD_CLAUDE_CODE)"
+  [ "$status" -eq 0 ]; [ "$output" = "$off" ]
+  # A URL with an empty key, and a key with no URL, are both still unarmed.
+  empty="$(_secrets)"
+  printf "export SWITCHBOARD_LANE_S_URL='https://switchboard.invalid/mcp/x'\nexport SWITCHBOARD_LANE_S_API_KEY=''\nexport SWITCHBOARD_LANE_M_API_KEY='fixture'\n" >"$empty"
+  run _render_toml ci-agent "$this" "$empty"
+  [ "$status" -eq 0 ]; [ "$output" = "$off" ]
+}
+
+@test "lanes: each lane arms on its own credentials only" {
   local this
   this="$(_q '{{ .chezmoi.hostname }}')"
-  run _render_toml ci "$this"
+  run _render_toml ci-agent "$this" "$(_secrets SWITCHBOARD_LANE_M)"
   [ "$status" -eq 0 ]
-  [ "$(grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$output" || true)" -eq 0 ]
-  run _render_toml ci-agent "not-$this"
-  [ "$status" -eq 0 ]
-  [ "$(grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$output" || true)" -eq 0 ]
-  [ "$(grep -c 'difficulty lanes"' <<<"$output" || true)" -eq 0 ]
+  [ "$(_lane_tables "$output")" -eq 2 ]
+  grep -qE '^\[harness\.crush-lane-m-zai\]' <<<"$output"
+  grep -qE '^\[harness\.crush-lane-m-hyper\]' <<<"$output"
+  grep -qE '^harnesses = .*"crush-lane-m-hyper"' <<<"$output"
+  [ "$(grep -cE '^harnesses = .*"crush-(lane-s|lane-l|lane-vision|triage)"' <<<"$output" || true)" -eq 0 ]
+}
+
+@test "lanes: arming a lane re-fires the harness reload script" {
+  # Credentials change the rendered harness.toml, not its template, so the
+  # template hash alone would never reload the daemon.
+  grep -q 'armed lanes: {{ includeTemplate "harness/armed-lanes.tmpl" . | trim }}' "$RELOAD"
 }

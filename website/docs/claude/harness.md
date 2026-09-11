@@ -134,6 +134,15 @@ that needs Joe) has no worker.
 - **One host, agent login.** Lanes render only on `.switchboard.laneHost`, and
   only for a `-agent` login. That gives one set of consumers per queue, and
   agent-authored work still gets the human identity's review.
+- **Off until its credentials exist.** A lane's workers render only once the
+  Vault Agent secrets file carries both `<PREFIX>_URL` and `<PREFIX>_API_KEY`.
+  Until then `harness.toml` is exactly what it was before lanes existed, so a
+  worker can never start green with no endpoint.
+- **Arming needs a daemon restart.** The daemon reads its secrets once, at
+  start. After a lane's credentials land, `czu` renders the workers and the
+  reload adds them stopped. The next `systemctl --user restart harness`
+  starts them from the autostart profile with their credentials loaded. Don't
+  `harness start` one before that restart.
 - **The worker contract** lives in the shared agent rules: check the work
   order's verified provenance, do the task under every normal clamp, report via
   the `reply:` tag, then complete or fail the todo.
