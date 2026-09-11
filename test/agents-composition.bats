@@ -203,6 +203,11 @@ setup() {
   grep -q '`authorized_by.rule_id` is non-empty, and `lane` is the queue you drain' "$f"
   # A literal actor check would refuse every handoff created over OAuth MCP.
   grep -q 'Do not re-check `subject.actor_id` against agent names' "$f"
+  # Every Cairn create today records joe@stump.rocks, whichever agent made it,
+  # so provenance is logged, not gated on. Forge repo prefixes do not drift that
+  # way, so the issue repo check stays as defense in depth.
+  grep -q 'Record `subject.actor_id`, `author` or `sender` in your result instead' "$f"
+  grep -q 'For an `issue`, `subject.repo` is under `stump.wtf`' "$f"
   grep -q '`fail` with `refused: <the check>`' "$f"
   grep -q 'no self-merge' "$f"
   # A worker that relabels the issue it executes re-routes it as a new work order.
