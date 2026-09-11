@@ -171,7 +171,8 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_outpu
                 'A turn with no tool call ENDS THE RUN' 'sweep-finish' \
                 'Executed via scheduled [Harness](https://github.com/stump-wtf/harness)' \
                 'git remote -v' 'Assisted-by:' 'Never approve a PR authored by your own identity' \
-                'APPROVED it' 'stumpcloud/stumpcloud' 'keeps its own' 'in anything public' 'job_output'; do
+                'APPROVED it' 'stumpcloud/stumpcloud' 'keeps its own' 'in anything public' 'job_output' \
+                'update-branch'; do
     grep -qF -- "$phrase" <<<"$output" || { echo "RULES.md lost: $phrase"; return 1; }
   done
 }

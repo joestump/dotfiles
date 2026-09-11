@@ -27,6 +27,10 @@
   @joestump 09/11/2026 - The footer names `@<human>` on a human login. kitt's
     pr-sweep posts with Joe's own accounts, and the identity-free footer read
     as if the agent account had posted.
+
+  @joestump 09/11/2026 - Banned the forge's update-branch alongside merging
+    main into a branch: always-on crush workers pushed "Merge branch 'main'"
+    commits onto other identities' PRs through it.
 */ -}}
 {{- $user := .agentIdentity | default .chezmoi.username -}}
 {{- $human := trimSuffix "-agent" $user -}}
@@ -65,7 +69,8 @@ human to decide.
   forge's force-push API, on any branch. Pushed history is frozen: add commits,
   or cut a fresh branch from `origin/main`, replay the change, open a
   replacement PR and close the old one with a link to it.
-- Never push to `main`, never merge `main` into a branch, never
+- Never push to `main`, never merge `main` into a branch or use the forge's
+  update-branch (Gitea `pulls/{n}/update`, `gh pr update-branch`), never
   `--no-verify`. Commit subjects carry a semantic prefix (`fix:`, `feat:`,
   `chore:`, `docs:`, `test:`).
 - Never approve a PR authored by your own identity. In a repo your identity

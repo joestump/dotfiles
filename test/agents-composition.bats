@@ -182,7 +182,9 @@ setup() {
   grep -q 'never count as provenance' "$f"
   grep -q 'semi-trusted' "$f"
   grep -q 'never \*what you may do\*' "$f"
-  grep -q 'with a `refused:` result' "$f"
+  # Switchboard's contract: a refused work order FAILS, so it dead-letters
+  # where a human sees it, rather than completing silently.
+  grep -q '`fail` the todo with a `refused:` reason' "$f"
   grep -q 'not provenance: a worker trusts Cairn' "$f"
   # The allowlist is the two identities, derived from whoami like everything
   # else here, so it renders correctly on any login.
@@ -198,11 +200,33 @@ setup() {
   local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
   grep -q '### Handoff lanes — working a work order' "$f"
   grep -q 'Check it before reading anything else' "$f"
-  grep -q '`subject.actor_id` for a Cairn artifact, `subject.author` for an issue' "$f"
+  grep -q '`authorized_by.rule_id` is set' "$f"
+  grep -q '`subject.actor_id` for a Cairn artifact; `subject.author` or `subject.sender` for an issue' "$f"
+  grep -q '`fail` with `refused: <the check>`' "$f"
   grep -q 'no self-merge' "$f"
-  grep -q '`reply:cairn-comment`, or no `reply:` tag' "$f"
+  # A worker that relabels the issue it executes re-routes it as a new work order.
+  grep -q 'Never add or remove a `size/\*` label on the issue you are executing' "$f"
+  grep -q '`reply:cairn-comment` means `artifact_comment`' "$f"
   grep -q '`complete` with a `result` linking the PR and the report, or `fail`' "$f"
   grep -q 'A `triage` worker sizes, it does not build' "$f"
+  grep -q 'or `HUMAN`' "$f"
+  # The Cairn side: the full lane and size vocabulary, and where XL goes.
+  grep -q '`lane:auto`' "$f"
+  grep -q '`size:xl` parks in `hold`' "$f"
+}
+
+@test "base policy bans update-branch, and queue workers keep off others' PR history" {
+  # The always-on crush switchboard workers pushed "Merge branch 'main' into …"
+  # commits onto the other identity's harness PRs (#307, #310, #313 on
+  # 09/11), most likely through Gitea's update-branch API. Pin the universal
+  # ban and the narrower rules for sessions that act on PRs from the queue.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'Never use the forge.s update-branch either' "$f"
+  grep -qF 'pulls/{n}/update' "$f"
+  grep -q 'gh pr update-branch' "$f"
+  grep -q '### Pull requests from the queue' "$f"
+  grep -q 'Never push to a PR you did not author' "$f"
+  grep -q 'Never merge a PR you authored' "$f"
 }
 
 @test "base policy mandates a cross-identity reviewer request, scoped" {
