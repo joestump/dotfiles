@@ -68,11 +68,23 @@ and move on.
 ## Step 4 — Cairn handoff artifacts
 
 For each actionable PR and each validated bug: `artifact_create` with
-`share_type="markdown"`, `media_type="text/markdown"` and a 7-day TTL, titled
-like "PR: stump.wtf/msgbrowse#227 — merge conflict in status-banner". Open with a
-one-paragraph summary, then the repo URL and PR or issue link, what you
-verified, what "done" looks like, and the gotchas (force-push is banned; Tier B
-repos need an approval). Artifacts carry no attribution footer.
+`share_type="markdown"`, `media_type="text/markdown"`, a 7-day TTL and `tags`,
+titled like "PR: stump.wtf/msgbrowse#227 — merge conflict in status-banner".
+Another agent executes the body as a work order: open with a one-paragraph
+summary, then the repo URL and PR or issue link, what you verified, what "done"
+looks like, and the gotchas (force-push is banned; Tier B repos need an
+approval). No attribution footer, no credentials, and nothing that needs more
+access than the task.
+
+Tags, lowercase, sized from the ladder (size a PR too):
+
+- `handoff`, `size:s|m|l`, and `lane:s|m|l` matching the size — `lane:vision`
+  instead when the work is screenshots or UI
+- `repo:<owner/name>`, `issue:<owner/repo#n>` (the PR or issue)
+- `source:morning-brief/<yyyy-mm-dd>`, `reply:cairn-comment`
+
+Size XL, or anything that needs Joe: leave `handoff` and `lane:` off, so nothing
+routes it, and mark it "needs Joe" in the summary.
 
 ## Step 5 — finish
 

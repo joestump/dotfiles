@@ -191,6 +191,19 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_outpu
   [ "$(grep -c 'on behalf of' <<<"$agent" || true)" -eq 0 ]
 }
 
+# morning-brief's artifacts are work orders: tagged so Switchboard can route them
+# to a lane, with XL and needs-Joe work kept off every lane.
+@test "lean: morning-brief tags its handoff artifacts for the lanes" {
+  local f="$PROMPTS_DIR/morning-brief.prompt.md.tmpl" tag
+  for tag in '`handoff`' '`size:s|m|l`' '`lane:s|m|l`' '`lane:vision`' '`repo:<owner/name>`' \
+             '`issue:<owner/repo#n>`' '`source:morning-brief/<yyyy-mm-dd>`' '`reply:cairn-comment`'; do
+    grep -qF -- "$tag" "$f" || { echo "morning-brief lost tag $tag"; return 1; }
+  done
+  grep -qF 'leave `handoff` and `lane:` off' "$f"
+  # Creating them needs the cairn MCP, which the lean profile disables by default.
+  grep -q '"cairn"' "$SWEEPS/morning-brief/crush.json.tmpl"
+}
+
 # Budgets are RENDERED bytes, set ~15-25% above each prompt as shipped. These
 # files run ~3.9 bytes per token (the captured 308KB request came to 76,290 vLLM
 # prompt tokens), so pr-sweep at its 9KB ceiling is ~2.3k tokens. With the
