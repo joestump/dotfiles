@@ -234,6 +234,24 @@ setup() {
   grep -qF '`set_webhook_rules` or `add_webhook_rule`' "$f"
 }
 
+@test "base policy makes heartbeat a cadence, and names the duplicate-work cost" {
+  # 27 todos across both pools were claimed and then held with no heartbeat until
+  # the lease reaper returned them to pending - one cohort ~305s, another ~7,220s
+  # (two hours). The old rule said "heartbeat if the work outruns the lease":
+  # once, mid-arrow, as a conditional, against a 300s lease that real work
+  # routinely outruns. A rule stated that way is not one a worker follows during
+  # a long task, so pin the cadence AND the consequence - the failure is silent
+  # from inside the session, which is what makes it worth spelling out.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'Heartbeat on a cadence while you work' "$f"
+  grep -qF 'not "if" the work runs long' "$f"
+  grep -qF '*before* you start anything slow' "$f"
+  grep -qF 'A lapsed lease is not harmless' "$f"
+  grep -qF 'the same work is done twice' "$f"
+  # The old conditional phrasing must not come back.
+  [ "$(grep -cF 'heartbeat` if the work outruns' "$f" || true)" -eq 0 ]
+}
+
 @test "base policy states the real list_todos limit and claim_next" {
   # internal/store/todos.go resets any limit above 200 to the default 50 rather
   # than clamping, so a "limit: 500" call makes a backed-up queue look empty.
