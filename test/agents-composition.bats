@@ -210,6 +210,19 @@ setup() {
   [ "$(grep -c 'joestump.github.io/switchboard' "$f" || true)" -eq 0 ]
 }
 
+@test "base policy fixes a flood with a drop rule, not just a new webhook" {
+  # ADR-0024 routing rules: an owner can drop a flooding event kind before it
+  # becomes a todo, and dry-run the candidate first. That is the fast lever for
+  # the workflow_run floods, and it is also what writes the work_order the lane
+  # workers check — so the two halves are visibly one mechanism.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -qF 'add_webhook_rule` with a `{drop: true}` action' "$f"
+  grep -qF 'first match wins' "$f"
+  grep -qF '`test_webhook_rules` dry-runs' "$f"
+  grep -q 'a routing rule.s action carries it' "$f"
+  grep -qF '`set_webhook_rules` or `add_webhook_rule`' "$f"
+}
+
 @test "base policy states the real list_todos limit and claim_next" {
   # internal/store/todos.go resets any limit above 200 to the default 50 rather
   # than clamping, so a "limit: 500" call makes a backed-up queue look empty.
