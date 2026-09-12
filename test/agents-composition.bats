@@ -218,7 +218,14 @@ setup() {
   local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
   grep -qF 'add_webhook_rule` with a `{drop: true}` action' "$f"
   grep -qF 'first match wins' "$f"
-  grep -qF '`test_webhook_rules` dry-runs' "$f"
+  grep -qF '`test_webhook_rules` runs a candidate' "$f"
+  # Both cautions come from real failures on 09/11: four rules were dead
+  # because they matched a UI sub-type rather than the delivery's event
+  # header, and a rule that matches nothing is indistinguishable from one
+  # that works. And drop records the delivery, so evidence survives.
+  grep -qF 'Dropping is not deleting' "$f"
+  grep -qF 'Score it against real deliveries before you save it' "$f"
+  grep -q 'Match the delivery.s actual event header' "$f"
   grep -q 'a routing rule.s action carries it' "$f"
   grep -qF '`set_webhook_rules` or `add_webhook_rule`' "$f"
 }

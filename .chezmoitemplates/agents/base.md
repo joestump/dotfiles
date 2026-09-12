@@ -552,7 +552,12 @@ Much of the queue is CI/webhook exhaust. Classify before acting:
 - **Informational** — a PR merged, a run succeeded → `complete` with a result noting no action was needed.
 - **Noise** — duplicate `workflow_run` events (they fire on both `requested` and `completed`), upstream-sync failures on `main`, skipped CLA checks → `complete` as noise.
 
-If one event kind is flooding the queue, fix it at the source rather than draining it forever. On a webhook you own, `add_webhook_rule` with a `{drop: true}` action discards that kind before it ever becomes a todo — no repo admin, no cooperation from whatever is sending it. Rules are ordered jq filters and **first match wins**, so put the drop above the rules that route real work, and `test_webhook_rules` dry-runs a candidate against one of the webhook's own stored events and saves nothing — use it before you save. Re-cutting the subscription with `create_webhook`/`rotate_webhook` is the heavier alternative, for when the provider should stop sending at all. Tell Joe what you changed either way.
+If one event kind is flooding the queue, fix it at the source rather than draining it forever. On a webhook you own, `add_webhook_rule` with a `{drop: true}` action stops that kind becoming a todo — no repo admin, no cooperation from whatever is sending it. **Dropping is not deleting**: the delivery is still recorded and still readable with `list_webhook_events`, so you lose the noise and keep the evidence. Rules are ordered jq filters and **first match wins**, so put the drop above the rules that route real work. Two things separate a rule that works from one that only looks like it does:
+
+- **Score it against real deliveries before you save it.** `test_webhook_rules` runs a candidate against the webhook's own stored events and saves nothing. A rule that matches nothing looks exactly like a rule that works, right up until the flood carries on.
+- **Match the delivery's actual event header**, not a sub-type you read off a UI or guessed from a name. That one kills rules silently.
+
+Re-cutting the subscription with `create_webhook`/`rotate_webhook` is the heavier fallback, for when the sender should stop sending at all. Tell Joe what you changed either way.
 
 ### Handing work to another agent — not available yet
 
