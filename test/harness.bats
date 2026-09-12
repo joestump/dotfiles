@@ -376,6 +376,47 @@ assert swb.count(\"--channels\") == 1 and \"switchboard\" in swb, swb
   grep -q '.local/bin:' "$REPO_ROOT/Library/LaunchAgents/rocks.stump.harness.plist.tmpl"
 }
 
+@test "harness: every always-on crush harness has its own session store" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # crush keeps sessions in a PROJECT database, <data dir>/crush.db, and the
+  # data dir defaults to the nearest .crush above the working directory. Every
+  # always-on harness runs in ~/src, so before --data-dir they all wrote to
+  # ~/src/.crush/crush.db (234 MB, 289 sessions) and `harness logs` could
+  # attribute nothing: "N session(s) not shown … nothing identifies whose they
+  # are". CRUSH_GLOBAL_DATA does NOT move the database - it moves config and
+  # projects.json - and the pool shares one env file on purpose, so the
+  # per-table flag is the only lever with per-harness granularity.
+  #
+  # harness's runtrace resolver reads this exact flag out of args
+  # (stump.wtf/harness#332), so the spelling is load-bearing: two argv entries,
+  # absolute, named after the harness, ending in /data.
+  run _render "$HARNESS_TOML"
+  [ "$status" -eq 0 ]
+  printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/harness.toml"
+  run python3 -c "
+import tomllib
+d = tomllib.load(open('$BATS_TEST_TMPDIR/harness.toml', 'rb'))
+seen = {}
+for name, h in d['harness'].items():
+    if h.get('harness') != 'crush' or 'schedule' in h:
+        continue
+    args = h['args']
+    assert '--data-dir' in args, ('no --data-dir', name, args)
+    path = args[args.index('--data-dir') + 1]
+    assert path.startswith('/'), ('not absolute', name, path)
+    assert path.endswith('/data'), ('not a /data dir', name, path)
+    # Named after the harness, so a rename cannot silently point two at one store.
+    assert path.rsplit('/', 2)[-2] == name, ('store not named for harness', name, path)
+    assert path not in seen, ('two harnesses share a store', name, seen.get(path), path)
+    seen[path] = name
+    # Only the bookkeeping moves; the agents still work in the repo tree.
+    assert h['workdir'].endswith('/src'), ('workdir moved', name, h['workdir'])
+assert len(seen) >= 3, ('expected crush-signal plus the pool', seen)
+"
+  [ "$status" -eq 0 ]
+}
+
 @test "harness: env_file repoints CRUSH_GLOBAL_DATA at the model-pin dir" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   run _render "$HARNESS_ENV"
