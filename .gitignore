@@ -13,7 +13,10 @@
 # Agent worktrees. The agent rules mandate worktree isolation for every
 # code-change task, and Claude Code puts them here — so the path must be
 # invisible to git, or every session offers to commit its own checkout.
+# `.worktrees/` is the same thing under a different harness's convention;
+# both must be ignored or the workbench never reads clean.
 .claude/worktrees/
+.worktrees/
 
 # chezmoi local state / OS cruft
 .DS_Store
