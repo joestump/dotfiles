@@ -9,6 +9,27 @@ load test_helper
 
 GIT_TMPL="$REPO_ROOT/dot_gitconfig.tmpl"
 
+# The three addresses, stated LITERALLY here on purpose. Every value assertion
+# below compares against these, NOT against a second render of .gitEmail — a
+# test that renders both sides from the same data proves only that chezmoi is
+# deterministic: change the address to anything well-formed and it stays green.
+# Verified 09/12/2026 by mutation: with the old self-referential form, setting
+# github to wrong@example.invalid passed 22/22.
+#
+# These are ACCOUNT facts, not preferences. A forge attributes a commit by
+# matching the author email against that account's registered addresses, so a
+# wrong-but-plausible value costs every commit its avatar, profile link and
+# contribution credit — permanently, because history is immutable. Confirmed
+# registered: GitHub attributes both joe@joestump.net and the older joe@stu.mp
+# to `joestump`; joestump.net is the one this repo selected (7ff7768).
+#
+# Changing one of these is a deliberate identity change: update .chezmoidata.yaml
+# and this line together, and make sure the new address is registered on that
+# forge FIRST.
+WANT_AGENT="agent@stump.wtf"
+WANT_GITEA="joe@stump.rocks"
+WANT_GITHUB="joe@joestump.net"
+
 # Render the real template (real .chezmoidata.yaml) into a variable. Skips when
 # chezmoi isn't installed.
 _render() {
@@ -74,38 +95,59 @@ _email_for_remote() {
   [ "$(tr ' ' '\n' <<< "$output" | sort -u | wc -l)" -eq 3 ]
 }
 
+@test "git-config: gitEmail holds the exact registered addresses" {
+  # The assertion the rest of the suite leans on. Everything else checks that
+  # the RIGHT address reaches the right repo; this is the only place that says
+  # which addresses are right. Without it the suite is self-referential and a
+  # typo'd or swapped address ships green.
+  local agent gitea github
+  agent="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.agent }}')"
+  gitea="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')"
+  github="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')"
+  # Non-empty first, and named separately: an empty value renders a syntactically
+  # valid `email =` line that git accepts, then silently falls back to
+  # user@hostname — which is exactly how joestump@ie01.stump.rocks reached this
+  # repo's history. A bare equality check would report that as a value mismatch.
+  [ -n "$agent" ]
+  [ -n "$gitea" ]
+  [ -n "$github" ]
+  [ "$agent" = "$WANT_AGENT" ]
+  [ "$gitea" = "$WANT_GITEA" ]
+  [ "$github" = "$WANT_GITHUB" ]
+}
+
 # ────── rendered output: per-forge identity, as REAL GIT resolves it ──────
 
 @test "git-config: human commits to Gitea as the Gitea address" {
   [ "$(_email_for_remote joestump https://gitea.stump.rocks/joestump/dotfiles.git)" \
-    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')" ]
+    = "$WANT_GITEA" ]
 }
 
 @test "git-config: human commits to GitHub as the GitHub address (https remote)" {
   [ "$(_email_for_remote joestump https://github.com/joestump/claude-ops.git)" \
-    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')" ]
+    = "$WANT_GITHUB" ]
 }
 
 @test "git-config: human commits to GitHub as the GitHub address (scp-style ssh remote)" {
   # The case that caught the bad glob: `git@github.com:**` matches NOTHING, so
   # every SSH-remote GitHub repo silently kept the Gitea address.
   [ "$(_email_for_remote joestump git@github.com:joestump/claude-ops.git)" \
-    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')" ]
+    = "$WANT_GITHUB" ]
 }
 
 @test "git-config: human commits to GitHub as the GitHub address (ssh:// remote)" {
   [ "$(_email_for_remote joestump ssh://git@github.com/joestump/claude-ops.git)" \
-    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.github }}')" ]
+    = "$WANT_GITHUB" ]
 }
 
 @test "git-config: a repo with no remote falls back to the Gitea address" {
   [ "$(_email_for_remote joestump "")" \
-    = "$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')" ]
+    = "$WANT_GITEA" ]
 }
 
 @test "git-config: agent uses one address on every forge" {
   local want
-  want="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.agent }}')"
+  want="$WANT_AGENT"
   [ "$(_email_for_remote joestump-agent https://gitea.stump.rocks/joestump/dotfiles.git)" = "$want" ]
   [ "$(_email_for_remote joestump-agent https://github.com/joestump/claude-ops.git)" = "$want" ]
   [ "$(_email_for_remote joestump-agent git@github.com:joestump/claude-ops.git)" = "$want" ]
@@ -134,7 +176,7 @@ _email_for_remote() {
 
 @test "git-config: human user gets the Gitea address as the base identity" {
   local want
-  want="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')"
+  want="$WANT_GITEA"
   [ -n "$want" ]
   run _render_as "joestump"
   [ "$status" -eq 0 ]
@@ -156,7 +198,7 @@ _email_for_remote() {
   # one registered address per forge, whatever the OS login happens to be. Only
   # the NAME follows whoami.
   local want
-  want="$(chezmoi execute-template --source "$REPO_ROOT" '{{ .gitEmail.gitea }}')"
+  want="$WANT_GITEA"
   [ -n "$want" ]
   run _render_as "alice"
   [ "$status" -eq 0 ]
