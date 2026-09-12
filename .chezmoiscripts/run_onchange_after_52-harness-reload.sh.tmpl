@@ -48,6 +48,13 @@
 #   issue prompt: {{ include "dot_config/dotfiles/issue-sweep.prompt.md.tmpl" | sha256sum }}
 #   drop-in brief: {{ include "dot_config/harness/harness.d/morning-brief.toml.tmpl" | sha256sum }}
 #   brief prompt: {{ include "dot_config/dotfiles/morning-brief.prompt.md.tmpl" | sha256sum }}
+#
+# @joestump 09/11/2026 - Also embeds the difficulty lanes armed on this machine
+#   (queue names only). A lane arms when its credentials reach the secrets file,
+#   which changes the rendered harness.toml without touching its template, so
+#   the hash above alone would never re-fire.
+#
+#   armed lanes: {{ includeTemplate "harness/armed-lanes.tmpl" . | trim }}
 set -euo pipefail
 
 # Both identity branches below reload the daemon, so the ui-lib source and the
@@ -104,6 +111,9 @@ fi
 if "$HARNESS_BIN" reload >/dev/null 2>&1; then
   item ok "harness daemon reloaded (scheduled harnesses current)"
   item dim "[server] SSH cockpit changes need a daemon RESTART, not a reload"
+{{- with includeTemplate "harness/armed-lanes.tmpl" . | trim }}
+  item dim "armed lanes ({{ . }}) start on the next daemon RESTART, which loads their credentials"
+{{- end }}
 else
   warn "harness reload failed — the daemon picks the config up on its next restart"
 fi

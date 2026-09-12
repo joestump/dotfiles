@@ -126,6 +126,24 @@ _hb_this_host() {
     navidromeLdapSyncAgentHost = "%s"
     morningBriefAgentHost = "%s"
 ' "$_h" "$_h" "$_h" "$_h" "$_h" "$_h" >"$_cfg"
+  # The difficulty-lane workers render only for an ARMED lane: on
+  # .switchboard.laneHost, for a -agent login, with the lane's credentials in
+  # the secrets file. Derive the expected names through the same partial the
+  # template uses, under the same config, instead of freezing a literal: the
+  # worker set is a knob (same reasoning as the pool below), and a frozen list
+  # fails on the lane host the moment a lane arms.
+  #
+  # @joestump-agent 09/11/2026 - Added with the difficulty lanes; the frozen
+  #   seeded set failed on tars the first time the workers rendered.
+  #
+  # @joestump 09/11/2026 - Derived through armed-lanes.tmpl, now that lanes
+  #   also wait for their credentials. A host-only check expected workers on
+  #   tars before any lane endpoint was vended.
+  _lane_names="$(chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT" <<'TMPL'
+{{ $armed := includeTemplate "harness/armed-lanes.tmpl" . | trim | splitList " " }}{{ range $lane := .switchboard.lanes }}{{ if has $lane.queue $armed }}{{ range $w := $lane.workers }}{{ $w.name }}
+{{ end }}{{ end }}{{ end }}
+TMPL
+)"
   _render_all() {
     chezmoi execute-template --config "$_cfg" --source "$REPO_ROOT"       < "$HARNESS_TOML" > "$_cfgdir/00-main.toml"
     for _f in "$REPO_ROOT"/dot_config/harness/harness.d/*.toml.tmpl; do
@@ -135,7 +153,9 @@ _hb_this_host() {
   }
   run _render_all
   [ "$status" -eq 0 ]
-  run bash -c "python3 - '$_cfgdir' <<'PY'
+  _lane_args=""
+  for _ln in $_lane_names; do _lane_args="$_lane_args '$_ln'"; done
+  run bash -c "python3 - '$_cfgdir'$_lane_args <<'PY'
 import glob, os, sys, tomllib
 cfgdir = sys.argv[1]
 docs = {os.path.basename(p): tomllib.load(open(p, 'rb')) for p in sorted(glob.glob(cfgdir + '/*.toml'))}
@@ -163,11 +183,12 @@ def assert_pool(base):
     assert p == {base} | {f'{base}-{i}' for i in range(2, len(p) + 1)}, sorted(p)
     return p
 pool = assert_pool('crush-switchboard')
-assert names - pool == {'crush-signal',
+lanes = {a for a in sys.argv[2:]}
+assert names - pool == ({'crush-signal',
                  'stumpcloud-sweep-dub',
                  'stumpcloud-sweep-dtw', 'stumpcloud-sweep-pdx',
                  'pr-sweep', 'pr-sweep-github', 'morning-brief',
-                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'}, sorted(names - pool)
+                 'issue-sweep', 'blog-sweep', 'navidrome-ldap-sync'} | lanes), sorted(names - pool)
 assert d['harness']['crush-signal']['harness'] == 'crush'
 # The drop-in directory is wired: without [server].harness_d the daemon never
 # reads harness.d and every scheduled task silently stops existing.
@@ -176,7 +197,7 @@ assert d['server']['harness_d'].endswith('/.config/harness/harness.d'), d['serve
 # scheduled entries carry no enabled key at all (mutually exclusive with
 # schedule); the daemon fires them only on their cron. The interactive ones
 # live in the main doc; a scheduled name may never appear there.
-interactive = {'crush-signal'} | pool
+interactive = {'crush-signal'} | pool | lanes
 assert set(d['harness']) == interactive, sorted(d['harness'])
 for name in interactive:
     assert d['harness'][name]['enabled'] is False, name
@@ -510,8 +531,14 @@ assert len(seen) >= 3, ('expected crush-signal plus the pool', seen)
   #
   # @joestump-agent 08/30/2026 - large moved glm-5.2 -> glm-5.3-flash, so both
   # slots are now the same model.
-  local pin
+  #
+  # @joestump 09/11/2026 - The difficulty-lane workers are exempt: a lane is a
+  # difficulty served by several providers, Hyper included on purpose, and
+  # test/switchboard-lanes.bats pins each of them to its declared model.
+  local pin name
   for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
+    name="$(basename "$(dirname "$pin")")"
+    grep -qE "^ +- name: $name\$" "$REPO_ROOT/.chezmoidata.yaml" && continue
     run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$pin' | python3 -c '
 import json,sys
 m = json.load(sys.stdin)[\"models\"]

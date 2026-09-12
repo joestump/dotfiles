@@ -171,9 +171,38 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_outpu
                 'A turn with no tool call ENDS THE RUN' 'sweep-finish' \
                 'Executed via scheduled [Harness](https://github.com/stump-wtf/harness)' \
                 'git remote -v' 'Assisted-by:' 'Never approve a PR authored by your own identity' \
-                'APPROVED it' 'stumpcloud/stumpcloud' 'keeps its own' 'in anything public' 'job_output'; do
+                'APPROVED it' 'stumpcloud/stumpcloud' 'keeps its own' 'in anything public' 'job_output' \
+                'update-branch'; do
     grep -qF -- "$phrase" <<<"$output" || { echo "RULES.md lost: $phrase"; return 1; }
   done
+}
+
+# kitt's pr-sweep posts with the human's own accounts. The footer says so there,
+# and only there: on the agent login it would misattribute the agent's work.
+@test "lean: the RULES.md footer names the human only on a human login" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  local cfgdir human agent
+  cfgdir="$(mktemp -d)"
+  printf '[data]\n    agentIdentity = "ci"\n' >"$cfgdir/human.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$cfgdir/agent.toml"
+  human="$(chezmoi execute-template --config "$cfgdir/human.toml" --source "$REPO_ROOT" < "$SWEEPS/lib/RULES.md.tmpl")"
+  agent="$(chezmoi execute-template --config "$cfgdir/agent.toml" --source "$REPO_ROOT" < "$SWEEPS/lib/RULES.md.tmpl")"
+  rm -rf "$cfgdir"
+  grep -qF 'in [Crush](https://github.com/charmbracelet/crush) on behalf of `@ci`' <<<"$human"
+  [ "$(grep -c 'on behalf of' <<<"$agent" || true)" -eq 0 ]
+}
+
+# morning-brief's artifacts are work orders: tagged so Switchboard can route them
+# to a lane, with XL and needs-Joe work kept off every lane.
+@test "lean: morning-brief tags its handoff artifacts for the lanes" {
+  local f="$PROMPTS_DIR/morning-brief.prompt.md.tmpl" tag
+  for tag in '`handoff`' '`size:s|m|l`' '`lane:s|m|l`' '`lane:vision`' '`repo:<owner/name>`' \
+             '`issue:<owner/repo#n>`' '`source:morning-brief/<yyyy-mm-dd>`' '`reply:cairn-comment`'; do
+    grep -qF -- "$tag" "$f" || { echo "morning-brief lost tag $tag"; return 1; }
+  done
+  grep -qF 'leave `handoff` and `lane:` off' "$f"
+  # Creating them needs the cairn MCP, which the lean profile disables by default.
+  grep -q '"cairn"' "$SWEEPS/morning-brief/crush.json.tmpl"
 }
 
 # Budgets are RENDERED bytes, set ~15-25% above each prompt as shipped. These

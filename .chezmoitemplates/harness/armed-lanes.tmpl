@@ -1,0 +1,39 @@
+{{- /*
+  Armed Lanes (partial)
+
+  Prints the queues whose lane workers may render on this machine, space
+  separated, or nothing at all. A lane is armed only when all of these hold:
+    - this machine is .switchboard.laneHost, and the login is a -agent one;
+    - the Vault Agent secrets file carries a non-empty <endpointEnv>_URL AND a
+      non-empty <endpointEnv>_API_KEY for that lane.
+
+  Why gate on credentials: a lane worker whose switchboard MCP has no URL or
+  key starts green in `harness list` and drains nothing, the exact failure
+  the 09/11 harness audit found. So a lane renders only after its endpoint is
+  vended and its credentials reach OpenBao. Until then harness.toml is what it
+  was before the lanes existed.
+
+  The check reads the rendered secrets FILE, never the shell env: a scheduled
+  apply has no secret env, and env gating once rendered crush.json empty every
+  six hours (dotfiles#106). This is the same kind of guard as the externals'
+  `stat` on that file. Values stay inside the template engine; only queue
+  names come out.
+
+  Arguments: the template root. .switchboard.laneSecretsFile overrides the
+  secrets file path, for tests only.
+
+  @joestump 09/11/2026 - Added with the difficulty lanes.
+*/ -}}
+{{- $user := .agentIdentity | default .chezmoi.username -}}
+{{- $host := get .switchboard "laneHost" | default "" -}}
+{{- if and $host (eq .chezmoi.hostname $host) (hasSuffix "-agent" $user) -}}
+{{- $file := get .switchboard "laneSecretsFile" | default (joinPath .chezmoi.homeDir ".config/vault/secrets-static.env") -}}
+{{- if stat $file -}}
+{{- $secrets := include $file -}}
+{{- range $lane := .switchboard.lanes -}}
+{{- $url := printf "(?m)^(export )?%s_URL=['\"]?[^'\"\\s]" $lane.endpointEnv -}}
+{{- $key := printf "(?m)^(export )?%s_API_KEY=['\"]?[^'\"\\s]" $lane.endpointEnv -}}
+{{- if and (regexMatch $url $secrets) (regexMatch $key $secrets) }}{{ $lane.queue }} {{ end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}

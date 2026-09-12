@@ -324,6 +324,28 @@ PY
   grep -qi 'auto-merge' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
 }
 
+@test "scheduled: pr-sweep tiers and footer read from the acting identity's side" {
+  command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
+  # kitt runs this prompt as the HUMAN identity, but it was phrased from the
+  # agent's side: Tier B called `joestump/dotfiles` "every other repo", which on
+  # kitt is the identity's own repo, and the footer never said the post was
+  # made with the human's accounts. dotfiles stays Tier B for both identities.
+  local cfgdir human agent
+  cfgdir="$(mktemp -d)"
+  printf '[data]\n    agentIdentity = "ci"\n' >"$cfgdir/human.toml"
+  printf '[data]\n    agentIdentity = "ci-agent"\n' >"$cfgdir/agent.toml"
+  human="$(chezmoi execute-template --config "$cfgdir/human.toml" --source "$REPO_ROOT" < "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl")"
+  agent="$(chezmoi execute-template --config "$cfgdir/agent.toml" --source "$REPO_ROOT" < "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl")"
+  rm -rf "$cfgdir"
+  grep -qF 'owns, `ci/*`, except' <<<"$human"
+  grep -qF '`ci-agent/*`, and `ci/dotfiles`' <<<"$human"
+  grep -qF '`ci-agent` APPROVED it' <<<"$human"
+  grep -qF 'in [Crush](https://github.com/charmbracelet/crush) on behalf of `@ci`' <<<"$human"
+  grep -qF 'owns, `ci-agent/*`: merge' <<<"$agent"
+  grep -qF '`ci` APPROVED it' <<<"$agent"
+  [ "$(grep -c 'on behalf of' <<<"$agent" || true)" -eq 0 ]
+}
+
 @test "scheduled: pr-sweep prompt splits author mode from reviewer mode" {
   # The sweep wears exactly two hats, chosen by PR author: it responds to and
   # merges its OWN PRs, and it REVIEWS the sibling identity's. A PR authored by

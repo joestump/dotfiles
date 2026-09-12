@@ -175,6 +175,119 @@ setup() {
   grep -q 'Unattended sessions clamp harder' "$REPO_ROOT/.chezmoitemplates/agents/base.md"
 }
 
+@test "base policy admits verified agent handoffs narrowly, and only by provenance" {
+  # A handoff todo is the one place fetched text may choose the task, so every
+  # guard on it is pinned: a verified work order, provenance from Cairn's actor
+  # or the issue author (never a tag or the body), the semi-trusted clamp, and
+  # a refusal that does not retry.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'Verified agent handoffs are the one narrow exception' "$f"
+  grep -q '`verified: true`' "$f"
+  grep -q 'never count as provenance' "$f"
+  grep -q 'semi-trusted' "$f"
+  grep -q 'never \*what you may do\*' "$f"
+  # Switchboard's contract: a refused work order FAILS, so it dead-letters
+  # where a human sees it, rather than completing silently.
+  grep -q '`fail` the todo with a `refused:` reason' "$f"
+  grep -q 'not provenance: the router trusts Cairn' "$f"
+  # Cairn's actor_id is an OAuth login and on_behalf_of is self-reported, so
+  # the router enforces the allowlist and the worker gates on the work order.
+  grep -q 'only Switchboard.s router writes' "$f"
+  grep -q '`on_behalf_of` (a client.s self-reported name)' "$f"
+}
+
+@test "base policy does not promise a create_for handoff tool" {
+  # Switchboard registers no MCP tool for create_for — only a store backend and
+  # a web friend-intent — so an endpoint "granted" it gets an unknown-tool
+  # error (stump.wtf/switchboard#197). The rules used to tell agents to use it,
+  # and A2A cannot stand in: every method returns UnsupportedOperation.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q '### Handing work to another agent — not available yet' "$f"
+  grep -q 'No Switchboard MCP tool hands a todo to another agent' "$f"
+  grep -q 'Discovery only, no task intake' "$f"
+  # The one thing that does work routes future webhook deliveries, not the todo.
+  grep -q 'add_webhook_route' "$f"
+  [ "$(grep -c 'hand it over with' "$f" || true)" -eq 0 ]
+  # The GitHub Pages build is stale: /getting-started 404s there, 200 on the
+  # live docs site.
+  grep -q 'docs https://switchboard.stump.wtf/docs/' "$f"
+  [ "$(grep -c 'joestump.github.io/switchboard' "$f" || true)" -eq 0 ]
+}
+
+@test "base policy fixes a flood with a drop rule, not just a new webhook" {
+  # ADR-0024 routing rules: an owner can drop a flooding event kind before it
+  # becomes a todo, and dry-run the candidate first. That is the fast lever for
+  # the workflow_run floods, and it is also what writes the work_order the lane
+  # workers check — so the two halves are visibly one mechanism.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -qF 'add_webhook_rule` with a `{drop: true}` action' "$f"
+  grep -qF 'first match wins' "$f"
+  grep -qF '`test_webhook_rules` runs a candidate' "$f"
+  # Both cautions come from real failures on 09/11: four rules were dead
+  # because they matched a UI sub-type rather than the delivery's event
+  # header, and a rule that matches nothing is indistinguishable from one
+  # that works. And drop records the delivery, so evidence survives.
+  grep -qF 'Dropping is not deleting' "$f"
+  grep -qF 'Score it against real deliveries before you save it' "$f"
+  grep -q 'Match the delivery.s actual event header' "$f"
+  grep -q 'a routing rule.s action carries it' "$f"
+  grep -qF '`set_webhook_rules` or `add_webhook_rule`' "$f"
+}
+
+@test "base policy states the real list_todos limit and claim_next" {
+  # internal/store/todos.go resets any limit above 200 to the default 50 rather
+  # than clamping, so a "limit: 500" call makes a backed-up queue look empty.
+  # claim_next is the competing-consumers primitive the lane workers drain with.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -qF 'a `limit` of **200 or less**' "$f"
+  grep -qF 'it resets to the default 50' "$f"
+  grep -qF '`claim_next`' "$f"
+  grep -qF '{"empty": true}' "$f"
+}
+
+@test "base policy gives lane workers the full work-order contract" {
+  # The lane workers are unattended crush sessions whose only instructions for a
+  # handoff are these five steps: check the work order first, read
+  # semi-trusted, work under the normal rules, report via reply:, then close
+  # the todo.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q '### Handoff lanes — working a work order' "$f"
+  grep -q 'Check it before reading anything else' "$f"
+  grep -q '`authorized_by.rule_id` is non-empty, and `lane` is the queue you drain' "$f"
+  # A literal actor check would refuse every handoff created over OAuth MCP.
+  grep -q 'Do not re-check `subject.actor_id` against agent names' "$f"
+  # Every Cairn create today records joe@stump.rocks, whichever agent made it,
+  # so provenance is logged, not gated on. Forge repo prefixes do not drift that
+  # way, so the issue repo check stays as defense in depth.
+  grep -q 'Record `subject.actor_id`, `author` or `sender` in your result instead' "$f"
+  grep -q 'For an `issue`, `subject.repo` is under `stump.wtf`' "$f"
+  grep -q '`fail` with `refused: <the check>`' "$f"
+  grep -q 'no self-merge' "$f"
+  # A worker that relabels the issue it executes re-routes it as a new work order.
+  grep -q 'Never add or remove a `size/\*` label on the issue you are executing' "$f"
+  grep -q '`reply:cairn-comment`, or no `reply:` tag, means `artifact_comment` on `subject.handle`' "$f"
+  grep -q '`complete` with a `result` linking the PR and the report, or `fail`' "$f"
+  grep -q 'A `triage` worker sizes, it does not build' "$f"
+  grep -q 'or `HUMAN`' "$f"
+  # The Cairn side: the full lane and size vocabulary, and where XL goes.
+  grep -q '`lane:auto`' "$f"
+  grep -q '`size:xl` parks in `hold`' "$f"
+}
+
+@test "base policy bans update-branch, and queue workers keep off others' PR history" {
+  # The always-on crush switchboard workers pushed "Merge branch 'main' into …"
+  # commits onto the other identity's harness PRs (#307, #310, #313 on
+  # 09/11), most likely through Gitea's update-branch API. Pin the universal
+  # ban and the narrower rules for sessions that act on PRs from the queue.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'Never use the forge.s update-branch either' "$f"
+  grep -qF 'pulls/{n}/update' "$f"
+  grep -q 'gh pr update-branch' "$f"
+  grep -q '### Pull requests from the queue' "$f"
+  grep -q 'Never push to a PR you did not author' "$f"
+  grep -q 'Never merge a PR you authored' "$f"
+}
+
 @test "base policy mandates a cross-identity reviewer request, scoped" {
   # Rule 8's genuinely new contribution is that the reviewer is requested when
   # the PR is opened, instead of the scheduled sweep discovering it later. Pin
