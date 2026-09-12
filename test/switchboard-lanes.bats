@@ -144,13 +144,49 @@ for line in sys.stdin:
     name, queue = line.strip().split("|")[:2]
     h = d["harness"][name]
     assert h["harness"] == "crush", name
-    assert h["args"] == ["--yolo", "--channels", "switchboard"], (name, h["args"])
+    # The channel args are what this test owns; the store flag that follows is
+    # asserted in full by "every armed lane worker gets its own session store".
+    # Freezing the whole list here would fail on any future arg without saying
+    # anything useful about the channel wiring.
+    assert h["args"][:3] == ["--yolo", "--channels", "switchboard"], (name, h["args"])
     assert h["env_file"].endswith("/.config/harness/" + name + ".env"), (name, h["env_file"])
     assert h["enabled"] is False and h["restart"] == "on-failure", name
     assert queue in h["description"], (name, h["description"])
     for p in ("default", "full"):
         assert name in d["profile"][p]["harnesses"], (name, p)
 ' "$toml"
+}
+
+@test "lanes: every armed lane worker gets its own session store" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
+  # Same reasoning as crush-signal and the pool: a lane worker also runs in
+  # ~/src, so without --data-dir all seven would share ~/src/.crush/crush.db and
+  # `harness logs` could attribute none of them. The naming assertion is the one
+  # that survives a rename - seven distinct-but-wrong paths would pass a bare
+  # uniqueness check while attributing sessions to the wrong harness.
+  local toml
+  toml="$BATS_TEST_TMPDIR/lanes-armed.toml"
+  # shellcheck disable=SC2046
+  _render_toml ci-agent "$(_q '{{ .chezmoi.hostname }}')" "$(_secrets $(_all_prefixes))" >"$toml"
+  python3 -c "
+import tomllib
+d = tomllib.load(open('$toml', 'rb'))
+seen = {}
+for name, h in d['harness'].items():
+    if not (name.startswith('crush-lane-') or name == 'crush-triage'):
+        continue
+    args = h['args']
+    assert '--data-dir' in args, ('no --data-dir', name, args)
+    p = args[args.index('--data-dir') + 1]
+    assert p.startswith('/'), ('not absolute', name, p)
+    assert p.endswith('/data'), ('not a /data dir', name, p)
+    assert p.rsplit('/', 2)[-2] == name, ('store not named for harness', name, p)
+    assert p not in seen, ('two lanes share a store', name, seen.get(p), p)
+    seen[p] = name
+    # Only the bookkeeping moves; lane workers still work in the repo tree.
+    assert h['workdir'].endswith('/src'), ('workdir moved', name, h['workdir'])
+assert len(seen) == 7, ('expected all seven lane workers', sorted(seen.values()))
+"
 }
 
 @test "lanes: a human login, or any other host, declares no lane worker" {

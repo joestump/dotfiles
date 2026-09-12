@@ -291,7 +291,10 @@ enabled = false
 {{- $laneWorkers = append $laneWorkers $w.name }}
 [harness.{{ $w.name }}]
 harness = "crush"
-args = ["--yolo", "--channels", "switchboard"]
+# Its own session store, like crush-signal and the pool: every lane worker runs
+# in ~/src too, so without --data-dir they would all share ~/src/.crush and
+# `harness logs` could attribute none of them.
+args = ["--yolo", "--channels", "switchboard", "--data-dir", "{{ $.chezmoi.homeDir }}/.local/share/{{ $w.name }}/data"]
 workdir = "{{ $.chezmoi.homeDir }}/src"
 env_file = "{{ $.chezmoi.homeDir }}/.config/harness/{{ $w.name }}.env"
 description = "Crush · {{ $w.label }} · YOLO · Switchboard {{ $lane.queue }}"
