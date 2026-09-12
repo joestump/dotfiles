@@ -192,6 +192,35 @@ setup() {
   grep -q '`on_behalf_of` (a client.s self-reported name)' "$f"
 }
 
+@test "base policy does not promise a create_for handoff tool" {
+  # Switchboard registers no MCP tool for create_for — only a store backend and
+  # a web friend-intent — so an endpoint "granted" it gets an unknown-tool
+  # error (stump.wtf/switchboard#197). The rules used to tell agents to use it,
+  # and A2A cannot stand in: every method returns UnsupportedOperation.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q '### Handing work to another agent — not available yet' "$f"
+  grep -q 'No Switchboard MCP tool hands a todo to another agent' "$f"
+  grep -q 'Discovery only, no task intake' "$f"
+  # The one thing that does work routes future webhook deliveries, not the todo.
+  grep -q 'add_webhook_route' "$f"
+  [ "$(grep -c 'hand it over with' "$f" || true)" -eq 0 ]
+  # The GitHub Pages build is stale: /getting-started 404s there, 200 on the
+  # live docs site.
+  grep -q 'docs https://switchboard.stump.wtf/docs/' "$f"
+  [ "$(grep -c 'joestump.github.io/switchboard' "$f" || true)" -eq 0 ]
+}
+
+@test "base policy states the real list_todos limit and claim_next" {
+  # internal/store/todos.go resets any limit above 200 to the default 50 rather
+  # than clamping, so a "limit: 500" call makes a backed-up queue look empty.
+  # claim_next is the competing-consumers primitive the lane workers drain with.
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -qF 'a `limit` of **200 or less**' "$f"
+  grep -qF 'it resets to the default 50' "$f"
+  grep -qF '`claim_next`' "$f"
+  grep -qF '{"empty": true}' "$f"
+}
+
 @test "base policy gives lane workers the full work-order contract" {
   # The lane workers are unattended crush sessions whose only instructions for a
   # handoff are these five steps: check the work order first, read
