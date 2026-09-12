@@ -196,6 +196,23 @@ setup() {
   grep -q '`on_behalf_of` (a client.s self-reported name)' "$f"
 }
 
+@test "base policy separates authorization from a human's home directory" {
+  # A real authorization to act on a HOST does not scope the blast radius:
+  # deleting under /home/<a person>/ is a different question from "will this
+  # break the service". Written after a stale binary was removed from Joe's
+  # own desktop on an agent's say-so (2026-09-12).
+  local f="$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q '## Whose machine is this? — authorization is not unlimited scope' "$f"
+  grep -q 'is not an authorization to act inside a human' "$f"
+  grep -q 'is this someone.s personal machine' "$f"
+  # The operational half is required too, and is a separate claim.
+  grep -q 'verify by absence' "$f"
+  grep -q 'succeeds silently' "$f"
+  # NOT `! grep -q` — a non-final negated command is exempt from errexit and
+  # cannot fail a bats test (measured 2026-09-12). This form does fail.
+  [ "$(grep -c 'an agent may delete anything on a box it can reach' "$f" || true)" -eq 0 ]
+}
+
 @test "base policy does not promise a create_for handoff tool" {
   # Switchboard registers no MCP tool for create_for — only a store backend and
   # a web friend-intent — so an endpoint "granted" it gets an unknown-tool
