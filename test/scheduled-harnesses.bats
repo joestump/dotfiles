@@ -279,6 +279,35 @@ PY
   done
 }
 
+@test "scheduled: a description says what the job is, never when it runs" {
+  # Joe: "we should NOT use freetext to convey the schedule. It should be a
+  # field." It always was one - `schedule` - but nothing rendered it, so the
+  # cadence got duplicated into prose. stump.wtf/harness#331 makes SCHEDULE and
+  # NEXT real columns of `harness list`/`jobs` and deletes highlightSchedule,
+  # the helper that highlighted a cadence only where it matched the description
+  # verbatim (so rewording silently unhighlighted it). Prose that restates a
+  # field is a second copy that drifts: this keeps descriptions to what the job
+  # IS. Model is covered too - `harness describe` and the TUI dashboard already
+  # show it from config, and the always-on harnesses take theirs from a crush
+  # pin harness never reads, so prose there would be the least reliable copy.
+  local f name desc
+  for f in "$HARNESS_D"/*.toml.tmpl; do
+    name="$(basename "$f" .toml.tmpl)"
+    desc="$(_agent_render "$f" | sed -n 's/^description = "\(.*\)"$/\1/p')"
+    [ -n "$desc" ] || { echo "$name: no description rendered"; return 1; }
+    if grep -qiE '[0-9]{1,2}:[0-9]{2}|\b(gmt|utc)\b|\b(daily|weekly|mondays|fridays|sundays)\b' <<<"$desc"; then
+      echo "$name description carries a schedule, which is a field: $desc"
+      return 1
+    fi
+    if grep -qiE 'qwen|glm|claude|deepseek|opus|sonnet|haiku' <<<"$desc"; then
+      echo "$name description names a model, which is a field: $desc"
+      return 1
+    fi
+    # The schedule still has to BE somewhere - the field it belongs in.
+    _agent_render "$f" | grep -qE '^schedule = ' || { echo "$name lost its schedule field"; return 1; }
+  done
+}
+
 @test "scheduled: pr-sweep prompt keeps the two-tier merge policy + Signal rule" {
   grep -qi 'SQUASH' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
   grep -q 'APPROVED' "$PROMPTS_DIR/pr-sweep.prompt.md.tmpl"
