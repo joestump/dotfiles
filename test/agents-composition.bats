@@ -136,21 +136,25 @@ setup() {
 
 # Overlays are for capability deltas only. A fat overlay means policy leaked in,
 # which is exactly how the old CLAUDE.md/CRUSH.md pair drifted apart.
-@test "base policy mandates auto-merge, split author vs reviewer" {
-  # A green, approved PR must never sit waiting for a button press. WHO may arm
-  # it is the whole rule, because auto-merge is enforced by branch protection,
-  # which knows nothing about the Tier A/B merge policy and several of our repos
-  # require zero approvals. As the AUTHOR the rule stays scoped to repos the
-  # identity owns - dropping that scope is the failure that silently lands agent
-  # work unreviewed and reintroduces the contradiction with identity-agent.md
-  # ("Joe reviews and merges"). As a REVIEWER who has just approved, the gate has
-  # already been satisfied, so arming it anywhere is correct. Pin all three
-  # halves plus the "only after approving" guard.
-  grep -q 'As the PR.s author:'                        "$REPO_ROOT/.chezmoitemplates/agents/base.md"
-  grep -q 'only on a repo the acting identity owns'    "$REPO_ROOT/.chezmoitemplates/agents/base.md"
-  grep -q '\*\*Nowhere else\*\*'                        "$REPO_ROOT/.chezmoitemplates/agents/base.md"
-  grep -q 'As a reviewer, immediately after leaving an APPROVED review'  "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+@test "base policy arms auto-merge as the reviewer only, and only when review is done" {
+  # A green, approved PR should not sit waiting for a button press - but arming
+  # auto-merge early is how work silently disappears, so WHO arms it and WHEN are
+  # both the rule. The author never arms it: branch protection knows nothing about
+  # our merge policy, and several repos require zero approvals, so an author-armed
+  # merge lands agent work unreviewed and contradicts identity-agent.md ("Joe
+  # reviews and merges"). The reviewer arms it only once review is genuinely
+  # finished - not reflexively on clicking approve, because a push that lands
+  # after arming is merged at the ARMED sha and silently dropped (2026-09-12,
+  # switchboard#210). Hence the content-verification clause: every other signal -
+  # the merged flag, the head field, an ancestry check under squash-merge - reads
+  # identically whether the commit landed or vanished. Pin all four halves.
+  grep -q 'armed by the REVIEWER, never the author'    "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q '\*\*Never as the author\.\*\*'               "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'once review is genuinely finished'          "$REPO_ROOT/.chezmoitemplates/agents/base.md"
   grep -q 'never arm auto-merge on a PR you have not approved' "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  grep -q 'verify by CONTENT that your change reached' "$REPO_ROOT/.chezmoitemplates/agents/base.md"
+  # The squash-merge trap specifically: an ancestry check is the wrong instrument.
+  grep -q 'merge-base --is-ancestor'                   "$REPO_ROOT/.chezmoitemplates/agents/base.md"
 }
 
 @test "base policy states Gitea supports auto-merge" {
@@ -470,13 +474,19 @@ setup() {
 }
 
 # gitea.stump.rocks is private; most of these footers land on GitHub. Both
-# identity overlays must say so, and base.md must carry the general rule.
-@test "footer forbids a private Gitea link and names the public harness mirror" {
+# identity overlays must say so, and base.md must carry the general rule. The
+# rule covers references, not just links: a private host inside a command a
+# reader runs is worse than a dead link, because it exits 0 for everyone inside
+# the network and fails only for the audience it was written for.
+@test "footer forbids a private Gitea reference and names the public harness mirror" {
   for out in "$CLAUDE_OUT" "$CRUSH_OUT" "$AGENTS_OUT"; do
     grep -qF "https://github.com/stump-wtf/harness" <<< "$out"
-    grep -qF "Never link Gitea in anything public" <<< "$out"
+    grep -qF "A public artifact references only public forges and artifacts" <<< "$out"
   done
-  grep -qF "can the reader open this?" <<< "$CLAUDE_OUT"
+  grep -qF "can the reader reach this?" <<< "$CLAUDE_OUT"
+  # Commands and citations are the two surfaces that were missing from the rule.
+  grep -qF "Commands a reader will actually run" <<< "$CLAUDE_OUT"
+  grep -qF "Citations inside a publicly distributed artifact" <<< "$CLAUDE_OUT"
 }
 
 @test "footer requires a backticked model linked to OpenRouter" {
