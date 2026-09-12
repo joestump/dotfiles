@@ -146,9 +146,28 @@
 # room to clear INSIDE the budget rather than burning it in half a minute. A
 # failed launch is not free: it starts crush, loads every MCP server, and
 # makes a provider request before it finds out.
+#
+# ITS OWN SESSION STORE. crush keeps sessions in a PROJECT database,
+# <data dir>/crush.db, and the data dir defaults to the nearest .crush walking
+# up from the working directory. Every always-on harness here runs in ~/src, so
+# without --data-dir all three write to ~/src/.crush/crush.db and nothing can
+# say which session belonged to which harness: `harness logs` reported "N
+# session(s) not shown … nothing identifies whose they are".
+#
+# CRUSH_GLOBAL_DATA does NOT fix that — it moves crush's config and
+# projects.json registry, not the session database. --data-dir does, and
+# harness's runtrace resolver reads this exact flag out of args to attribute a
+# store to a harness (stump.wtf/harness#332, internal/runtrace/runtrace.go).
+# So the flag is the declaration: one value, in the config that also decides
+# crush's behaviour, rather than a second key that could disagree with it.
+#
+# workdir stays ~/src — these agents work in the repo tree; only their
+# bookkeeping moves.
+#
+# @joestump 09/12/2026 - Gave each always-on crush harness its own store.
 [harness.crush-signal]
 harness = "crush"
-args = ["--yolo", "--channels", "signal"]
+args = ["--yolo", "--channels", "signal", "--data-dir", "{{ .chezmoi.homeDir }}/.local/share/crush-signal/data"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
 description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
@@ -212,7 +231,10 @@ enabled = false
 {{- $n := add $i 1 }}
 [harness.crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}]
 harness = "crush"
-args = ["--yolo", "--channels", "switchboard"]
+# Its own store PER WORKER. The pool deliberately shares one env file and so
+# one model pin; --data-dir is per-table, which is what keeps two workers out
+# of one crush.db while that single pin stays the only place the model lives.
+args = ["--yolo", "--channels", "switchboard", "--data-dir", "{{ $.chezmoi.homeDir }}/.local/share/crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}/data"]
 workdir = "{{ $.chezmoi.homeDir }}/src"
 env_file = "{{ $.chezmoi.homeDir }}/.config/harness/crush-switchboard.env"
 description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Switchboard channel (webhook todos){{ if gt $workers 1 }} · worker {{ $n }}/{{ $workers }}{{ end }}"
