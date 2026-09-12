@@ -96,8 +96,12 @@ _render_tmpl_darwin() {
   [ "$status" -eq 0 ]
   # The daemon must NOT pin `-a` to a single account, even when SIGNAL_MCP_ACCOUNT
   # is set (the env var is for the signal-mcp client, not the daemon).
-  ! grep -E -- 'signal-cli(\s+\S+)*\s+-a\s' <<<"$output" >/dev/null
-  ! grep -F -- 'signal-cli -a' <<<"$output" >/dev/null
+  # `grep -c` + `|| true` rather than `! grep -q`, deliberately and in both
+  # directions: a NON-final negated command is exempt from errexit and cannot
+  # fail the test at all, and `run` would clobber $output, which the later
+  # assertions in these tests read. Both measured 2026-09-12. Do not 'simplify'.
+  [ "$(grep -cE -- 'signal-cli(\s+\S+)*\s+-a\s' <<<"$output" || true)" -eq 0 ]
+  [ "$(grep -cF -- 'signal-cli -a' <<<"$output" || true)" -eq 0 ]
   # The daemon line still launches signal-cli daemon.
   grep -F -- 'signal-cli daemon' <<<"$output" >/dev/null
 }
@@ -107,8 +111,8 @@ _render_tmpl_darwin() {
   [ "$status" -eq 0 ]
   # No `-a` <string> element in the ProgramArguments array, even with the env
   # var set — the daemon serves all linked accounts.
-  ! grep -F -- '<string>-a</string>' <<<"$output" >/dev/null
-  ! grep -F -- '<string>+15550001111</string>' <<<"$output" >/dev/null
+  [ "$(grep -cF -- '<string>-a</string>' <<<"$output" || true)" -eq 0 ]
+  [ "$(grep -cF -- '<string>+15550001111</string>' <<<"$output" || true)" -eq 0 ]
   # The plist still launches the daemon subcommand.
   grep -F -- '<string>daemon</string>' <<<"$output" >/dev/null
 }
@@ -142,7 +146,7 @@ for flag in ("--account","--operator","--prefix"):
   # them into the render, or one identity's numbers reach every box.
   run _render_tmpl SIGNAL_MCP_ACCOUNT=+15550001111 SIGNAL_MCP_OPERATOR=+15550002222 SIGNAL_MCP_PREFIX=cc -- "$CRUSH_TMPL"
   [ "$status" -eq 0 ]
-  ! grep -E -- '\+[0-9]{8,}' <<<"$output" >/dev/null
+  [ "$(grep -cE -- '\+[0-9]{8,}' <<<"$output" || true)" -eq 0 ]
   ! grep -F -- '"--prefix"' <<<"$output" >/dev/null
 }
 
@@ -190,7 +194,7 @@ assert "env" not in sig, sig.get("env")
   # them as CLI flags would shadow the OpenBao-provisioned values.
   run _render_tmpl -- "$CRUSH_TMPL"
   [ "$status" -eq 0 ]
-  ! grep -F -- '"--trusted-recipient"' <<<"$output" >/dev/null
+  [ "$(grep -cF -- '"--trusted-recipient"' <<<"$output" || true)" -eq 0 ]
   # Even with the env var set, the template must not synthesize flags from it.
   run _render_tmpl SIGNAL_MCP_TRUSTED_RECIPIENTS=+15551234567 -- "$CRUSH_TMPL"
   [ "$status" -eq 0 ]
