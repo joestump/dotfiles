@@ -1,0 +1,21 @@
+# User-Local Binaries on PATH for Every Shell
+#
+# PATH is otherwise composed only in ~/.oh-my-zsh/custom (env.zsh, go.zsh and
+# zz-path.zsh), every one of which loads from `source $ZSH/oh-my-zsh.sh` in
+# .zshrc — and .zshrc is read by INTERACTIVE shells only. That left every
+# `ssh host '<cmd>'` and every non-interactive automation without
+# ~/.local/bin on PATH, so they resolved a tool to a stale ~/go/bin copy or
+# not at all. .zshenv is the one startup file zsh reads for every shell, so
+# the user-local bins are seeded here.
+#
+# This file is deliberately PATH and nothing else. The OpenBao-derived
+# exports in custom/env.zsh MUST NOT move here: .zshenv runs on every shell
+# including every scp and rsync, and sourcing credentials on those is a
+# worse problem than the bug this fixes. `typeset -U` keeps the later
+# custom/* files idempotent, so none of them need to change.
+#
+# @joestump-agent 09/12/2026 - Added so ~/.local/bin is on PATH in
+# non-interactive shells; a 3-week-old ~/go/bin/harness had been answering
+# SSH commands with pre-#328 behaviour.
+typeset -U path PATH
+path=( "$HOME/.local/bin" "$HOME/bin" $path )
