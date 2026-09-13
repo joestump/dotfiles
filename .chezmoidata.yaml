@@ -325,6 +325,26 @@ claude:
   skipWorkflowUsageWarning: false
   # Skip the "bypass permissions" acceptance dialog. Independent of permissionMode.
   skipDangerousModePermissionPrompt: false
+  # Hostnames as `.chezmoi.hostname` sees them (short name, e.g. "kitt").
+  # Each listed box renders a [harness.claude-code] entry that runs Claude Code
+  # with --remote-control: a normal interactive session registered for remote
+  # drive-by, so the phone or claude.ai is a SECOND KEYBOARD on that session —
+  # same working tree, same MCP servers, same ~/.claude.json — rather than a
+  # separate cloud one.
+  #
+  # Deliberately a list and not a bool: this is a per-box posture, and the
+  # session name is derived from the hostname, so two boxes would register two
+  # distinguishable sessions rather than fight over one.
+  #
+  # It runs with --dangerously-skip-permissions (crush's --yolo equivalent), so
+  # only list a box you are willing to have answer without prompting. Empty
+  # removes the harness fleet-wide.
+  #
+  # @joestump-agent 09/13/2026 - Re-added on kitt after 1c95376 retired the
+  # Claude Code harnesses; the ask was for Remote Control to be connected from
+  # kitt again, and always-on this time rather than started by hand.
+  remoteControlHosts:
+    - kitt
 
 # Ghostty host-based tab/window coloring via OSC 11. The zsh hook in
 # dot_oh-my-zsh/custom/ghostty-host-colors.zsh.tmpl reads these mappings and
