@@ -150,7 +150,15 @@ if bad:
 @test "scheduled: no scheduled harness relaunches itself on failure" {
   run _agent_render_all
   [ "$status" -eq 0 ]
-  ! grep -q '^restart = "on-failure"' <<<"$output"
+  # Scoped to the scheduled harnesses: the always-on crush-* harnesses
+  # legitimately carry `restart = "on-failure"`, and an unscoped grep counts
+  # them too (#255). The names mirror the sibling declaration test above.
+  # The window runs from the table header to the next section header, not a
+  # fixed line count: restart is the 10th key in these blocks, so a -A8
+  # window never reaches it and the guard was dead.
+  for name in stumpcloud-sweep-dub stumpcloud-sweep-dtw stumpcloud-sweep-pdx               pr-sweep pr-sweep-github issue-sweep blog-sweep navidrome-ldap-sync               morning-brief; do
+    [ "$(awk -v n="$name" 'index($0, "[harness." n "]") == 1 { p = 1; next } p && /^\[/ { exit } p' <<<"$output" | grep -c '^restart = "on-failure"' || true)" -eq 0 ]
+  done
   # Every scheduled harness states the policy explicitly rather than relying on
   # a default. Note the default would NOT catch a dropped line: `restart` is
   # only "always" when unset for an ordinary harness, and a scheduled one is
