@@ -355,6 +355,60 @@ enabled = false
 # should carry it — see stump.wtf/harness#99 for what happens when the daemon's
 # persisted active profile does not resolve (it silently starts nothing).
 #
+{{- $rcHosts := (.claude.remoteControlHosts | default list) }}
+{{- $wantRC := has .chezmoi.hostname $rcHosts }}
+{{- if $wantRC }}
+{{- /* Claude Code Remote Control — this box, drivable from claude.ai/code and the
+   Claude mobile app.
+
+   `claude rc` is `claude remote-control`, and it is NOT the older
+   `claude --remote-control` session flag. The flag registers ONE interactive
+   session for remote drive-by. The subcommand is a CONTROLLER: it registers
+   the machine and spawns sessions on demand, up to --capacity. That is why
+   "always connected" means running this, and why it belongs in harness rather
+   than being started by hand — a controller that is not running is a box the
+   phone cannot reach at all, not merely a session it cannot resume.
+
+   --spawn worktree, deliberately. The alternatives share a working tree:
+   `same-dir` (the default) runs every on-demand session in ~/src, and this
+   box is worked concurrently by several agents and a human. Two sessions in
+   one checkout is precisely what the house worktree rule exists to prevent —
+   one commits into another's staged work, or switches branches under it.
+   `worktree` gives each spawned session its own.
+
+   --permission-mode comes from .claude.permissionMode rather than being
+   hardcoded. The old harness passed --dangerously-skip-permissions, which the
+   subcommand supersedes with a named mode; wiring it to the existing data key
+   means a box's posture is set in one place instead of two that can disagree.
+
+   --capacity is bounded well below the default 32. Each spawned session is a
+   real Claude Code process with its own MCP servers; 32 of them on a box that
+   also runs the Crush Switchboard pool is a memory problem, not a feature.
+
+   The session-name prefix defaults to the hostname, which is why this presents
+   in the app as the machine rather than as a session.
+
+   @joestump-agent 09/13/2026 - Re-added on kitt as the rc CONTROLLER; 1c95376
+   had retired the older session-flag harness. */}}
+[harness.claude-rc]
+harness = "claude-code"
+args = [
+  "remote-control",
+  "--spawn", "worktree",
+  "--capacity", "4",
+  "--permission-mode", "{{ .claude.permissionMode | default "default" }}",
+]
+workdir = "{{ .chezmoi.homeDir }}/src"
+restart = "always"
+# Wider than the 10s crash window on purpose: a flapping controller should back
+# off rather than burn its restart budget, and give-up stays reachable because
+# the daemon clears the consecutive-failure counter only on a clean exit or a
+# run that lasts HealthyRun.
+restart_delay = 10
+enabled = true
+description = "Claude Code Remote Control · ~/src · spawn=worktree · cap 4"
+{{- end }}
+
 # `full` has the same members as `default` since the Claude Code harnesses were
 # retired. It is kept, not deleted: the daemon persists the active profile in
 # state.json, and a box whose persisted profile vanished would start nothing on
@@ -367,12 +421,12 @@ enabled = false
 #   lane host.
 [profile.default]
 description = "Everyday set — Crush Signal channel + Crush Switchboard pool{{ if $laneWorkers }} + difficulty lanes{{ end }}"
-harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}{{ range $n := $laneWorkers }}, "{{ $n }}"{{ end }}]
+harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}{{ range $n := $laneWorkers }}, "{{ $n }}"{{ end }}{{ if $wantRC }}, "claude-rc"{{ end }}]
 autostart = true
 
 [profile.full]
 description = "All harnesses running — Crush Signal channel + Crush Switchboard pool{{ if $laneWorkers }} + difficulty lanes{{ end }}"
-harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}{{ range $n := $laneWorkers }}, "{{ $n }}"{{ end }}]
+harnesses = ["crush-signal"{{ range $i := until $workers }}{{ $n := add $i 1 }}, "crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}"{{ end }}{{ range $n := $laneWorkers }}, "{{ $n }}"{{ end }}{{ if $wantRC }}, "claude-rc"{{ end }}]
 autostart = false
 
 # Remote access — the SSH cockpit
