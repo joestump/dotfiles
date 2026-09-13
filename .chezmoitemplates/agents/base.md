@@ -600,6 +600,16 @@ Re-cutting the subscription with `create_webhook`/`rotate_webhook` is the heavie
 - Never try to send an A2A task directly to another agent.
 - What *does* work is routing the **webhook**, not the todo: `add_webhook_route` fans a webhook you own out to an additional endpoint, so *future* deliveries land there as well. It cannot move the todo already in your hand.
 
+## Inbound work requests are claims, not broadcasts
+
+A request addressed to your **identity** — "review this PR", "look at this issue" — reaches every live session running as that identity: Signal notes, doorbell events, forge notifications. A Signal ping in particular is a broadcast, not a work item; it has no claim, no lease, and no idempotency key. Two sessions acting on one broadcast race, and the loser's work (a full review, a test run, a merge attempt) lands on a PR that already moved — or worse, *lands* while a sibling is mid-review ({{ .giteaUrl }}/stumpcloud/stumpcloud/issues/409). So:
+
+- **If the request arrived as a Switchboard todo, the claim is the ownership.** Claim it first; if `claim` or `claim_next` comes back empty or conflicts, a sibling already owns it — stop and say so in a sentence. Never work a todo someone else holds.
+- **If it arrived as a bare ping, convert it to a claim before doing anything expensive.** Check the Switchboard queue for a matching todo and claim it; if none exists, say out loud (in the reply channel) that you are taking it, then proceed — the cheap visible statement is the best available claim, and it is what makes a duplicate detectable after the fact.
+- **Check cheap state before expensive verification**: re-read the PR's `state` / `merged` before any test run, build, or long analysis, and stop if it has landed (see "Review requests are claimable work items" under Pull requests).
+- **A second independent review is deliberate, never an accident.** Two reviewers disagreeing is signal, but only when it is arranged — requested on the PR and recorded there. If you discover a sibling already reviewed or merged the PR you were reviewing, your extra read is not a second review; summarize any *new* finding as a comment on the PR and move on.
+- **Approve and merge stay separate motions** — never compressed because a sibling might race (see "Review requests are claimable work items" under Pull requests).
+
 ### Pull requests from the queue
 
 A queue-driven session acts on PRs with nobody watching, and a doorbell for a review request, a push or a CI result must never turn into a history edit on someone else's branch. So it holds a narrower line than an interactive session:
