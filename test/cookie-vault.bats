@@ -72,9 +72,13 @@ _filter_to() {
 @test "filter drops banking, email and unrelated domains" {
   local raw out; raw="$(_mixed_jar)"; out="$BATS_TEST_TMPDIR/out.txt"
   _filter_to "$raw" "$out"
-  ! grep -q 'binance' "$out"
-  ! grep -q 'schwab' "$out"
-  ! grep -q 'proton' "$out"
+  # `grep -c` + `|| true` rather than `! grep -q`, deliberately and in both
+  # directions: a NON-final negated command is exempt from errexit and cannot
+  # fail the test at all, and `run` would clobber $output, which the later
+  # assertions in these tests read. Both measured 2026-09-12. Do not 'simplify'.
+  [ "$(grep -c 'binance' "$out" || true)" -eq 0 ]
+  [ "$(grep -c 'schwab' "$out" || true)" -eq 0 ]
+  [ "$(grep -c 'proton' "$out" || true)" -eq 0 ]
   ! grep -q 'mail\.google\.com' "$out"
 }
 
@@ -93,7 +97,7 @@ _filter_to() {
     printf '.youtube.com\tTRUE\t/\tTRUE\t2000000000\tLOGIN_INFO\tgood\n'
   } > "$raw"
   _filter_to "$raw" "$out"
-  ! grep -q 'EVIL' "$out"
+  [ "$(grep -c 'EVIL' "$out" || true)" -eq 0 ]
   grep -q 'LOGIN_INFO' "$out"
 }
 
@@ -115,8 +119,8 @@ _filter_to() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"cookies="* ]]
   [[ "$output" == *"domains="* ]]
-  ! [[ "$output" == *"MUST-NOT-LEAK"* ]]
-  ! [[ "$output" == *"yt-secret-value"* ]]
+  [ "$(grep -cF -- 'MUST-NOT-LEAK' <<<"$output" || true)" -eq 0 ]
+  [ "$(grep -cF -- 'yt-secret-value' <<<"$output" || true)" -eq 0 ]
   ! [[ "$output" == *"google-secret-value"* ]]
 }
 
