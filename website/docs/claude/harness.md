@@ -134,8 +134,12 @@ that needs Joe) has no worker.
   and `glm-5.3-flash-balanced` are balanced groups — one model name over a Z.ai
   deployment and a Hyper one — so a provider's quota wall costs a retry rather
   than a worker, and the benched upstream is re-probed automatically.
-  `deepseek-v4.1-flash` is the exception: only Hyper serves it, so `lane-vision`
-  is genuinely single-source.
+  `deepseek-v4.1-flash` is the exception: only Hyper serves it, and in the
+  router it is a fallback *target*, not a *source* — so `lane-vision` is
+  genuinely single-source, with nothing behind it. The groups themselves fall
+  back `deepseek-v4.1-flash` → `glm-5` (`bedrock/zai.glm-5`, a third provider),
+  so a Hyper-wide outage costs them a leg and a fallback hop but not the lane;
+  `lane-vision` it takes out entirely.
 - **One host, agent login.** Lanes render only on `.switchboard.laneHost`, and
   only for a `-agent` login. That gives one set of consumers per queue, and
   agent-authored work still gets the human identity's review.

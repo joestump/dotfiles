@@ -93,11 +93,31 @@ _lane_tables() { grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$1" || true; }
     case "$model" in
       Qwen3.8-27B) ;;
       *-balanced) ;;
-      # SINGLE-SOURCE EXEMPTION. Only one upstream serves these, so there is no
-      # sibling to balance against and a group of one would be a lie. They keep
-      # the router's `fallbacks` instead, which drops to a different model.
-      # Adding a model here is a deliberate acceptance of a single point of
-      # failure — check first whether a second provider now serves it.
+      # SINGLE-SOURCE EXEMPTION, AND IT IS EXACTLY THAT. Only one upstream
+      # serves these, so there is no sibling to balance against and a group of
+      # one would be a lie. Nothing catches them on the way down either: in
+      # LiteLLM's router (stumpcloud/ansible#643) deepseek-v4.1-flash is a
+      # fallback TARGET, never a fallback SOURCE —
+      #     fallbacks:
+      #       - glm-5.3-balanced:       ["deepseek-v4.1-flash", "glm-5"]
+      #       - glm-5.3-flash-balanced: ["deepseek-v4.1-flash", "glm-5"]
+      # — and there is no `default_fallbacks`. So the BALANCED groups have two
+      # upstreams plus a two-deep chain behind them, while a lane pinned
+      # straight at deepseek-v4.1-flash has one Hyper deployment and nothing
+      # after it. A model listed here is an UNMITIGATED single point of
+      # failure, not a balanced group reached by another route. Adding one is a
+      # deliberate acceptance of that; check first whether a second provider
+      # now serves it.
+      #
+      # @joestump-agent 09/14/2026 - Rewritten during review of #261. This used
+      # to say the exempt models "keep the router's `fallbacks` instead, which
+      # drops to a different model", which reads the arrow backwards: the
+      # fallbacks entry points AT deepseek, never away from it. Verified
+      # against #643's dub.yaml — glm-5.3{,-flash}-balanced each carry a Z.ai
+      # and a Hyper deployment, deepseek-v4.1-flash carries one (Hyper), and
+      # the chain's second hop glm-5 is bedrock/zai.glm-5, a third provider
+      # independent of both. The groups therefore survive a Hyper-wide outage
+      # on Bedrock; lane-vision does not survive one at all.
       deepseek-v4.1-flash) ;;
       *) echo "$name runs paid model $model outside a balanced group"; return 1 ;;
     esac
