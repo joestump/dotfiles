@@ -72,8 +72,8 @@ launchctl kickstart -k gui/$(id -u)/rocks.stump.harness       # macOS
 
 | Harness | What it is | Autostart |
 | --- | --- | :---: |
-| `crush-signal` | Crush on GLM-5.2 (Z.ai), `--yolo`, driven from the **Signal** channel | no |
-| `crush-switchboard` | Crush on GLM-5.2 (Z.ai), `--yolo`, woken by **Switchboard** webhook doorbells | no |
+| `crush-signal` | Crush on `glm-5.3-balanced` (LiteLLM), `--yolo`, driven from the **Signal** channel | no |
+| `crush-switchboard` | Crush on `glm-5.3-balanced` (LiteLLM), `--yolo`, woken by **Switchboard** webhook doorbells | no |
 | `crush-lane-*`, `crush-triage` | Difficulty-lane workers, one per lane and provider, each draining its lane's Switchboard queue; lane host and agent login only (see below) | no |
 | `stumpcloud-sweep-dub` | Scheduled: StumpCloud health sweep (dub), daily 07:00 GMT | cron |
 | `stumpcloud-sweep-dtw` | Scheduled: StumpCloud health sweep (dtw), daily 07:20 GMT | cron |
@@ -118,9 +118,9 @@ that needs Joe) has no worker.
 | Queue | Workers | Model |
 | --- | --- | --- |
 | `lane-s` | `crush-lane-s` | `litellm/Qwen3.8-27B` (local, ai01) |
-| `lane-m` | `crush-lane-m-zai`, `crush-lane-m-hyper` | `zai/glm-5.3-flash`, `hyper/glm-5.3-flash` |
-| `lane-l` | `crush-lane-l-zai`, `crush-lane-l-hyper` | `zai/glm-5.3`, `hyper/glm-5.3` |
-| `lane-vision` | `crush-lane-vision` | `hyper/deepseek-v4.1-flash` |
+| `lane-m` | `crush-lane-m`, `crush-lane-m-2` | `litellm/glm-5.3-flash-balanced` |
+| `lane-l` | `crush-lane-l`, `crush-lane-l-2` | `litellm/glm-5.3-balanced` |
+| `lane-vision` | `crush-lane-vision` | `litellm/deepseek-v4.1-flash` |
 | `triage` | `crush-triage` | `litellm/Qwen3.8-27B` |
 
 - **The set is data.** `.switchboard.lanes` in `.chezmoidata.yaml` names each
@@ -129,8 +129,17 @@ that needs Joe) has no worker.
   `~/.local/share/<name>/crush.json` carrying its model plus a `switchboard`
   MCP aimed at its lane's endpoint (`$<PREFIX>_URL`, `$<PREFIX>_API_KEY`).
 - **Workers of one lane compete** for that lane's endpoint, so each todo runs
-  once. When Z.ai's weekly cap runs out, the Z.ai worker parks in `failed` and
-  its Hyper twin keeps draining.
+  once. A lane's workers are CAPACITY, not providers: both run the same model.
+- **Failover happens in LiteLLM, not in the worker list.** `glm-5.3-balanced`
+  and `glm-5.3-flash-balanced` are balanced groups — one model name over a Z.ai
+  deployment and a Hyper one — so a provider's quota wall costs a retry rather
+  than a worker, and the benched upstream is re-probed automatically.
+  `deepseek-v4.1-flash` is the exception: only Hyper serves it, and in the
+  router it is a fallback *target*, not a *source* — so `lane-vision` is
+  genuinely single-source, with nothing behind it. The groups themselves fall
+  back `deepseek-v4.1-flash` → `glm-5` (`bedrock/zai.glm-5`, a third provider),
+  so a Hyper-wide outage costs them a leg and a fallback hop but not the lane;
+  `lane-vision` it takes out entirely.
 - **One host, agent login.** Lanes render only on `.switchboard.laneHost`, and
   only for a `-agent` login. That gives one set of consumers per queue, and
   agent-authored work still gets the human identity's review.
@@ -148,8 +157,13 @@ that needs Joe) has no worker.
   the `reply:` tag, then complete or fail the todo.
 - **Hyper is pay-per-token.** Watch its dashboard, not `harness list`.
 
-LiteLLM carries only the local Qwen. Z.ai and Hyper are always crush's native
-providers.
+Every agent model goes through LiteLLM. The paid GLM models are **balanced
+groups** there — `glm-5.3-balanced` and `glm-5.3-flash-balanced` each front a
+Z.ai deployment and a Hyper one under one model name — and the small slot runs
+ai01's free local `Qwen3.8-27B`. Crush's native `zai` and `hyper` providers stay
+configured for interactive use, but no unattended harness pins one: a single
+provider's quota wall is what took the Switchboard pool offline for ~20h on
+2026-09-14.
 
 The scheduled ones are **gated on the login identity and on one designated host
 each** (`.sweeps.*Host` in `.chezmoidata.yaml`); `pr-sweep` and

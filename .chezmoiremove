@@ -97,3 +97,28 @@ sweeps/crushrc
 # without anyone running rm by hand.
 # @joestump 09/11/2026 - Added while retiring the Claude Code harnesses.
 .config/harness/harness.d/pr-sweep.toml.bak-costfreeze
+
+# Per-provider lane workers — retired 2026-09-14 by #261, which made a lane's
+# workers CAPACITY rather than providers: crush-lane-{m,l}-{zai,hyper} became
+# crush-lane-{m,l} and crush-lane-{m,l}-2, all four on LiteLLM's balanced GLM
+# groups. Renaming a source file does not remove what it already rendered, and
+# these two file kinds are NOT gated by the lane arming rule — only the
+# [harness.*] tables in harness.toml are. The .env files and pins render on
+# every machine the moment the source exists, armed or not, so all eight of
+# these are sitting in $HOME right now on boxes that have never run a lane.
+# Left behind they read like live config for workers the daemon no longer
+# declares — the same hazard as the pr-sweep .bak above.
+# The crush.json is listed rather than its directory: a lane dir can also hold
+# <name>/data (crush session history) once a lane is armed and run, and that is
+# never this file's to delete. On a box where the lane never ran the directory
+# is simply left empty.
+# @joestump-agent 09/14/2026 - Added while reviewing #261; verified present and
+# data-free on this Mac (crush.json only, no data/).
+.config/harness/crush-lane-m-zai.env
+.config/harness/crush-lane-m-hyper.env
+.config/harness/crush-lane-l-zai.env
+.config/harness/crush-lane-l-hyper.env
+.local/share/crush-lane-m-zai/crush.json
+.local/share/crush-lane-m-hyper/crush.json
+.local/share/crush-lane-l-zai/crush.json
+.local/share/crush-lane-l-hyper/crush.json

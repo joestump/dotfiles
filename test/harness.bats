@@ -521,20 +521,25 @@ assert len(seen) >= 3, ('expected crush-signal plus the pool', seen)
   done <<<"$output"
 }
 
-@test "harness: every model pin is glm-5.3-flash on zai, and never hyper" {
+@test "harness: every always-on model pin is a balanced group on litellm" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # The GLM models are served by BOTH zai and hyper. Z.ai is quota-metered, so
-  # a busy week degrades to a hard stop; Hyper is pay-per-token and degrades to
-  # a bill. Every always-on crush belongs on zai, not just the first one
-  # written -- the provider assertion is the load-bearing half of this test.
+  # An always-on agent must not depend on ONE provider's quota. The GLM models
+  # are served by both Z.ai and Hyper, and LiteLLM fronts them as a balanced
+  # group (two deployments, one model_name) that fails over per request.
   #
-  # @joestump-agent 08/30/2026 - large moved glm-5.2 -> glm-5.3-flash, so both
-  # slots are now the same model.
+  # This test used to assert the opposite -- zai, never hyper -- reasoning that
+  # Z.ai is quota-metered and "degrades to a hard stop" while Hyper is
+  # pay-per-token and "degrades to a bill". On 2026-09-14 that hard stop
+  # arrived: Z.ai's weekly cap emptied, all four crush-switchboard workers died
+  # at once, and the Switchboard forge queue sat ~20h undrained with a
+  # four-day reset ahead. A hard stop is not the safe failure it was taken for.
   #
-  # @joestump 09/11/2026 - The difficulty-lane workers are exempt: a lane is a
-  # difficulty served by several providers, Hyper included on purpose, and
-  # test/switchboard-lanes.bats pins each of them to its declared model.
+  # The free local Qwen (ai01) is allowed in the small slot: no quota, nothing
+  # to fail over to, and it costs nothing.
+  #
+  # @joestump-agent 09/14/2026 - Reversed to the balanced group, per Joe,
+  # after the outage above.
   local pin name
   for pin in "$REPO_ROOT"/dot_local/share/*/private_crush.json.tmpl; do
     name="$(basename "$(dirname "$pin")")"
@@ -543,29 +548,33 @@ assert len(seen) >= 3, ('expected crush-signal plus the pool', seen)
 import json,sys
 m = json.load(sys.stdin)[\"models\"]
 for slot in (\"large\", \"small\"):
-    assert m[slot][\"provider\"] == \"zai\", (slot, m[slot])
-assert m[\"large\"][\"model\"] == \"glm-5.3-flash\", m[\"large\"]
+    assert m[slot][\"provider\"] == \"litellm\", (slot, m[slot])
+assert m[\"large\"][\"model\"].endswith(\"-balanced\"), m[\"large\"]
+assert m[\"small\"][\"model\"] == \"Qwen3.8-27B\" or m[\"small\"][\"model\"].endswith(\"-balanced\"), m[\"small\"]
 '"
-    [ "$status" -eq 0 ] || fail "bad pin: $pin"
+    # NB: no `fail` helper is loaded here -- calling one exits 127 with a bash
+    # "command not found" in place of the message, which is the one thing this
+    # assertion exists to print. Echo and return instead.
+    [ "$status" -eq 0 ] || { echo "bad pin: $pin"; return 1; }
   done
 }
 
-@test "harness: the model pin is glm-5.3-flash on the zai provider, and never hyper" {
+@test "harness: the signal pin is a balanced group, never a single provider" {
   command -v chezmoi >/dev/null 2>&1 || skip "chezmoi not installed"
   command -v python3 >/dev/null 2>&1 || skip "python3 not installed"
-  # The GLM models are served by BOTH zai and hyper, so the provider must be
-  # pinned too. large moved glm-5.2 -> glm-5.3-flash on 2026-08-30.
+  # Same invariant as the sweep above, asserted on the one pin that drifted
+  # historically (six days on hyper/kimi-k3 at $3.27/M in, $16.33/M out, while
+  # `harness list` claimed GLM-5.2 on Z.ai). Pinning the PROVIDER is what
+  # caught that; pinning it to a balanced group is what survives a quota wall.
   #
-  # The always-on agent belongs on Z.ai specifically: Z.ai is quota-metered, so
-  # a busy week degrades to a hard stop, while Hyper is pay-per-token and
-  # degrades to a bill. Assert NEITHER slot points at hyper — the drift that
-  # motivated this test moved both of them there at once.
+  # @joestump-agent 09/14/2026 - Reversed from "zai, never hyper" per Joe. See
+  # the sweep test above for the 2026-09-14 outage that motivated it.
   run bash -c "chezmoi execute-template --source '$REPO_ROOT' < '$MODEL_PIN' | python3 -c '
 import json,sys
 m = json.load(sys.stdin)[\"models\"]
-assert m[\"large\"] == {\"model\": \"glm-5.3-flash\", \"provider\": \"zai\"}, m[\"large\"]
-assert m[\"small\"][\"provider\"] == \"zai\", m[\"small\"]
-assert all(v[\"provider\"] != \"hyper\" for v in m.values()), m
+assert all(v[\"provider\"] == \"litellm\" for v in m.values()), m
+assert m[\"large\"][\"model\"].endswith(\"-balanced\"), m[\"large\"]
+assert m[\"small\"][\"model\"] in (\"Qwen3.8-27B\",) or m[\"small\"][\"model\"].endswith(\"-balanced\"), m[\"small\"]
 '"
   [ "$status" -eq 0 ]
 }

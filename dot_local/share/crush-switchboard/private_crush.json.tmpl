@@ -22,12 +22,22 @@ has an opinion about it again. czu_reassert_targets in executable_czu-run.zsh
 absorbs the rewrite so the managed render keeps landing.
 
 Same pin as crush-signal — this agent's work (webhook triage, issue and PR
-reads) is the same weight as its Signal work, and zai is quota-metered rather
-than pay-per-token, so a busy week degrades to a hard stop instead of a bill.
-Nothing here should ever point at hyper.
+reads) is the same weight as its Signal work.
 
-  large  glm-5.3-flash  doorbell triage; same tier as small
-  small  glm-5.3-flash  titles and summaries, off the large quota
+  large  glm-5.3-balanced  doorbell triage, via LiteLLM: one model name over a
+                           Z.ai deployment and a Hyper one, failing over per
+                           request so neither provider's quota strands the pool
+  small  Qwen3.8-27B       titles and summaries on ai01's local GPU — free, and
+                           no quota to exhaust
+
+@joestump-agent 09/14/2026 - Was glm-5.3-flash on zai for both slots, with a
+  note here saying "nothing here should ever point at hyper" because zai is
+  quota-metered and "degrades to a hard stop instead of a bill". The hard stop
+  came on 09/14: Z.ai's weekly cap emptied, all four workers in this pool died
+  at once, and the forge queue sat ~20h undrained against a four-day reset. A
+  hard stop that takes every unattended agent offline is not the cheap failure
+  that note assumed. Both slots now go through LiteLLM — large to the balanced
+  group, small to the free local Qwen.
 
 @joestump 08/29/2026 - Added while reviewing #197. The harness landed with
   CRUSH_GLOBAL_DATA repointed but no pin at the far end, so every box except
@@ -48,7 +58,7 @@ Nothing here should ever point at hyper.
 {
   "$schema": "https://charm.land/crush.json",
   "models": {
-    "large": { "model": "glm-5.3-flash", "provider": "zai" },
-    "small": { "model": "glm-5.3-flash", "provider": "zai" }
+    "large": { "model": "glm-5.3-balanced", "provider": "litellm" },
+    "small": { "model": "Qwen3.8-27B", "provider": "litellm" }
   }
 }

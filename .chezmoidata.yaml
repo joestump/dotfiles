@@ -459,11 +459,23 @@ switchboard:
   # Agent from OpenBao like every other secret. Workers of one queue are
   # competing consumers on its endpoint: each claim hands out a different todo.
   #
-  # A lane is a difficulty, not a provider, so a lane can hold workers on more
-  # than one provider. When Z.ai's weekly cap runs out, the Z.ai worker parks
-  # in `failed` and its Hyper twin keeps draining the same queue. LiteLLM
-  # carries the local Qwen only; Z.ai and Hyper are always crush's native
-  # providers.
+  # A lane is a difficulty, not a provider. Every worker reaches its model
+  # through LiteLLM, and the paid GLM models are BALANCED GROUPS there —
+  # glm-5.3-balanced and glm-5.3-flash-balanced each hold a Z.ai deployment and
+  # a Hyper one behind a single model name, so the router fails over per
+  # request and a provider's quota wall costs nothing but a retry.
+  #
+  # Workers within a lane are therefore about CAPACITY, not providers: two
+  # competing consumers on one queue, both on the same balanced group.
+  #
+  # @joestump-agent 09/14/2026 - Was per-provider twins (crush-lane-m-zai +
+  # crush-lane-m-hyper) on crush's native providers, on the theory that a
+  # Z.ai wall would park one worker and leave its twin draining. It does not
+  # work as well as it reads: on 09/14 Z.ai's weekly cap emptied and the
+  # crush-switchboard pool — which had no twin at all — died whole, taking the
+  # forge queue offline for ~20h against a four-day reset. Balancing inside
+  # LiteLLM fails over per request instead of per worker, keeps full capacity,
+  # and re-probes the benched upstream on its own.
   #
   # laneHost is the ONE box that runs the lanes, and only a -agent login
   # renders them. One set of consumers per queue is what makes each handoff
@@ -494,30 +506,30 @@ switchboard:
     - queue: lane-m
       endpointEnv: SWITCHBOARD_LANE_M
       workers:
-        - name: crush-lane-m-zai
-          provider: zai
-          model: glm-5.3-flash
-          label: "Z.ai · GLM-5.3 Flash"
-        - name: crush-lane-m-hyper
-          provider: hyper
-          model: glm-5.3-flash
-          label: "Hyper · GLM-5.3 Flash"
+        - name: crush-lane-m
+          provider: litellm
+          model: glm-5.3-flash-balanced
+          label: "Z.ai + Hyper · GLM-5.3 Flash (balanced)"
+        - name: crush-lane-m-2
+          provider: litellm
+          model: glm-5.3-flash-balanced
+          label: "Z.ai + Hyper · GLM-5.3 Flash (balanced)"
     - queue: lane-l
       endpointEnv: SWITCHBOARD_LANE_L
       workers:
-        - name: crush-lane-l-zai
-          provider: zai
-          model: glm-5.3
-          label: "Z.ai · GLM-5.3"
-        - name: crush-lane-l-hyper
-          provider: hyper
-          model: glm-5.3
-          label: "Hyper · GLM-5.3"
+        - name: crush-lane-l
+          provider: litellm
+          model: glm-5.3-balanced
+          label: "Z.ai + Hyper · GLM-5.3 (balanced)"
+        - name: crush-lane-l-2
+          provider: litellm
+          model: glm-5.3-balanced
+          label: "Z.ai + Hyper · GLM-5.3 (balanced)"
     - queue: lane-vision
       endpointEnv: SWITCHBOARD_LANE_VISION
       workers:
         - name: crush-lane-vision
-          provider: hyper
+          provider: litellm
           model: deepseek-v4.1-flash
           label: "Hyper · DeepSeek V4.1 Flash (vision)"
     - queue: triage

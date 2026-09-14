@@ -17,13 +17,23 @@ lasts until the next czu, and a permanent change is an edit HERE.
 
 Same trap harness.toml was pulled out of; see its header for the other half.
 
-PROVIDER CHOICE. Z.ai is quota-metered (hourly/weekly/monthly), not
+PROVIDER CHOICE. Both slots go through LiteLLM. large names the BALANCED
+group glm-5.3-balanced — one model name over a Z.ai deployment and a Hyper
+one — so the router fails over per request and neither provider's quota can
+strand this agent. small runs ai01's local Qwen, which is free and has no
+quota at all.
+
+@joestump-agent 09/14/2026 - This used to read "Z.ai is quota-metered, not
 pay-per-token, so a busy week degrades to a hard stop rather than to a bill.
 That is the property this always-on agent wants. Hyper stays the metered
-overflow and nothing here should point at it.
+overflow and nothing here should point at it." On 09/14 the hard stop arrived
+and it was not the property we wanted: Z.ai's weekly cap emptied, every
+always-on worker on tars and kitt died together, and the Switchboard forge
+queue went ~20h undrained with the reset four days out. Balanced, a wall costs
+a retry instead of an outage.
 
-  large  glm-5.3-flash  Signal work; same tier as small, one quota to watch
-  small  glm-5.3-flash  titles and summaries, which fire on every exchange —
+  large  glm-5.3-balanced  Signal work, failing over across Z.ai and Hyper
+  small  Qwen3.8-27B    titles and summaries, which fire on every exchange —
                         the cheapest way to keep those off the large quota.
                         Replaces glm-4.7-flashx, two generations stale.
 
@@ -45,7 +55,7 @@ overflow and nothing here should point at it.
 {
   "$schema": "https://charm.land/crush.json",
   "models": {
-    "large": { "model": "glm-5.3-flash", "provider": "zai" },
-    "small": { "model": "glm-5.3-flash", "provider": "zai" }
+    "large": { "model": "glm-5.3-balanced", "provider": "litellm" },
+    "small": { "model": "Qwen3.8-27B", "provider": "litellm" }
   }
 }

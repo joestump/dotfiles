@@ -277,7 +277,11 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_outpu
     model="$(sed -n 's/^model = "\(.*\)"$/\1/p' <<<"$tbl")"
     case "$model" in
       litellm/Qwen3.8-27B) slug="qwen/qwen3.8-27b" ;;
-      zai/glm-5.3) slug="z-ai/glm-5.3" ;;
+      # A balanced group serves ONE model from either upstream, so the footer
+      # names that model. Which provider answered a given request is a router
+      # decision the agent cannot see, and is not what the footer is for.
+      litellm/glm-5.3-balanced) slug="z-ai/glm-5.3" ;;
+      litellm/glm-5.3-flash-balanced) slug="z-ai/glm-5.3-flash" ;;
       *) echo "$job: no OpenRouter slug mapped for $model — add it here"; return 1 ;;
     esac
     grep '^prompt = ' <<<"$tbl" | grep -qF "https://openrouter.ai/$slug" \
@@ -287,14 +291,37 @@ for t in (\"bash\", \"view\", \"grep\", \"glob\", \"ls\", \"write\", \"job_outpu
   [ "$output" -eq 0 ] || { echo "a sweep prompt, ref or RULES.md still names Claude Code or claude-opus"; false; }
 }
 
-# Z.ai's plan terms forbid proxying: it is reached only through crush's native
-# zai provider. A sweep pinned to a GLM model through litellm would breach that.
-@test "lean: Z.ai is only ever reached directly, never through LiteLLM" {
+# Every harness model goes through LiteLLM
+#
+# One gateway for every agent model: the balanced GLM groups get per-request
+# failover across Z.ai and Hyper, the free local Qwen costs nothing, and spend
+# and latency land on one set of Prometheus series instead of being guessed at
+# per provider.
+#
+# THE TRADE, stated out loud. Sweeps used to pin crush's NATIVE zai provider
+# for a fail-closed spend cap: Z.ai is subscription-metered, so a runaway cron
+# job exhausted a quota rather than generating a bill. A balanced group fails
+# over to Hyper, which is pay-per-token, so that cap is gone. Joe took that
+# trade knowingly on 2026-09-14, against a Z.ai quota exhaustion that had just
+# stranded every always-on worker for ~20h. If a sweep ever bills badly, this
+# is the comment that explains how.
+#
+# @joestump-agent 09/14/2026 - Replaced "Z.ai is only ever reached directly,
+# never through LiteLLM", whose stated reason (Z.ai's plan terms forbid
+# proxying) was not true: LiteLLM lists Z.AI as a supported upstream and passes
+# keys through untouched, and the terms restrict commercially repackaging or
+# reselling the tier, not internal routing.
+@test "lean: every sweep model goes through the litellm gateway" {
   local job tbl
   for job in $JOBS; do
     tbl="$(_table "$job")"
-    [ "$(grep -ciE '^model = "litellm/[^"]*glm' <<<"$tbl" || true)" -eq 0 ] \
-      || { echo "$job routes a GLM model through litellm"; return 1; }
+    while read -r line; do
+      [ -n "$line" ] || continue
+      case "$line" in
+        *'"litellm/'*) ;;
+        *) echo "$job pins a model outside litellm: $line"; return 1 ;;
+      esac
+    done < <(grep -E '^model = ' <<<"$tbl" || true)
   done
 }
 

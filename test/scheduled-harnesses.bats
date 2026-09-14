@@ -104,6 +104,19 @@ _agent_render_all() {
 # gone, a hard cap is a FEATURE: Z.ai refuses and stops, where Hyper auto-tops-up
 # and bills on. So the guard is no longer "never zai" -- it is "a zai pin must be
 # accompanied by the restart policy that makes a refusal harmless".
+#
+# @joestump-agent 09/14/2026 - Broadened the pin pattern from `zai/` to include
+# `litellm/glm-`, while reviewing #261. That PR moved the last `zai/`-pinned
+# sweep (navidrome-ldap-sync) to `litellm/glm-5.3-balanced`, which left this
+# guard matching NOTHING in the repo -- verified by planting the defect: with
+# the balanced pin, deleting `restart = "no"` from navidrome-ldap-sync passed
+# this test, and only went red once the old `zai/` pin was restored. The cap
+# itself did not go anywhere: the balanced group holds a Z.ai deployment, so a
+# scheduled sweep on it still dies at stream-open when the weekly cap empties.
+# What changed is only the spelling of the pin, and a guard that reads the
+# spelling instead of the reachable provider is decoration. Any model name a
+# LiteLLM GLM group fronts can land on Z.ai; `litellm/Qwen3.8-27B` is local and
+# uncapped, so it is deliberately not matched.
 @test "scheduled: any Z.ai-pinned sweep cannot relaunch itself into the cap" {
   run _agent_render_all
   [ "$status" -eq 0 ]
@@ -122,7 +135,9 @@ for blk in re.split(r"^\[harness\.", text, flags=re.M)[1:]:
     name, _, body = blk.partition("]")
     body = re.split(r"^\[", body, flags=re.M)[0]
     scheduled = re.search(r"^schedule = ", body, re.M)
-    zai       = re.search(r"^model = \"zai/", body, re.M)
+    # Anything that can be SERVED by Z.ai, however it is spelled: the native
+    # zai provider in crush, or a LiteLLM GLM group holding a Z.ai deployment.
+    zai       = re.search(r"^model = \"(zai/|litellm/glm-)", body, re.M)
     onfail    = re.search(r"^restart = \"on-failure\"", body, re.M)
     norestart = re.search(r"^restart = \"no\"", body, re.M)
     # An always-on harness may legitimately restart on failure; a SCHEDULED one
