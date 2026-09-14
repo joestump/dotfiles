@@ -82,7 +82,12 @@ _lane_tables() { grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$1" || true; }
   # repackaging or reselling the tier, not internal routing. Confirmed with
   # Joe before reversing it. The old shape had already been "reverted" once,
   # which is what a wrong invariant does to the work that contradicts it.
+  #
+  # @joestump-agent 09/14/2026 - Added the emptiness guard below while reviewing
+  # #261. A `while read` over no workers is a loop that never runs, so with
+  # `workers: []` in the data this test passed green while asserting nothing.
   local name queue provider model env
+  [ -n "$(_workers)" ] || { echo "no lane workers declared"; return 1; }
   while IFS='|' read -r name queue provider model env; do
     [ "$provider" = "litellm" ] || { echo "$name uses provider $provider; lanes route through litellm"; return 1; }
     case "$model" in
@@ -115,6 +120,44 @@ _lane_tables() { grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$1" || true; }
     name="$(basename "$dir")"
     [[ "$declared" == *" $name "* ]] || { echo "orphan lane pin: $name"; return 1; }
   done
+}
+
+# Retiring a worker is a RENAME plus a removal
+#
+# A lane worker owns two files that are NOT gated by the arming rule -- only the
+# [harness.*] tables are. `~/.config/harness/<name>.env` and
+# `~/.local/share/<name>/crush.json` render on every machine the moment their
+# source exists, armed or not. Deleting the source stops chezmoi managing them
+# and leaves both behind, so a rename ships stale files that read like live
+# config for a worker the daemon no longer declares.
+#
+# The <name>/data dir is deliberately NOT listed in .chezmoiremove: it holds
+# crush session history once a lane has actually run, and that is never this
+# repo's to delete.
+#
+# @joestump-agent 09/14/2026 - Added while reviewing #261, which renamed the
+# per-provider twins. Both files were verified present in $HOME on a Mac that
+# has never armed a lane, which is what makes the arming rule irrelevant here.
+@test "lanes: a retired worker's env file and pin are listed in .chezmoiremove" {
+  local retired name
+  for retired in crush-lane-m-zai crush-lane-m-hyper crush-lane-l-zai crush-lane-l-hyper; do
+    [ ! -f "$REPO_ROOT/dot_config/harness/$retired.env.tmpl" ] \
+      || { echo "$retired still has a source env file"; return 1; }
+    grep -qx ".config/harness/$retired.env" "$REPO_ROOT/.chezmoiremove" \
+      || { echo "$retired.env is not listed in .chezmoiremove"; return 1; }
+    grep -qx ".local/share/$retired/crush.json" "$REPO_ROOT/.chezmoiremove" \
+      || { echo "$retired pin is not listed in .chezmoiremove"; return 1; }
+    grep -qx ".local/share/$retired" "$REPO_ROOT/.chezmoiremove" \
+      && { echo "$retired: .chezmoiremove lists the DIR, which can hold session history"; return 1; }
+  done
+  # And nothing currently declared may be listed for removal.
+  while IFS='|' read -r name _; do
+    # Anchored: crush-lane-m is a prefix of crush-lane-m-zai, and an unanchored
+    # match reads a RETIRED worker's entry as the live worker's.
+    grep -qE "^\.(config/harness/$name\.env|local/share/$name/)\$" "$REPO_ROOT/.chezmoiremove" \
+      && { echo "$name is declared AND listed in .chezmoiremove"; return 1; }
+  done < <(_workers)
+  return 0
 }
 
 @test "lanes: each pin runs its worker's model on its own lane's endpoint" {

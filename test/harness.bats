@@ -552,7 +552,10 @@ for slot in (\"large\", \"small\"):
 assert m[\"large\"][\"model\"].endswith(\"-balanced\"), m[\"large\"]
 assert m[\"small\"][\"model\"] == \"Qwen3.8-27B\" or m[\"small\"][\"model\"].endswith(\"-balanced\"), m[\"small\"]
 '"
-    [ "$status" -eq 0 ] || fail "bad pin: $pin"
+    # NB: no `fail` helper is loaded here -- calling one exits 127 with a bash
+    # "command not found" in place of the message, which is the one thing this
+    # assertion exists to print. Echo and return instead.
+    [ "$status" -eq 0 ] || { echo "bad pin: $pin"; return 1; }
   done
 }
 
