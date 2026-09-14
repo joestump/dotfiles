@@ -63,15 +63,38 @@ _lane_tables() { grep -cE '^\[harness\.crush-(lane-|triage)' <<<"$1" || true; }
   [ -n "$(_q '{{ .switchboard.laneHost }}')" ]
 }
 
-@test "lanes: LiteLLM carries only the local Qwen; Z.ai and Hyper stay native" {
-  # Z.ai's plan terms forbid proxying it, and LiteLLM's lane aliases were
-  # reverted, so litellm means ai01's Qwen and nothing else.
+@test "lanes: paid GLM runs on a balanced group, never one provider" {
+  # Every lane worker reaches its model through LiteLLM, and any PAID model
+  # must name a balanced group — two deployments on different upstreams, so one
+  # provider's quota wall fails over instead of stranding the lane.
+  #
+  # This is the invariant that was missing on 2026-09-14: the crush-switchboard
+  # pool was pinned to a single provider, Z.ai's weekly cap emptied, and all
+  # four workers died at once with the forge queue ~20h undrained.
+  #
+  # The free local Qwen is exempt: it has no quota to exhaust and nothing to
+  # fail over to.
+  #
+  # @joestump-agent 09/14/2026 - Replaced "LiteLLM carries only the local Qwen;
+  # Z.ai and Hyper stay native". That test asserted Z.ai's plan terms forbid
+  # proxying it, which is not true — LiteLLM lists Z.AI as a supported upstream
+  # and passes keys through untouched; the terms restrict commercially
+  # repackaging or reselling the tier, not internal routing. Confirmed with
+  # Joe before reversing it. The old shape had already been "reverted" once,
+  # which is what a wrong invariant does to the work that contradicts it.
   local name queue provider model env
   while IFS='|' read -r name queue provider model env; do
-    case "$provider" in
-      litellm) [ "$model" = "Qwen3.8-27B" ] || { echo "$name routes $model through litellm"; return 1; } ;;
-      zai|hyper) ;;
-      *) echo "$name: unexpected provider $provider"; return 1 ;;
+    [ "$provider" = "litellm" ] || { echo "$name uses provider $provider; lanes route through litellm"; return 1; }
+    case "$model" in
+      Qwen3.8-27B) ;;
+      *-balanced) ;;
+      # SINGLE-SOURCE EXEMPTION. Only one upstream serves these, so there is no
+      # sibling to balance against and a group of one would be a lie. They keep
+      # the router's `fallbacks` instead, which drops to a different model.
+      # Adding a model here is a deliberate acceptance of a single point of
+      # failure — check first whether a second provider now serves it.
+      deepseek-v4.1-flash) ;;
+      *) echo "$name runs paid model $model outside a balanced group"; return 1 ;;
     esac
   done < <(_workers)
 }
@@ -232,9 +255,9 @@ assert len(seen) == 7, ('expected all seven lane workers', sorted(seen.values())
   run _render_toml ci-agent "$this" "$(_secrets SWITCHBOARD_LANE_M)"
   [ "$status" -eq 0 ]
   [ "$(_lane_tables "$output")" -eq 2 ]
-  grep -qE '^\[harness\.crush-lane-m-zai\]' <<<"$output"
-  grep -qE '^\[harness\.crush-lane-m-hyper\]' <<<"$output"
-  grep -qE '^harnesses = .*"crush-lane-m-hyper"' <<<"$output"
+  grep -qE '^\[harness\.crush-lane-m\]' <<<"$output"
+  grep -qE '^\[harness\.crush-lane-m-2\]' <<<"$output"
+  grep -qE '^harnesses = .*"crush-lane-m-2"' <<<"$output"
   [ "$(grep -cE '^harnesses = .*"crush-(lane-s|lane-l|lane-vision|triage)"' <<<"$output" || true)" -eq 0 ]
 }
 

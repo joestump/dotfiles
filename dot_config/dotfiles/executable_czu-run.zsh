@@ -166,10 +166,10 @@ czu_reassert_out="$(czu_reassert_targets "$CZU_PROD" \
   "$HOME/.local/share/crush-signal/crush.json" \
   "$HOME/.local/share/crush-switchboard/crush.json" \
   "$HOME/.local/share/crush-lane-s/crush.json" \
-  "$HOME/.local/share/crush-lane-m-zai/crush.json" \
-  "$HOME/.local/share/crush-lane-m-hyper/crush.json" \
-  "$HOME/.local/share/crush-lane-l-zai/crush.json" \
-  "$HOME/.local/share/crush-lane-l-hyper/crush.json" \
+  "$HOME/.local/share/crush-lane-m/crush.json" \
+  "$HOME/.local/share/crush-lane-m-2/crush.json" \
+  "$HOME/.local/share/crush-lane-l/crush.json" \
+  "$HOME/.local/share/crush-lane-l-2/crush.json" \
   "$HOME/.local/share/crush-lane-vision/crush.json" \
   "$HOME/.local/share/crush-triage/crush.json" \
   "$HOME/.gitconfig")"

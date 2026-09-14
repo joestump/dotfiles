@@ -90,12 +90,13 @@
 #   them stopped and dropped by the reload script — Manager.Reload stops any
 #   running harness that is no longer declared.
 
-# Crush driven from Signal, on Z.ai's GLM-5.3 Flash, with permission prompts off.
+# Crush driven from Signal, on the balanced GLM group via LiteLLM, with
+# permission prompts off.
 #
 # MODEL PINNING. Crush has no --model flag; the model comes from config, and the
 # last config file wins (GlobalConfig → GlobalConfigData → project configs).
 # CRUSH_GLOBAL_DATA, set in the env_file below, repoints GlobalConfigData at
-# ~/.local/share/crush-signal/crush.json, which pins glm-5.3-flash on the zai provider
+# ~/.local/share/crush-signal/crush.json, which pins glm-5.3-balanced on litellm
 # for THIS harness only. The `crush` you run interactively keeps its own model —
 # the shared ~/.config/crush/crush.json still pins nothing, by design.
 #
@@ -136,13 +137,15 @@
 #     whoever did that. Worse, per the note above, a clean exit clears the
 #     consecutive-failure counter — so "always" turns an exit-0 loop into the
 #     one loop the daemon's give-up rule can never break.
-#   * Z.ai is quota-metered. When the quota goes, every launch fails at
-#     stream-open; "on-failure" then walks the 6-attempt budget and parks in
-#     `failed`, visible in `harness doctor` and spending nothing further.
+#   * A provider wall still ends the session. The balanced GLM group fails
+#     over per request, so one upstream's quota no longer strands the agent —
+#     but if BOTH upstreams are down, every launch fails at stream-open;
+#     "on-failure" then walks the 6-attempt budget and parks in `failed`,
+#     visible in `harness doctor` and spending nothing further.
 #
 # restart_delay = 30, up from 5. The budget is 6 attempts either way, so a
 # longer delay buys no extra launches — it spreads them over minutes instead
-# of seconds, which gives a transient blip (a Z.ai 5xx, a Signal reconnect)
+# of seconds, which gives a transient blip (a LiteLLM 5xx, a Signal reconnect)
 # room to clear INSIDE the budget rather than burning it in half a minute. A
 # failed launch is not free: it starts crush, loads every MCP server, and
 # makes a provider request before it finds out.
@@ -170,7 +173,7 @@ harness = "crush"
 args = ["--yolo", "--channels", "signal", "--data-dir", "{{ .chezmoi.homeDir }}/.local/share/crush-signal/data"]
 workdir = "{{ .chezmoi.homeDir }}/src"
 env_file = "{{ .chezmoi.homeDir }}/.config/harness/crush-signal.env"
-description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
+description = "Crush · GLM-5.3 (balanced) · YOLO · Signal channel ({{ hasSuffix "-agent" (.agentIdentity | default .chezmoi.username) | ternary "no prefix" "cc prefix" }})"
 restart = "on-failure"
 restart_delay = 30
 enabled = false
@@ -190,7 +193,7 @@ enabled = false
 #
 # Same model-pinning and restart economics as crush-signal — see that block's
 # comments. CRUSH_GLOBAL_DATA in the env file repoints this harness at its own
-# ~/.local/share/crush-switchboard/crush.json (glm-5.2 / glm-5.3-flash on zai),
+# ~/.local/share/crush-switchboard/crush.json (glm-5.3-balanced on litellm),
 # which is chezmoi-managed and czu-reasserted exactly like crush-signal's — the
 # model an unattended agent runs is declared config, and an unpinned harness
 # silently takes crush's first-enabled-provider fallback while `harness list`
@@ -237,7 +240,7 @@ harness = "crush"
 args = ["--yolo", "--channels", "switchboard", "--data-dir", "{{ $.chezmoi.homeDir }}/.local/share/crush-switchboard{{ if gt $n 1 }}-{{ $n }}{{ end }}/data"]
 workdir = "{{ $.chezmoi.homeDir }}/src"
 env_file = "{{ $.chezmoi.homeDir }}/.config/harness/crush-switchboard.env"
-description = "Crush · GLM-5.3 Flash (Z.ai) · YOLO · Switchboard channel (webhook todos){{ if gt $workers 1 }} · worker {{ $n }}/{{ $workers }}{{ end }}"
+description = "Crush · GLM-5.3 (balanced) · YOLO · Switchboard channel (webhook todos){{ if gt $workers 1 }} · worker {{ $n }}/{{ $workers }}{{ end }}"
 restart = "on-failure"
 restart_delay = 30
 enabled = false
