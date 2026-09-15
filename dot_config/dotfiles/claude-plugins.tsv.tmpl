@@ -17,7 +17,11 @@ stump-wtf/claude-plugin-cairn                  cairn@claude-plugin-cairn
 # EMPTY (never synced), so the plugin only exists on Gitea. Public repo, so
 # `claude plugin marketplace add <url>` clones it fine.
 https://gitea.stump.rocks/stump.wtf/claude-plugin-harness.git  harness@claude-plugin-harness
-# StumpCloud's canonical agent-skill marketplace (public repo, so the URL form
-# works). Supersedes the arr-triage / stumpcloud-deploy / proxmox-manage /
-# stumpcloud-zfs skills in claude-personal.
-https://gitea.stump.rocks/stumpcloud/skills.git  stumpcloud@stumpcloud-skills
+# The single agent-skills repo (coding, operating, review families) that
+# stumpcloud/skills migrated into on 2026-09-15. Public repo, so the URL form
+# works; Gitea rather than the stump-wtf GitHub mirror because that mirror is
+# not wired yet (no push-mirror credential, stumpcloud/stumpcloud#298).
+# Supersedes the arr-triage / stumpcloud-deploy / proxmox-manage /
+# stumpcloud-zfs skills in claude-personal. The retired stumpcloud@stumpcloud-skills
+# plugin is uninstalled by run_onchange_after_31-retire-claude-plugins.
+https://gitea.stump.rocks/stump.wtf/skills.git  stump-wtf@stump-wtf-skills

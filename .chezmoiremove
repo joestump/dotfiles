@@ -122,3 +122,13 @@ sweeps/crushrc
 .local/share/crush-lane-m-hyper/crush.json
 .local/share/crush-lane-l-zai/crush.json
 .local/share/crush-lane-l-hyper/crush.json
+
+# The Crush skills clone of stumpcloud/skills, replaced by skills-ext/
+# stump-wtf-skills when the repo migrated (2026-09-15). It is a throwaway
+# external checkout (public repo, no local state, re-cloned by chezmoi if the
+# entry ever came back), not a data directory. It must actually go: Crush
+# deduplicates skill names by keeping the LAST path in lowercase sort order, and
+# "skills-ext/stumpcloud-skills" sorts after "skills-ext/stump-wtf-skills", so a
+# leftover clone would silently win with the stale copy of every skill.
+# @joestump 09/15/2026 - Added with the stump.wtf/skills pointer move.
+.config/crush/skills-ext/stumpcloud-skills

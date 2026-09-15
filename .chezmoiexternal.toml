@@ -201,17 +201,20 @@
     refreshPeriod = "24h"
 [".config/crush/skills-ext/claude-plugin-harness".pull]
     args = ["--ff-only", "--quiet"]
-# StumpCloud's canonical agent-skill marketplace (gitea.stump.rocks/stumpcloud/
-# skills) — fleet, deploy, triage, secrets, CI, storage, media, backups, Proxmox,
-# and skill-authoring skills. PUBLIC repo, no credential guard needed. These are
+# The single agent-skills repo (gitea.stump.rocks/stump.wtf/skills): coding,
+# operating and review families; stumpcloud/skills migrated into it on
+# 2026-09-15 and is archived. PUBLIC repo, no credential guard needed. These are
 # the maintained replacements for the ad-hoc copies that used to live in the
 # claude-personal marketplace (arr-triage, stumpcloud-deploy, proxmox-manage,
-# stumpcloud-zfs) — see disabled_skills in crush.json.
-[".config/crush/skills-ext/stumpcloud-skills"]
+# stumpcloud-zfs) — see disabled_skills in crush.json. A NEW path rather than a
+# URL change on the old one: chezmoi never re-points an existing clone, and two
+# clones carrying the same skill names would resolve by path sort order — the
+# stale one wins. The old clone is retired through .chezmoiremove.
+[".config/crush/skills-ext/stump-wtf-skills"]
     type = "git-repo"
-    url = "https://gitea.stump.rocks/stumpcloud/skills.git"
+    url = "https://gitea.stump.rocks/stump.wtf/skills.git"
     refreshPeriod = "24h"
-[".config/crush/skills-ext/stumpcloud-skills".pull]
+[".config/crush/skills-ext/stump-wtf-skills".pull]
     args = ["--ff-only", "--quiet"]
 
 # ---------- Signal MCP server (Linux only) ----------

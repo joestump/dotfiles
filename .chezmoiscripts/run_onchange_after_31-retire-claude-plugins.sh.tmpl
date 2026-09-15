@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Retire Claude Code Plugins That Left claude-plugins.tsv
+#
+# run_after_31-install-claude-plugins keeps every plugin in the tsv installed
+# and current, but it never uninstalls one that is removed from the list, so a
+# retired marketplace lingers on every machine forever and its skills show up
+# beside their replacements (Claude Code namespaces them <plugin>:<skill>, so
+# nothing collides and nothing warns). This script is the other half: each
+# name@marketplace in RETIRED is uninstalled, its marketplace registration
+# removed, and its install sentinel dropped so the installer never resurrects
+# it from a stale fingerprint.
+#
+# run_onchange_: it re-fires whenever the RETIRED list changes and is
+# idempotent, so adding a name later is enough. Every command is best-effort;
+# a box without `claude` on PATH just logs and moves on.
+#
+# @joestump 09/15/2026 - Added for stumpcloud@stumpcloud-skills, superseded by
+#   stump-wtf@stump-wtf-skills when stumpcloud/skills migrated into
+#   stump.wtf/skills.
+set -u
+
+RETIRED="stumpcloud@stumpcloud-skills"
+STATE="$HOME/.config/dotfiles/.claude-plugin-state"
+
+. "$HOME/.config/dotfiles/ui-lib.sh" 2>/dev/null || {
+  heading() { printf '\n== %s ==\n' "$*"; }
+  item() { shift; echo "    - $*"; }
+  step() { shift; [ "${1:-}" = "--" ] && shift; "$@"; }
+  say()  { echo "  $*"; }; warn() { echo "  WARN: $*" >&2; }
+}
+
+command -v claude >/dev/null 2>&1 || { say "claude not on PATH; nothing to retire"; exit 0; }
+
+heading "🧹 Retired Claude plugins"
+installed="$(claude plugin list 2>/dev/null | grep -oE '[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+' || true)"
+for plugin in $RETIRED; do
+  mp="${plugin##*@}"
+  pname="${plugin%@*}"
+  if grep -qxF "$plugin" <<<"$installed"; then
+    step "uninstall $plugin" -- claude plugin uninstall "$plugin" </dev/null || warn "uninstall $plugin failed"
+  else
+    item dim "$plugin not installed"
+  fi
+  claude plugin marketplace remove "$mp" </dev/null >/dev/null 2>&1 || true
+  # Same guard as the installer: never let an empty component widen an rm -rf.
+  if [ -n "$pname" ] && [ -n "$mp" ]; then
+    rm -rf "$HOME/.claude/plugins/cache/$mp/$pname" 2>/dev/null || true
+  fi
+  rm -f "$STATE/${plugin//[^A-Za-z0-9_.@-]/_}" 2>/dev/null || true
+done
