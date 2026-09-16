@@ -138,14 +138,12 @@ V="$REPO_ROOT/dot_config/private_vault"
   grep -q 'perms       = "0600"' "$V/agent.hcl.tmpl"
 }
 
-@test "MCP aws entry points boto at the rendered INI with the read-only profile" {
-  grep -q 'AWS_SHARED_CREDENTIALS_FILE' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
-  grep -q 'AWS_PROFILE' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
-  grep -q 'agent-readonly' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+@test "the retired aws MCP entry is gone from mcp-servers.json" {
+  run jq -e '.aws' "$REPO_ROOT/dot_config/dotfiles/mcp-servers.json"
+  [ "$status" -ne 0 ]
 }
 
-@test "crush.json.tmpl aws entry points boto at the rendered INI with the read-only profile" {
-  grep -q 'AWS_SHARED_CREDENTIALS_FILE' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
-  grep -q 'AWS_PROFILE' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
-  grep -q 'agent-readonly' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
+@test "the retired aws MCP entry is gone from crush.json.tmpl" {
+  run grep -cE '"aws":' "$REPO_ROOT/dot_config/crush/crush.json.tmpl"
+  [ "$output" = "0" ]
 }
