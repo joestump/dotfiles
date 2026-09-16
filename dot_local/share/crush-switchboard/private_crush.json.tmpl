@@ -54,11 +54,26 @@ reads) is the same weight as its Signal work.
   file via CRUSH_GLOBAL_DATA. The description strings are corrected in
   harness.toml.tmpl so the listing stops asserting a pin that does not live
   there.
+
+@joestump 09/16/2026 - Added the capability manifest. This pin used to carry
+only the two model slots, so the whole crush-switchboard pool attached all eleven MCP servers in
+the global crush.json. Measured on tars against litellm/Qwen3.8-27B, that is
+36,007 prompt tokens of tool schemas in an 81,309-token starting prompt. The
+pool's whole recorded history is ~1,500 tool calls, and switchboard, gitea,
+signal and cairn account for every MCP call in it but four: one outline fetch
+and three aws-knowledge lookups. aws, chrome-devtools, filesystem, memory and
+sequential-thinking were called zero times and cost 10,978 tokens a session
+between them. harness/worker-lean.tmpl switches every unkept server off BY
+NAME, which is the only thing that works: a pin merges OVER the global config,
+so a server merely left out of the list stays enabled.
+
+CRUSH.md STAYS. The sweeps swap it for an 8 KB RULES.md and save another
+20,811 tokens. This worker does not: it takes arbitrary work over a channel,
+including forge writes and merges, and CRUSH.md is the policy that bounds
+them. That trade is worth re-opening only behind a real CRUSH.md split.
 */ -}}
-{
-  "$schema": "https://charm.land/crush.json",
-  "models": {
-    "large": { "model": "glm-5.3-balanced", "provider": "litellm" },
-    "small": { "model": "Qwen3.8-27B", "provider": "litellm" }
-  }
-}
+{{ template "harness/worker-lean.tmpl" (dict
+     "model" "glm-5.3-balanced"
+     "provider" "litellm"
+     "small" (dict "model" "Qwen3.8-27B" "provider" "litellm")
+     "mcp" (list "switchboard" "gitea" "signal" "cairn")) }}

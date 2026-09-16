@@ -495,9 +495,22 @@ switchboard:
   # @joestump 09/11/2026 - Added. The per-provider lane shape builds on the
   #   09/09 lanes draft.
   laneHost: "tars"
+  # Each lane also declares the MCP servers its workers keep. A pin merges OVER
+  # the global crush.json, so a server is only gone when the pin switches it off
+  # by name — .chezmoitemplates/harness/worker-lean.tmpl does that for every
+  # server NOT listed here. Measured on tars, the eleven global servers cost a
+  # worker 36,007 prompt tokens at session start; these four cost about 20,000
+  # of that and are the only ones the pool's recorded history ever called.
+  #
+  # @joestump 09/16/2026 - Added the per-lane MCP manifests.
   lanes:
     - queue: lane-s
       endpointEnv: SWITCHBOARD_LANE_S
+      mcp:
+        - switchboard
+        - gitea
+        - cairn
+        - signal
       workers:
         - name: crush-lane-s
           provider: litellm
@@ -505,6 +518,11 @@ switchboard:
           label: "ai01 · Qwen3.8-27B (local)"
     - queue: lane-m
       endpointEnv: SWITCHBOARD_LANE_M
+      mcp:
+        - switchboard
+        - gitea
+        - cairn
+        - signal
       workers:
         - name: crush-lane-m
           provider: litellm
@@ -516,6 +534,11 @@ switchboard:
           label: "Z.ai + Hyper · GLM-5.3 Flash (balanced)"
     - queue: lane-l
       endpointEnv: SWITCHBOARD_LANE_L
+      mcp:
+        - switchboard
+        - gitea
+        - cairn
+        - signal
       workers:
         - name: crush-lane-l
           provider: litellm
@@ -527,6 +550,12 @@ switchboard:
           label: "Z.ai + Hyper · GLM-5.3 (balanced)"
     - queue: lane-vision
       endpointEnv: SWITCHBOARD_LANE_VISION
+      mcp:
+        - switchboard
+        - gitea
+        - cairn
+        - signal
+        - chrome-devtools
       workers:
         - name: crush-lane-vision
           provider: litellm
@@ -534,6 +563,11 @@ switchboard:
           label: "Hyper · DeepSeek V4.1 Flash (vision)"
     - queue: triage
       endpointEnv: SWITCHBOARD_TRIAGE
+      mcp:
+        - switchboard
+        - gitea
+        - cairn
+        - signal
       workers:
         - name: crush-triage
           provider: litellm
