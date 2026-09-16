@@ -25,7 +25,7 @@
   @joestump 09/11/2026 - Review: job_output and job_kill back on, and
     attribution trailers switched off (see the notes on each below).
 */ -}}
-{{- $servers := list "aws" "aws-knowledge" "cairn" "chrome-devtools" "filesystem" "gitea" "memory" "msgbrowse" "outline" "sequential-thinking" "signal" "switchboard" -}}
+{{- $servers := list "aws-knowledge" "cairn" "chrome-devtools" "filesystem" "gitea" "memory" "msgbrowse" "outline" "sequential-thinking" "signal" "switchboard" -}}
 {{- $mcp := dict -}}
 {{- range $s := $servers -}}
 {{- if not (has $s $.mcp) }}{{ $_ := set $mcp $s (dict "disabled" true) }}{{ end -}}
