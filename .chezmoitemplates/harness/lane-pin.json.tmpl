@@ -3,12 +3,13 @@
 
   Rendered into every ~/.local/share/<lane worker>/crush.json, the
   CRUSH_GLOBAL_DATA config of one difficulty-lane worker. It merges OVER the
-  global ~/.config/crush/crush.json, and it carries two things the global
-  config cannot: the worker's model, and its lane's switchboard MCP. The
-  global entry attaches to the crush-switchboard pool's endpoint; a lane
-  worker must attach to its own lane's endpoint instead, or it would drain
-  the pool's queue. The url and key stay $VAR references that crush expands
-  at runtime from the Vault Agent env, so nothing secret is committed.
+  global ~/.config/crush/crush.json, and it carries three things the global
+  config cannot: the worker's model, its lane's switchboard MCP, and the list
+  of global MCP servers this lane switches OFF. The global switchboard entry
+  attaches to the crush-switchboard pool's endpoint; a lane worker must attach
+  to its own lane's endpoint instead, or it would drain the pool's queue. The
+  url and key stay $VAR references that crush expands at runtime from the
+  Vault Agent env, so nothing secret is committed.
 
   Same MANAGED + private_ + czu-reassert rules as the crush-signal pin: see
   dot_local/share/crush-signal/private_crush.json.tmpl.
@@ -18,6 +19,14 @@
     .data  the template root
 
   @joestump 09/11/2026 - Added with the difficulty lanes.
+
+  @joestump 09/16/2026 - The disables moved in behind
+    harness/worker-lean.tmpl. Until then a lane pin named only its model and
+    its endpoint, so every lane worker inherited all eleven global servers —
+    36,007 prompt tokens of tool schemas, measured on tars, before the worker
+    read its first todo. The kept set is per-lane data (.switchboard.lanes
+    mcp), not a constant here, because lane-vision keeps chrome-devtools and
+    no other lane does.
 */ -}}
 {{- $found := dict -}}
 {{- range $lane := .data.switchboard.lanes -}}
@@ -26,7 +35,12 @@
 {{- end -}}
 {{- end -}}
 {{- if not (hasKey $found "worker") }}{{ fail (printf "lane worker %q is not declared in .switchboard.lanes" .name) }}{{ end -}}
-{{- $pin := dict "model" $found.worker.model "provider" $found.worker.provider -}}
+{{- if not (hasKey $found.lane "mcp") }}{{ fail (printf "lane %q declares no mcp manifest in .switchboard.lanes" $found.lane.queue) }}{{ end -}}
+{{- if not (has "switchboard" $found.lane.mcp) }}{{ fail (printf "lane %q drops switchboard, so its workers could not claim a todo" $found.lane.queue) }}{{ end -}}
 {{- $env := $found.lane.endpointEnv -}}
 {{- $switchboard := dict "type" "http" "url" (printf "$%s_URL" $env) "headers" (dict "Authorization" (printf "Bearer $%s_API_KEY" $env)) "timeout" 120 "disabled" false -}}
-{{ dict "$schema" "https://charm.land/crush.json" "models" (dict "large" $pin "small" $pin) "mcp" (dict "switchboard" $switchboard) | toPrettyJson }}
+{{ template "harness/worker-lean.tmpl" (dict
+     "model" $found.worker.model
+     "provider" $found.worker.provider
+     "mcp" $found.lane.mcp
+     "extra" (dict "switchboard" $switchboard)) }}

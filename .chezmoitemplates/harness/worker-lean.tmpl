@@ -1,0 +1,50 @@
+{{- /*
+  Worker Capability Manifest (partial)
+
+  Renders the whole CRUSH_GLOBAL_DATA pin for a Crush worker — the pool
+  workers, the difficulty lanes, and triage — from a model and a list of the
+  MCP servers that worker actually calls.
+
+  A pin merges OVER the global ~/.config/crush/crush.json, so a server is only
+  gone when the pin switches it off BY NAME. Leaving it out of the list keeps
+  the global entry, and the global entry is enabled. That is not hypothetical:
+  before this partial, every pin named only its model (and, on a lane, its own
+  switchboard endpoint), so every worker started with all eleven global
+  servers attached. Measured on tars against litellm/Qwen3.8-27B, a pool
+  worker's first turn carried 81,309 prompt tokens, 36,007 of them MCP tool
+  schemas — and the pool's own history shows it never once called five of
+  those servers.
+
+  This is the worker half of what .chezmoitemplates/sweeps/crush.json.tmpl
+  does for the scheduled sweeps. It deliberately does NOT touch
+  global_context_paths or disabled_tools: a sweep runs one bounded errand from
+  a prompt file, while these workers take arbitrary work over a channel, keep
+  CRUSH.md as their policy, and have on record used the tools a sweep can
+  safely drop.
+
+  $servers must name every MCP server in dot_config/crush/crush.json.tmpl, or
+  a new server silently rides into every worker; test/lean-workers.bats checks
+  that, the same way test/lean-sweeps.bats checks the sweep half.
+
+  Arguments, as a dict:
+    .model     the model id, for both the large and small slots
+    .provider  the provider that model is reached through
+    .small     optional, a dict overriding the small slot entirely
+    .mcp       the MCP servers this worker keeps
+    .extra     optional, server name -> definition, merged in after the
+               disables (a lane's own switchboard endpoint)
+
+  @joestump 09/16/2026 - Added with the worker capability manifests.
+*/ -}}
+{{- $servers := list "aws" "aws-knowledge" "cairn" "chrome-devtools" "filesystem" "gitea" "memory" "msgbrowse" "outline" "sequential-thinking" "signal" "switchboard" -}}
+{{- range $s := .mcp -}}
+{{- if not (has $s $servers) }}{{ fail (printf "worker keeps MCP server %q, which is not in the global crush.json" $s) }}{{ end -}}
+{{- end -}}
+{{- $mcp := dict -}}
+{{- range $s := $servers -}}
+{{- if not (has $s $.mcp) }}{{ $_ := set $mcp $s (dict "disabled" true) }}{{ end -}}
+{{- end -}}
+{{- range $name, $def := (dig "extra" (dict) .) }}{{ $_ := set $mcp $name $def }}{{ end -}}
+{{- $large := dict "model" .model "provider" .provider -}}
+{{- $small := dig "small" $large . -}}
+{{ dict "$schema" "https://charm.land/crush.json" "models" (dict "large" $large "small" $small) "mcp" $mcp | toPrettyJson }}

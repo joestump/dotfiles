@@ -51,11 +51,26 @@ a retry instead of an outage.
   file via CRUSH_GLOBAL_DATA. The description strings are corrected in
   harness.toml.tmpl so the listing stops asserting a pin that does not live
   there.
+
+@joestump 09/16/2026 - Added the capability manifest. This pin used to carry
+only the two model slots, so crush-signal attached all eleven MCP servers in
+the global crush.json. Measured on tars against litellm/Qwen3.8-27B, that is
+36,007 prompt tokens of tool schemas in an 81,309-token starting prompt — and
+across this worker's whole recorded history it called exactly two of those
+servers, signal and gitea, doing everything else through bash. The kept set
+below adds switchboard and cairn, which this worker does not use today but
+which the pool it shares an identity with does, so the three pool pins stay
+one manifest. harness/worker-lean.tmpl switches the rest off BY NAME, which is
+the only thing that works: a pin merges OVER the global config, so a server
+merely left out of the list stays enabled.
+
+CRUSH.md STAYS. The sweeps swap it for an 8 KB RULES.md and save another
+20,811 tokens. This worker does not: it takes arbitrary work over a channel,
+including forge writes and merges, and CRUSH.md is the policy that bounds
+them. That trade is worth re-opening only behind a real CRUSH.md split.
 */ -}}
-{
-  "$schema": "https://charm.land/crush.json",
-  "models": {
-    "large": { "model": "glm-5.3-balanced", "provider": "litellm" },
-    "small": { "model": "Qwen3.8-27B", "provider": "litellm" }
-  }
-}
+{{ template "harness/worker-lean.tmpl" (dict
+     "model" "glm-5.3-balanced"
+     "provider" "litellm"
+     "small" (dict "model" "Qwen3.8-27B" "provider" "litellm")
+     "mcp" (list "switchboard" "gitea" "signal" "cairn")) }}
