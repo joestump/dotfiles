@@ -138,10 +138,20 @@
 #     consecutive-failure counter — so "always" turns an exit-0 loop into the
 #     one loop the daemon's give-up rule can never break.
 #   * A provider wall still ends the session. The balanced GLM group fails
-#     over per request, so one upstream's quota no longer strands the agent —
-#     but if BOTH upstreams are down, every launch fails at stream-open;
-#     "on-failure" then walks the 6-attempt budget and parks in `failed`,
-#     visible in `harness doctor` and spending nothing further.
+#     over per request, so one upstream's quota no longer strands the agent,
+#     and since 09/16 the chain ends on a budgeted Bedrock tier and then on the
+#     free local Qwen — so "both upstreams down" degrades the ANSWER rather
+#     than ending the session. What is left for "on-failure" to catch is a
+#     launch that fails before any of that helps: a bad config, a dead MCP
+#     server, LiteLLM itself unreachable. It then walks the 6-attempt budget
+#     and parks in `failed`, visible in `harness doctor` and spending nothing
+#     further.
+#
+#     Do not read the floor as making this harness unkillable. It removes the
+#     provider-wall class of silence, not every class: on 2026-09-15 the
+#     process stayed `running` with zero restarts and answered nothing for
+#     sixteen hours, because the SESSION died on a model error while the
+#     supervisor had nothing to restart. `harness list` cannot see that.
 #
 # restart_delay = 30, up from 5. The budget is 6 attempts either way, so a
 # longer delay buys no extra launches — it spreads them over minutes instead

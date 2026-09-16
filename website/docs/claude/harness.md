@@ -137,9 +137,19 @@ that needs Joe) has no worker.
   `deepseek-v4.1-flash` is the exception: only Hyper serves it, and in the
   router it is a fallback *target*, not a *source* — so `lane-vision` is
   genuinely single-source, with nothing behind it. The groups themselves fall
-  back `deepseek-v4.1-flash` → `glm-5` (`bedrock/zai.glm-5`, a third provider),
-  so a Hyper-wide outage costs them a leg and a fallback hop but not the lane;
+  back `deepseek-v4.1-flash` → `glm-5-backstop` → `Qwen3.8-27B`, so a
+  Hyper-wide outage costs them a leg and a fallback hop but not the lane;
   `lane-vision` it takes out entirely.
+- **The chain ends somewhere nothing can take away.** `glm-5-backstop` is
+  `bedrock/zai.glm-5` on a third account, carrying a LiteLLM `max_budget` so a
+  long outage degrades to a small bounded bill rather than an open-ended one.
+  Under it sits ai01's free local `Qwen3.8-27B`, because every tier above it can
+  be emptied by *accounting* rather than by an outage — a weekly subscription
+  cap, a prepaid balance, or that budget. On 2026-09-15 the first two emptied
+  within the same hour and the Signal agent answered nothing for sixteen hours
+  behind a healthy process and a green `harness list`. The floor is a real
+  downgrade in capability; that is the trade, because a weaker answer beats
+  silence from an agent a human is waiting on.
 - **One host, agent login.** Lanes render only on `.switchboard.laneHost`, and
   only for a `-agent` login. That gives one set of consumers per queue, and
   agent-authored work still gets the human identity's review.
